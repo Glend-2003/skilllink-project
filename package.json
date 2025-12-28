@@ -1,0 +1,8 @@
+{
+  "name": "skilllink-project",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ]
+}
