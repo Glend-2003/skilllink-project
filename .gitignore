@@ -1,0 +1,19 @@
+# Ignorar dependencias (Lo más importante)
+node_modules/
+**/node_modules/
+
+# Ignorar compilados
+dist/
+**/dist/
+
+# Ignorar archivos de entorno (seguridad)
+.env
+**/.env
+
+# Ignorar logs
+npm-debug.log*
+yarn-debug.log*
+
+# Ignorar archivos de sistema
+.DS_Store
+Thumbs.db
