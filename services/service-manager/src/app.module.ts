@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-// 1. IMPORTANTE: Traemos el módulo de categorías
+
 import { CategoriesModule } from './modules/categories/categories.module';
+import { ProvidersModule } from './modules/providers/providers.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
     }),
 
     CategoriesModule,
+    ProvidersModule,
   ],
   controllers: [],
   providers: [],
