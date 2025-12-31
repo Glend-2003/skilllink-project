@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -21,17 +23,32 @@ export class ProvidersService {
 
   async create(createProviderDto: CreateProviderDto) {
     const existing = await this.providerRepository.findOne({
-      where: { userId: createProviderDto.userId },
+      where: {
+        userId: createProviderDto.userId,
+      },
     });
 
     if (existing) {
       throw new ConflictException(
-        `El usuario ID ${createProviderDto.userId} ya es proveedor.`,
+        `El usuario ID ${createProviderDto.userId} ya posee un perfil de proveedor.`,
       );
     }
 
-    const provider = this.providerRepository.create(createProviderDto);
-    return await this.providerRepository.save(provider);
+    try {
+      const provider = this.providerRepository.create(createProviderDto);
+      return await this.providerRepository.save(provider);
+    } catch (error: any) {
+      const dbError = error as { errno: number; code: string };
+      if (dbError.errno === 1452 || dbError.code === 'ER_NO_REFERENCED_ROW_2') {
+        throw new BadRequestException(
+          `Error de integridad: El userId ${createProviderDto.userId} no existe en la base de datos de usuarios.`,
+        );
+      }
+
+      throw new InternalServerErrorException(
+        'Error inesperado al crear el proveedor.',
+      );
+    }
   }
 
   async findAll() {
@@ -43,7 +60,7 @@ export class ProvidersService {
       where: { providerId: id },
     });
     if (!provider)
-      throw new NotFoundException(`Proveedor #${id} no encontrado`);
+      throw new NotFoundException(`Proveedor con ID ${id} no encontrado`);
     return provider;
   }
 
@@ -62,7 +79,7 @@ export class ProvidersService {
       ...updateProviderDto,
     });
     if (!provider)
-      throw new NotFoundException(`Proveedor #${id} no encontrado`);
+      throw new NotFoundException(`Proveedor con ID ${id} no encontrado`);
     return await this.providerRepository.save(provider);
   }
 
@@ -72,19 +89,24 @@ export class ProvidersService {
   }
 
   // Private Internal Methods
-
   // Verify Provider
   async verifyProvider(id: number) {
     const provider = await this.findOne(id);
-    provider.isVerified = true;
-    provider.verificationDate = new Date(); // exact timestamp
+    provider.isVerified = !provider.isVerified;
+    provider.verificationDate = provider.isVerified ? new Date() : null;
     return await this.providerRepository.save(provider);
   }
 
   // give or remove trust badge
   async toggleTrustBadge(id: number) {
-    const provider = await this.findOne(id);
-    provider.trustBadge = !provider.trustBadge; // invert current state
+    const provider = await this.providerRepository.preload({
+      providerId: id,
+    });
+
+    if (!provider)
+      throw new NotFoundException(`Proveedor con ID ${id} no encontrado`);
+
+    provider.trustBadge = !provider.trustBadge;
     return await this.providerRepository.save(provider);
   }
 }
