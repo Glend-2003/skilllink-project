@@ -5,6 +5,9 @@ import {
   UseGuards,
   Request,
   Get,
+  Patch,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UserProfileService } from './user-profile.service';
@@ -42,5 +45,31 @@ export class UserProfileController {
   async getProfile(@Request() req: RequestWithUser) {
     const userId = Number(req.user.userId);
     return this.userProfileService.findOne(userId);
+  }
+
+  @Get(':userId')
+  async findOne(@Param('userId') userId: string) {
+    // <--- SACA EL ID DE LA URL
+    return this.userProfileService.findOne(+userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('profile')
+  async updateProfile(
+    @Request() req: RequestWithUser,
+    @Body() updateDto: CreateUserProfileDto,
+  ) {
+    const userId = Number(req.user.userId);
+    console.log(`🔄 Actualizando perfil del usuario ID: ${userId}`);
+    return this.userProfileService.update(userId, updateDto);
+  }
+
+  // ELIMINAR (DELETE)
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('profile')
+  async deleteProfile(@Request() req: RequestWithUser) {
+    const userId = Number(req.user.userId);
+    console.log(`🗑️ Eliminando perfil del usuario ID: ${userId}`);
+    return this.userProfileService.remove(userId);
   }
 }

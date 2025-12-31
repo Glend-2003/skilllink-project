@@ -41,4 +41,30 @@ export class UserProfileService {
       where: { user_id: userId },
     });
   }
+  // 3. Actualizar Perfil (PATCH)
+  async update(
+    userId: number,
+    updateDto: CreateUserProfileDto,
+  ): Promise<UserProfile> {
+    // .update() de TypeORM es muy eficiente, busca por ID y cambia solo lo que envíes
+    await this.profileRepository.update({ user_id: userId }, updateDto);
+
+    // Devolvemos el perfil ya actualizado para que el usuario vea los cambios
+    const updatedProfile = await this.findOne(userId);
+    if (!updatedProfile) {
+      throw new Error('No se encontró el perfil después de actualizar');
+    }
+    return updatedProfile;
+  }
+
+  // 4. Eliminar Perfil (DELETE)
+  async remove(userId: number): Promise<{ message: string }> {
+    const result = await this.profileRepository.delete({ user_id: userId });
+
+    if (result.affected === 0) {
+      throw new Error('No se encontró un perfil para eliminar');
+    }
+
+    return { message: 'Perfil eliminado correctamente' };
+  }
 }

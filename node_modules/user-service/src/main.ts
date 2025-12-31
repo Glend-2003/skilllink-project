@@ -1,13 +1,21 @@
+import 'reflect-metadata'; // <--- ESTA DEBE IR PRIMERO SIEMPRE
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Habilitar CORS para que acepte peticiones del Gateway u otros orígenes
   app.enableCors();
 
-  // CAMBIO CLAVE: Poner el puerto 3004
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
   await app.listen(3004);
   console.log(`🚀 User-Service corriendo en: http://localhost:3004`);
 }
