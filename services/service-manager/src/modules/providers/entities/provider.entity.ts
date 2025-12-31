@@ -31,7 +31,7 @@ export class ProviderProfile {
   isVerified: boolean;
 
   @Column({ name: 'verification_date', type: 'timestamp', nullable: true })
-  verificationDate: Date;
+  verificationDate: Date | null;
 
   @Column({ name: 'trust_badge', default: false })
   trustBadge: boolean;

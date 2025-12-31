@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { CategoriesModule } from './modules/categories/categories.module';
 import { ProvidersModule } from './modules/providers/providers.module';
+import { ServicesModule } from './modules/services/services.module';
 
 @Module({
   imports: [
@@ -14,11 +15,12 @@ import { ProvidersModule } from './modules/providers/providers.module';
       password: 'root',
       database: 'skilllink_db',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
 
     CategoriesModule,
     ProvidersModule,
+    ServicesModule,
   ],
   controllers: [],
   providers: [],
