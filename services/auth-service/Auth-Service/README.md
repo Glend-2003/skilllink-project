@@ -3,7 +3,7 @@
 *(Como este es en C#, los comandos cambian a `dotnet`)*
 
 ```markdown
-# Auth Service 🔐
+# Auth Service 
 
 This microservice handles authentication and authorization (Login, Register, JWT Token generation). It is built using .NET.
 
@@ -12,7 +12,7 @@ This microservice handles authentication and authorization (Login, Register, JWT
 - **Language:** C#
 - **Identity:** JWT Bearer Authentication
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 Ensure you have the following installed:
