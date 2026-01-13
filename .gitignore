@@ -1,19 +1,45 @@
-# Ignorar dependencias (Lo más importante)
-node_modules/
-**/node_modules/
-
-# Ignorar compilados
-dist/
-**/dist/
-
-# Ignorar archivos de entorno (seguridad)
-.env
-**/.env
-
-# Ignorar logs
-npm-debug.log*
-yarn-debug.log*
-
-# Ignorar archivos de sistema
+# ==========================
+# GLOBAL / SISTEMA
+# ==========================
 .DS_Store
 Thumbs.db
+
+# ==========================
+# IDEs y EDITORES (Importante para no subir configs personales)
+# ==========================
+.vscode/
+.idea/
+*.user
+*.suo
+.vs/
+
+# ==========================
+# SEGURIDAD 
+# ==========================
+*.env
+.env
+.env.*
+!*.example
+
+# ==========================
+# NODE.JS (NestJS / Angular / React)
+# ==========================
+# El **/ asegura que se ignore en cualquier subcarpeta
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
+
+# ==========================
+# .NET / C# (Para Auth Service)
+# ==========================
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+appsettings.Development.json
