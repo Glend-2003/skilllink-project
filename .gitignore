@@ -3,8 +3,15 @@
 # ==========================
 .DS_Store
 Thumbs.db
+
+# ==========================
+# IDEs y EDITORES (Importante para no subir configs personales)
+# ==========================
 .vscode/
 .idea/
+*.user
+*.suo
+.vs/
 
 # ==========================
 # SEGURIDAD 
@@ -17,21 +24,21 @@ Thumbs.db
 # ==========================
 # NODE.JS (NestJS / Angular / React)
 # ==========================
+# El **/ asegura que se ignore en cualquier subcarpeta
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 coverage/
 
 # ==========================
-# .NET / C# Para Auth Service
+# .NET / C# (Para Auth Service)
 # ==========================
 bin/
 obj/
-*.user
-*.suo
-.vs/
 *.dll
 *.exe
 *.pdb
