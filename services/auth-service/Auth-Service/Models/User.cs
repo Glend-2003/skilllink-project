@@ -26,5 +26,9 @@ namespace AuthService.Models
         public DateTime created_at { get; set; } = DateTime.Now;
         
         public DateTime? last_login { get; set; }
+
+        // Nuevo campo para diferenciar tipo de usuario
+        [Required]
+        public string user_type { get; set; } // "client" o "provider"
     }
 }

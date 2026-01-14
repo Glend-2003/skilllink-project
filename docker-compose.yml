@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  chat-service:
+    build: ./services/chat-service
+    ports:
+      - "3003:3003"
+
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "3000:3000"

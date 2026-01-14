@@ -26,7 +26,12 @@ namespace AuthService.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            // Nota: Asegúrate de que en RegisterDto las propiedades sean email, password, etc.
+            // Validar que el userType sea válido
+            if (model.userType != "client" && model.userType != "provider")
+            {
+                return BadRequest(new { message = "El tipo de usuario debe ser 'client' o 'provider'." });
+            }
+
             if (await _context.users.AnyAsync(u => u.email == model.email))
             {
                 return BadRequest(new { message = "El correo ya está registrado." });
@@ -37,6 +42,7 @@ namespace AuthService.Controllers
                 email = model.email,
                 password_hash = BCrypt.Net.BCrypt.HashPassword(model.password),
                 phone_number = model.phoneNumber,
+                user_type = model.userType,
                 is_active = true,
                 created_at = DateTime.Now
             };
@@ -44,7 +50,12 @@ namespace AuthService.Controllers
             _context.users.Add(newUser);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "¡Usuario registrado exitosamente en SkillLink!" });
+            return Ok(new { 
+                message = "¡Usuario registrado exitosamente en SkillLink!",
+                userId = newUser.user_id,
+                userType = newUser.user_type,
+                requiresProviderProfile = newUser.user_type == "provider"
+            });
         }
 
         [HttpPost("login")]
