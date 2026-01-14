@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, Toucha
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from './context/AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -9,6 +10,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -32,7 +35,17 @@ export default function LoginScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        console.log("Login exitoso:", data.token);
+        console.log("Login exitoso:", data);
+
+        // Extraer información del usuario de la respuesta
+        const userData = {
+          userId: data.userId,
+          email: data.email,
+          userType: data.userType,
+          token: data.token
+        };
+
+        await login(userData);
         router.replace("/(tabs)");
       } else {
         Alert.alert("Error", data.message || "Credenciales incorrectas.");

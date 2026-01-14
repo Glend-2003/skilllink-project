@@ -4,7 +4,7 @@ const socket = io('http://localhost:3003');
 
 socket.on('connect', () => {
   console.log('Script: Conectado al servidor de chat');
-  socket.emit('join_chat', '4'); // Usar conversation_id directamente
+  socket.emit('join_chat', { conversationId: '4', userId: 9 }); 
 });
 
 socket.on('receive_message', (data) => {
@@ -15,18 +15,17 @@ socket.on('disconnect', () => {
   console.log('Desconectado del servidor');
 });
 
-// Función para enviar mensajes
+
 function sendMessage(content) {
   const messageData = {
-    requestId: '4', // conversation_id
-    senderId: 9, // user ID numérico
+    requestId: '4',
+    senderId: 9, 
     content: content,
   };
   socket.emit('send_message', messageData);
   console.log(`Mensaje enviado: ${content}`);
 }
 
-// Ejemplo: enviar un mensaje inmediatamente
 socket.on('connect', () => {
   console.log('Script: Conectado');
   setTimeout(() => {
@@ -34,10 +33,6 @@ socket.on('connect', () => {
   }, 1000);
 });
 
-// Para enviar manualmente, puedes llamar sendMessage('tu mensaje') en la consola de Node
-// O modificar el script para leer de stdin
-
-// Para leer de consola:
 const readline = require('readline');
 const rl = readline.createInterface({
   input: process.stdin,

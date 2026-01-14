@@ -8,12 +8,10 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
-// Conexión a MySQL
 const dbConfig = {
   host: 'localhost',
   port: 3306,
   user: 'root',
-  // password: '', // Sin password
   database: 'skilllink_db'
 };
 
@@ -23,8 +21,6 @@ let db;
     db = await mysql.createConnection(dbConfig);
     console.log('Conectado a MySQL');
     
-    // Crear tabla si no existe (usando el esquema correcto)
-    // Nota: Asumimos que conversations ya existe, solo verificamos messages
     await db.execute(`
       CREATE TABLE IF NOT EXISTS messages (
         message_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -55,29 +51,45 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Unirse a una "sala" basada en el ID de la solicitud de servicio o conversation_id
-    socket.on('join_chat', async (requestId) => {
-        // Si requestId es numérico, tratar como conversation_id
+    socket.on('join_chat', async (data) => {
+        console.log('Join chat data:', data);
+        const { requestId, userId } = data;
+        
+        if (!requestId || !userId) {
+            socket.emit('error', { message: 'requestId y userId son requeridos' });
+            return;
+        }
+        
         let conversationId;
         if (!isNaN(requestId)) {
             conversationId = parseInt(requestId);
         } else {
-            // Buscar conversation_id por request_id
             const [rows] = await db.execute(
                 'SELECT conversation_id FROM conversations WHERE request_id = ?',
                 [requestId]
             );
             if (rows.length === 0) {
                 console.log(`No conversation found for request ${requestId}`);
+                socket.emit('error', { message: 'Conversación no encontrada' });
                 return;
             }
             conversationId = rows[0].conversation_id;
         }
+
+        const [participants] = await db.execute(
+            'SELECT * FROM conversations WHERE conversation_id = ? AND (participant1_user_id = ? OR participant2_user_id = ?)',
+            [conversationId, userId, userId]
+        );
+
+        if (participants.length === 0) {
+            console.log(`User ${userId} not authorized for conversation ${conversationId}`);
+            socket.emit('error', { message: 'No tienes acceso a esta conversación' });
+            return;
+        }
         
         socket.join(conversationId.toString());
-        console.log(`User joined room: ${conversationId}`);
+        console.log(`User ${userId} joined room: ${conversationId}`);
 
-        // Cargar mensajes previos
         const [messages] = await db.execute(
             'SELECT sender_user_id, message_text, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC',
             [conversationId]
@@ -85,30 +97,43 @@ io.on('connection', (socket) => {
         socket.emit('previous_messages', messages);
     });
 
-    // Escuchar cuando alguien envía un mensaje
     socket.on('send_message', async (data) => {
-        // data contiene: requestId, senderId, content
         console.log('Message received:', data);
+        
+        if (!data.requestId || !data.senderId || !data.content) {
+            socket.emit('error', { message: 'requestId, senderId y content son requeridos' });
+            return;
+        }
         
         let conversationId;
         if (!isNaN(data.requestId)) {
             conversationId = parseInt(data.requestId);
         } else {
-            // Buscar conversation_id por request_id
             const [rows] = await db.execute(
                 'SELECT conversation_id FROM conversations WHERE request_id = ?',
                 [data.requestId]
             );
             if (rows.length === 0) {
                 console.log(`No conversation found for request ${data.requestId}`);
+                socket.emit('error', { message: 'Conversación no encontrada' });
                 return;
             }
             conversationId = rows[0].conversation_id;
         }
 
+        const [participants] = await db.execute(
+            'SELECT * FROM conversations WHERE conversation_id = ? AND (participant1_user_id = ? OR participant2_user_id = ?)',
+            [conversationId, data.senderId, data.senderId]
+        );
+
+        if (participants.length === 0) {
+            console.log(`User ${data.senderId} not authorized to send messages in conversation ${conversationId}`);
+            socket.emit('error', { message: 'No tienes permiso para enviar mensajes en esta conversación' });
+            return;
+        }
+
         console.log('Conversation ID:', conversationId);
 
-        // Guardar en DB
         try {
             console.log('Inserting message:', conversationId, data.senderId, data.content);
             const result = await db.execute(
@@ -120,13 +145,11 @@ io.on('connection', (socket) => {
             console.error('Error guardando mensaje:', error);
         }
 
-        // Actualizar last_message_at en conversations
         await db.execute(
             'UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE conversation_id = ?',
             [conversationId]
         );
         
-        // Emitir el mensaje a todos en la sala
         io.to(conversationId.toString()).emit('receive_message', data);
     });
 

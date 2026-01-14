@@ -98,6 +98,9 @@ namespace AuthService.Controllers
             return Ok(new
             {
                 token = new JwtSecurityTokenHandler().WriteToken(token),
+                userId = user.user_id,
+                email = user.email,
+                userType = user.user_type,
                 message = "Login exitoso"
             });
         }
