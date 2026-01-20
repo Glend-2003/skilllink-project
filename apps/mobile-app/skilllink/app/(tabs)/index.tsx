@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { Config } from '@/constants/Config';
 
 interface Provider {
   id: string;
@@ -34,61 +35,42 @@ const CATEGORIES: Category[] = [
   { id: "8", name: "Jardinería", icon: "leaf", color: "#84CC16" },
 ];
 
-const PROVIDERS: Provider[] = [
-  {
-    id: "1",
-    name: "Juan Pérez",
-    category: "Plomería",
-    rating: 4.8,
-    location: "Centro, Ciudad",
-    description: "Especialista en reparaciones de plomería residencial y comercial",
-    hourlyRate: 25,
-    verified: true,
-  },
-  {
-    id: "2",
-    name: "Ana Martínez",
-    category: "Electricista",
-    rating: 4.9,
-    location: "Norte, Ciudad",
-    description: "Instalaciones eléctricas, reparaciones y mantenimiento",
-    hourlyRate: 30,
-    verified: true,
-  },
-  {
-    id: "3",
-    name: "Miguel Torres",
-    category: "Barbería",
-    rating: 4.7,
-    location: "Sur, Ciudad",
-    description: "Cortes modernos, afeitados tradicionales y cuidado capilar",
-    hourlyRate: 20,
-    verified: false,
-  },
-  {
-    id: "4",
-    name: "Carlos Ruiz",
-    category: "Mecánica",
-    rating: 4.6,
-    location: "Este, Ciudad",
-    description: "Reparación y mantenimiento de vehículos de todas las marcas",
-    hourlyRate: 35,
-    verified: true,
-  },
-];
+const PROVIDERS: Provider[] = [];
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [filteredProviders, setFilteredProviders] = useState<Provider[]>(PROVIDERS);
+  const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
+  const [allProviders, setAllProviders] = useState<Provider[]>([]);
+  const [loading, setLoading] = useState(true);
   const { logout } = useAuth();
+
+  // Cargar proveedores reales desde la API
   useEffect(() => {
-    let filtered = PROVIDERS;
+    const loadProviders = async () => {
+      try {
+        const response = await fetch(`${Config.PROVIDER_SERVICE_URL}/api/providers`);
+        const data = await response.json();
+        setAllProviders(data);
+        setFilteredProviders(data);
+      } catch (error) {
+        console.error('Error cargando proveedores:', error);
+        setAllProviders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProviders();
+  }, []);
+
+  // Filtrar proveedores cuando cambien búsqueda o categoría
+  useEffect(() => {
+    let filtered = allProviders;
 
     if (searchQuery) {
       filtered = filtered.filter(provider =>
         provider.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        provider.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
         provider.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -98,7 +80,21 @@ export default function HomeScreen() {
     }
 
     setFilteredProviders(filtered);
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, allProviders]);
+
+  if (loading) {
+    return (
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={{ paddingVertical: 100, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Cargando proveedores...</Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const handleViewProfile = (provider: Provider) => {
+    router.push(`/provider/${provider.id}`);
+  };
 
   const handleContactProvider = (provider: Provider) => {
     router.push(`/chat/${provider.id}`);
@@ -127,7 +123,7 @@ export default function HomeScreen() {
   );
 
   const renderProvider = ({ item }: { item: Provider }) => (
-    <TouchableOpacity style={styles.providerCard} onPress={() => handleContactProvider(item)}>
+    <TouchableOpacity style={styles.providerCard} onPress={() => handleViewProfile(item)}>
       <View style={styles.providerHeader}>
         <View style={styles.providerInfo}>
           <View style={styles.nameRow}>
@@ -158,7 +154,9 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           style={styles.contactButton}
-          onPress={() => handleContactProvider(item)}
+          onPress={() => {
+            handleContactProvider(item);
+          }}
         >
           <Text style={styles.contactButtonText}>Contactar</Text>
           <Ionicons name="chatbubble-outline" size={16} color="white" />

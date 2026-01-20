@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const dbConfig = {
   host: 'localhost',
@@ -46,6 +47,81 @@ const io = new Server(server, {
         origin: "*", 
         methods: ["GET", "POST"]
     }
+});
+
+// REST API: Crear nueva conversación
+app.post('/api/conversations', async (req, res) => {
+  try {
+    console.log('POST /api/conversations from', req.ip);
+    const { participant1_user_id, participant2_user_id } = req.body;
+
+    if (!participant1_user_id || !participant2_user_id) {
+      return res.status(400).json({ error: 'Ambos IDs de participantes son requeridos' });
+    }
+
+    // Verificar si ya existe una conversación entre estos usuarios
+    const [existing] = await db.execute(
+      'SELECT conversation_id FROM conversations WHERE (participant1_user_id = ? AND participant2_user_id = ?) OR (participant1_user_id = ? AND participant2_user_id = ?)',
+      [participant1_user_id, participant2_user_id, participant2_user_id, participant1_user_id]
+    );
+
+    if (existing.length > 0) {
+      // La conversación ya existe, devolverla
+      return res.json(existing[0]);
+    }
+
+    // Crear nueva conversación
+    const [result] = await db.execute(
+      'INSERT INTO conversations (participant1_user_id, participant2_user_id) VALUES (?, ?)',
+      [participant1_user_id, participant2_user_id]
+    );
+
+    res.json({
+      conversation_id: result.insertId,
+      participant1_user_id,
+      participant2_user_id
+    });
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    res.status(500).json({ error: 'Error al crear conversación' });
+  }
+});
+
+// REST API: Obtener conversaciones de un usuario
+app.get('/api/conversations/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('GET /api/conversations/', userId, 'from', req.ip);
+
+    const [conversations] = await db.execute(
+      `SELECT 
+        c.conversation_id,
+        c.participant1_user_id,
+        c.participant2_user_id,
+        CASE 
+          WHEN c.participant1_user_id = ? THEN c.participant2_user_id
+          ELSE c.participant1_user_id
+        END as other_user_id,
+        COALESCE(u.email, '') as other_user_email,
+        COALESCE(pp.business_name, 'Usuario') as other_user_name,
+        CASE WHEN pp.provider_id IS NULL THEN 0 ELSE 1 END as is_provider,
+        (SELECT m.message_text FROM messages m WHERE m.conversation_id = c.conversation_id ORDER BY m.created_at DESC LIMIT 1) as last_message_text,
+        COALESCE(c.last_message_at, c.created_at) as last_activity_at,
+        c.last_message_at,
+        c.created_at
+      FROM conversations c
+      LEFT JOIN users u ON (c.participant1_user_id = ? AND u.user_id = c.participant2_user_id) OR (c.participant2_user_id = ? AND u.user_id = c.participant1_user_id)
+      LEFT JOIN provider_profiles pp ON u.user_id = pp.user_id
+      WHERE c.participant1_user_id = ? OR c.participant2_user_id = ?
+      ORDER BY last_activity_at DESC`,
+      [userId, userId, userId, userId, userId]
+    );
+
+    res.json(conversations);
+  } catch (error) {
+    console.error('Error fetching conversations:', error);
+    res.status(500).json({ error: 'Error al obtener conversaciones' });
+  }
 });
 
 io.on('connection', (socket) => {
@@ -159,7 +235,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3003;
-server.listen(PORT, () => {
-    console.log(`💬 Chat Service corriendo en puerto ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`💬 Chat Service corriendo en puerto ${PORT} en 0.0.0.0`);
 });
 

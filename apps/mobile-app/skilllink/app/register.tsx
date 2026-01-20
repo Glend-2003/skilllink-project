@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, Toucha
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
+import { Config } from '@/constants/Config';
 
 export default function RegisterScreen() {
   const [step, setStep] = useState(1);
@@ -55,7 +56,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://192.168.100.161:5293/api/auth/register", {
+      const response = await fetch(`${Config.AUTH_SERVICE_URL}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

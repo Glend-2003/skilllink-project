@@ -1,9 +1,10 @@
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, DeviceEventEmitter } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { io, Socket } from "socket.io-client";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { Config } from '@/constants/Config';
 
 type Message = {
   id: string;
@@ -84,6 +85,7 @@ export default function ChatDetail() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('active');
   const [showServiceProposal, setShowServiceProposal] = useState(false);
+  const [provider, setProvider] = useState<Provider | null>(null);
   const [serviceProposal, setServiceProposal] = useState({
     title: '',
     description: '',
@@ -92,7 +94,42 @@ export default function ChatDetail() {
   });
 
   const flatListRef = useRef<FlatList<Message>>(null);
-  const provider = mockProviders[id || '1'];
+
+  // Fetch conversation and provider info
+  useEffect(() => {
+    const loadConversationInfo = async () => {
+      if (!id || !user) return;
+
+      try {
+        console.log('Loading conversation info for:', id);
+        // Get conversation details
+        const conversationsRes = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
+        const conversations = await conversationsRes.json();
+        
+        const conversation = conversations.find((c: any) => c.conversation_id === parseInt(id as string));
+        
+        if (conversation && conversation.other_user_id) {
+          // Fetch provider details
+          const providerRes = await fetch(`${Config.PROVIDER_SERVICE_URL}/api/providers/${conversation.other_user_id}`);
+          if (providerRes.ok) {
+            const providerData = await providerRes.json();
+            setProvider({
+              id: providerData.id,
+              name: providerData.name,
+              category: 'Servicios',
+              rating: providerData.rating,
+              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerData.id}`,
+              verified: providerData.verified,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading conversation info:', error);
+      }
+    };
+
+    loadConversationInfo();
+  }, [id, user]);
 
   useEffect(() => {
   }, [id]);
@@ -101,15 +138,23 @@ export default function ChatDetail() {
     console.log('useEffect triggered, id:', id, 'user:', user, 'isLoading:', isLoading);
     if (!id || !user || isLoading) return;
 
-    const newSocket = io("http://192.168.100.161:3003", {
+    const newSocket = io(Config.CHAT_SERVICE_URL, {
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5
     });
 
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Socket connected, joining chat with userId:', user.userId, 'requestId:', id);
-      newSocket.emit("join_chat", { requestId: id, userId: user.userId });
+      // Use the conversation ID directly
+      newSocket.emit("join_chat", { 
+        requestId: parseInt(id as string), 
+        userId: user.userId 
+      });
     });
 
     newSocket.on("receive_message", (data) => {
@@ -149,13 +194,17 @@ export default function ChatDetail() {
   const sendMessage = () => {
     if (!text.trim() || !socket || !id || !user) return;
 
+    console.log('Sending message:', { requestId: parseInt(id as string), senderId: user.userId, content: text });
+
     const messageData = {
-      requestId: id,
+      requestId: parseInt(id as string),
       senderId: user.userId,
       content: text,
     };
 
     socket.emit("send_message", messageData);
+    // Notificar a la lista de chats para refrescar inmediatamente
+    DeviceEventEmitter.emit('conversation_sent', { conversationId: parseInt(id as string) });
     setText("");
   };
 

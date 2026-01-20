@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from './context/AuthContext';
+import { Config } from '@/constants/Config';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -21,7 +22,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch("http://192.168.100.161:5293/api/auth/login", {
+      const response = await fetch(`${Config.AUTH_SERVICE_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -37,7 +38,6 @@ export default function LoginScreen() {
       if (response.ok) {
         console.log("Login exitoso:", data);
 
-        // Extraer información del usuario de la respuesta
         const userData = {
           userId: data.userId,
           email: data.email,
