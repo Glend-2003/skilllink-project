@@ -1,4 +1,4 @@
-namespace AuthService.DTOs
+namespace Auth_Service.DTOs
 {
     public class RegisterDto
     {

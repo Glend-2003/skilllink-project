@@ -1,34 +1,30 @@
-using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace AuthService.Models
+namespace Auth_Service.Models
 {
     [Table("users")]
-    public class User
+    public class User : IdentityUser<int>
     {
-        [Key]
-        public int user_id { get; set; }
-        
-        [Required]
-        public string email { get; set; }
-        
-        [Required]
-        public string password_hash { get; set; }
-        
-        public string? phone_number { get; set; }
-        
-        public string? profile_image_url { get; set; } 
-        
-        public bool is_active { get; set; } = true;
-        
-        public bool email_verified { get; set; } = false; 
-        
-        public DateTime created_at { get; set; } = DateTime.Now;
-        
-        public DateTime? last_login { get; set; }
+        [Column("user_id")]
+        public override int Id { get; set; }
 
-        // Nuevo campo para diferenciar tipo de usuario
-        [Required]
-        public string user_type { get; set; } // "client" o "provider"
+        [Column("email")]
+        public override string Email { get; set; }
+
+        [Column("password_hash")]
+        public override string PasswordHash { get; set; }
+
+        [Column("phone_number")]
+        public override string PhoneNumber { get; set; }
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        // Relación con roles a través de tabla intermedia
+        public ICollection<UserRole> UserRoles { get; set; }
     }
 }

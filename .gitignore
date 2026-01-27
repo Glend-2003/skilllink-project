@@ -43,3 +43,20 @@ obj/
 *.exe
 *.pdb
 appsettings.Development.json
+
+# --- Directorios de Compilación (Basura) ---
+bin/
+obj/
+.vs/
+.vscode/
+
+# --- Archivos de Usuario ---
+*.user
+*.suo
+
+# --- Migraciones (Si NO quieres subirlas a GitHub) ---
+**/Migrations/
+
+# --- Dependencias y Logs ---
+node_modules/
+*.log

@@ -1,108 +1,117 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using AuthService.Data;
-using AuthService.Models;
-using AuthService.DTOs;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
+using Auth_Service.Models;
+using Auth_Service.DTOs;
+using Auth_Service.Data;
+using Microsoft.EntityFrameworkCore;
 
-namespace AuthService.Controllers
+namespace AuthController.Controllers
 {
-    [Route("api/auth")]
+    [Route("api/[controller]")]
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _config;
+        private readonly UserManager<User> _userManager;
+        private readonly ApplicationDbContext _context; 
+        private readonly IConfiguration _configuration;
+        private readonly IPasswordHasher<User> _passwordHasher;
 
-        public AuthController(ApplicationDbContext context, IConfiguration config)
+        public AuthController(UserManager<User> userManager, ApplicationDbContext context, IConfiguration configuration, IPasswordHasher<User> passwordHasher)
         {
+            _userManager = userManager;
             _context = context;
-            _config = config;
+            _configuration = configuration;
+            _passwordHasher = passwordHasher;
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterDto model)
+       public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            // Validar que el userType sea válido
-            if (model.userType != "client" && model.userType != "provider")
-            {
-                return BadRequest(new { message = "El tipo de usuario debe ser 'client' o 'provider'." });
-            }
+            // 1. Verificar si existe (Manual)
+            var userExists = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
+            if (userExists != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
-            if (await _context.users.AnyAsync(u => u.email == model.email))
+            // 2. Crear Objeto User
+            User user = new User()
             {
-                return BadRequest(new { message = "El correo ya está registrado." });
-            }
-
-            var newUser = new User
-            {
-                email = model.email,
-                password_hash = BCrypt.Net.BCrypt.HashPassword(model.password),
-                phone_number = model.phoneNumber,
-                user_type = model.userType,
-                is_active = true,
-                created_at = DateTime.Now
+                Email = model.email,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                SecurityStamp = Guid.NewGuid().ToString()
             };
 
-            _context.users.Add(newUser);
-            await _context.SaveChangesAsync();
+            // 3. ENCRIPTAR CONTRASEÑA MANUALMENTE (Usando BCrypt)
+            user.PasswordHash = _passwordHasher.HashPassword(user, model.password);
 
-            return Ok(new { 
-                message = "¡Usuario registrado exitosamente en SkillLink!",
-                userId = newUser.user_id,
-                userType = newUser.user_type,
-                requiresProviderProfile = newUser.user_type == "provider"
-            });
+            try 
+            {
+                // 4. GUARDAR USUARIO (Directo a la BD)
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                // 5. ASIGNAR ROL (Directo a la tabla intermedia)
+                // Asumimos que el Rol ID 1 es "Client". 
+                var userRole = new UserRole 
+                { 
+                    UserId = user.Id, 
+                    RoleId = 1 
+                };
+                
+                _context.UserRoles.Add(userRole);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Usuario creado exitosamente!" });
+            }
+            catch (Exception ex)
+            {
+                 return StatusCode(500, new { Status = "Error", Message = "Error guardando en BD", Detail = ex.Message });
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-            // 1. Buscar al usuario
-            var user = await _context.users.FirstOrDefaultAsync(u => u.email == model.Email);
+            // 1. Buscamos usuario E INCLUIMOS la tabla de roles
+            var user = await _context.Users
+                .Include(u => u.UserRoles) // Traer tabla intermedia
+                .ThenInclude(ur => ur.Role) // Traer nombre del rol
+                .FirstOrDefaultAsync(u => u.Email == model.email);
 
-            // 2. Valida credenciales con BCrypt
-            if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.password_hash))
+            if (user != null && await _userManager.CheckPasswordAsync(user, model.password))
             {
-                return Unauthorized(new { message = "Correo o contraseña incorrectos." });
+                var authClaims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.Email),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                };
+
+                // 2. Sacamos los roles de la lista cargada
+                foreach (var ur in user.UserRoles)
+                {
+                    if(ur.Role != null) 
+                    {
+                        authClaims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
+                    }
+                }
+
+                var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+                var token = new JwtSecurityToken(
+                    issuer: _configuration["Jwt:Issuer"],
+                    audience: _configuration["Jwt:Audience"],
+                    expires: DateTime.Now.AddHours(3),
+                    claims: authClaims,
+                    signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                );
+
+                return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
             }
-
-            // 3. Obtener clave del appsettings y validar que no sea nula
-            var jwtKey = _config["Jwt:Key"];
-            if (string.IsNullOrEmpty(jwtKey)) return StatusCode(500, "Error de configuración en el servidor (JWT Key)");
-
-            // 4. Crear los Claims
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.user_id.ToString()),
-                new Claim(ClaimTypes.Email, user.email),
-                new Claim("IsActive", user.is_active.ToString())
-            };
-
-            // 5. Genera el Token
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(8),
-                signingCredentials: creds
-            );
-
-            // 6. Respuesta con el Token
-            return Ok(new
-            {
-                token = new JwtSecurityTokenHandler().WriteToken(token),
-                userId = user.user_id,
-                email = user.email,
-                userType = user.user_type,
-                message = "Login exitoso"
-            });
+            return Unauthorized();
         }
     }
 }
