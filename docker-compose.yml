@@ -1,4 +1,5 @@
-version: '3.8'
+version: '3.9'
+
 services:
   # Base de Datos
   mysql_db:
@@ -9,7 +10,13 @@ services:
     ports:
       - "3306:3306"
 
-  # Tu servicio de usuarios
+  # Servicio de chat
+  chat-service:
+    build: ./services/chat-service
+    ports:
+      - "3003:3003"
+
+  # Servicio de usuarios
   user-service:
     build: ./services/user-service
     ports:
@@ -17,12 +24,13 @@ services:
     depends_on:
       - mysql_db
     environment:
-      DB_HOST: mysql_db # Se conecta al nombre del servicio, no a localhost
+      DB_HOST: mysql_db
 
-  # Tu Gateway
+  # Gateway
   api-gateway:
     build: ./services/api-gateway
     ports:
       - "3000:3000"
     depends_on:
       - user-service
+      - chat-service

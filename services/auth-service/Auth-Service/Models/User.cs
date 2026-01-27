@@ -24,8 +24,10 @@ namespace Auth_Service.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // --- RELACIÓN CORRECTA (3 Tablas) ---
-        // Quitamos RoleId directo. Ahora es una lista a través de la tabla intermedia.
-        public ICollection<UserRole> UserRoles { get; set; } 
+        [Column("user_type")]
+        public string UserType { get; set; } = string.Empty;
+
+        // Relación con roles a través de tabla intermedia
+        public ICollection<UserRole> UserRoles { get; set; }
     }
 }

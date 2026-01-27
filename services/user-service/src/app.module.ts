@@ -12,7 +12,7 @@ import { AppService } from './app.service';
       host: 'localhost',
       port: 3306,
       username: 'root',
-      password: 'root',
+      password: '', // Sin contraseña
       database: 'skilllink_db',
       entities: [UserProfile],
       synchronize: true,
