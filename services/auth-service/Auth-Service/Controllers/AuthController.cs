@@ -40,21 +40,19 @@ namespace AuthController.Controllers
             User user = new User()
             {
                 Email = model.email,
-                // UserName = model.email, // Ya no es necesario si no usas Identity interno
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 SecurityStamp = Guid.NewGuid().ToString()
             };
 
             // 3. ENCRIPTAR CONTRASEÑA MANUALMENTE (Usando BCrypt)
-            // Esto evita que CreateAsync busque columnas que no existen
             user.PasswordHash = _passwordHasher.HashPassword(user, model.password);
 
             try 
             {
                 // 4. GUARDAR USUARIO (Directo a la BD)
                 _context.Users.Add(user);
-                await _context.SaveChangesAsync(); // Aquí se genera el ID automático
+                await _context.SaveChangesAsync();
 
                 // 5. ASIGNAR ROL (Directo a la tabla intermedia)
                 // Asumimos que el Rol ID 1 es "Client". 
@@ -111,7 +109,12 @@ namespace AuthController.Controllers
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
 
-                return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+                return Ok(new { 
+                    token = new JwtSecurityTokenHandler().WriteToken(token),
+                    userId = user.Id,
+                    email = user.Email,
+                    userType = user.UserRoles.FirstOrDefault()?.Role?.Name ?? "User"
+                });
             }
             return Unauthorized();
         }

@@ -25,5 +25,7 @@ namespace Auth_Service.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<UserRole> UserRoles { get; set; } 
+        [Column("user_type")]
+        public string UserType { get; set; } = string.Empty;
     }
 }
