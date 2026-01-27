@@ -95,6 +95,27 @@ export default function ChatDetail() {
 
   const flatListRef = useRef<FlatList<Message>>(null);
 
+  // Load previous messages
+  const loadPreviousMessages = async () => {
+    if (!id || !user) return;
+    
+    try {
+      const response = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${id}/messages`);
+      if (response.ok) {
+        const prevMessages = await response.json();
+        const formattedMessages: Message[] = prevMessages.map((msg: any) => ({
+          id: msg.message_id.toString(),
+          text: msg.message_text,
+          sender: msg.sender_user_id === user.userId ? "me" : "other",
+          timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        }));
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading previous messages:', error);
+    }
+  };
+
   // Fetch conversation and provider info
   useEffect(() => {
     const loadConversationInfo = async () => {
@@ -149,35 +170,27 @@ export default function ChatDetail() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('Socket connected, joining chat with userId:', user.userId, 'requestId:', id);
-      // Use the conversation ID directly
+      console.log('Socket connected, joining chat with conversationId:', id);
       newSocket.emit("join_chat", { 
-        requestId: parseInt(id as string), 
-        userId: user.userId 
+        conversationId: parseInt(id as string)
       });
+      
+      // Cargar mensajes previos
+      loadPreviousMessages();
     });
 
     newSocket.on("receive_message", (data) => {
+      console.log('Received message:', data);
       const newMessage: Message = {
-        id: Date.now().toString() + Math.random(),
-        text: data.content,
-        sender: data.senderId === user.userId ? "me" : "other",
-        timestamp: new Date().toLocaleTimeString([], {
+        id: data.message_id?.toString() || Date.now().toString() + Math.random(),
+        text: data.message_text,
+        sender: data.sender_user_id === user.userId ? "me" : "other",
+        timestamp: new Date(data.created_at || new Date()).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
       };
       setMessages((prev) => [...prev, newMessage]);
-    });
-
-    newSocket.on("previous_messages", (prevMessages) => {
-      const formattedMessages: Message[] = prevMessages.map((msg: any, index: number) => ({
-        id: `prev-${index}`,
-        text: msg.message_text,
-        sender: msg.sender_user_id === user.userId ? "me" : "other",
-        timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }));
-      setMessages(formattedMessages);
     });
 
     return () => {
@@ -194,12 +207,10 @@ export default function ChatDetail() {
   const sendMessage = () => {
     if (!text.trim() || !socket || !id || !user) return;
 
-    console.log('Sending message:', { requestId: parseInt(id as string), senderId: user.userId, content: text });
-
     const messageData = {
-      requestId: parseInt(id as string),
-      senderId: user.userId,
-      content: text,
+      conversationId: parseInt(id as string),
+      sender_user_id: user.userId,
+      message_text: text.trim(),
     };
 
     socket.emit("send_message", messageData);

@@ -117,7 +117,13 @@ export default function ProviderDetailScreen() {
       return;
     }
 
+    if (!user.userId) {
+      Alert.alert('Error', 'Sesión inválida. Por favor, cierra sesión e inicia sesión nuevamente.');
+      return;
+    }
+
     try {
+      console.log('User data:', user);
       console.log('Creating conversation with provider:', providerId);
       console.log('Chat Service URL:', Config.CHAT_SERVICE_URL);
       console.log('Payload:', {

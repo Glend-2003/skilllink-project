@@ -34,11 +34,17 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState<boolean>(false);
 
   const fetchConversations = useCallback(async () => {
-    if (!user) return;
+    if (!user || !user.userId) {
+      console.log('No user or userId:', user);
+      return;
+    }
     setLoading(true);
     try {
+      console.log('Fetching conversations for userId:', user.userId);
       const res = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
+      console.log('Response status:', res.status);
       const data: ApiConversation[] = await res.json();
+      console.log('Conversations data:', data);
       const providerConvs = (data || []).filter(c => c.is_provider === 1);
       const mapped: ConversationItemUI[] = providerConvs.map(c => ({
         id: String(c.conversation_id),

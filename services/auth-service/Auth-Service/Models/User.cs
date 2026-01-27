@@ -24,6 +24,9 @@ namespace Auth_Service.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        [Column("user_type")]
+        public string UserType { get; set; } = string.Empty;
+
         // Relación con roles a través de tabla intermedia
         public ICollection<UserRole> UserRoles { get; set; }
     }
