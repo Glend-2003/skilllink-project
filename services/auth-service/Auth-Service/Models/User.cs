@@ -16,7 +16,7 @@ namespace Auth_Service.Models
         public override string PasswordHash { get; set; }
 
         [Column("phone_number")]
-        public override string PhoneNumber { get; set; }
+        public override string? PhoneNumber { get; set; } 
 
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
@@ -24,10 +24,8 @@ namespace Auth_Service.Models
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public ICollection<UserRole> UserRoles { get; set; } 
         [Column("user_type")]
         public string UserType { get; set; } = string.Empty;
-
-        // Relación con roles a través de tabla intermedia
-        public ICollection<UserRole> UserRoles { get; set; }
     }
 }
