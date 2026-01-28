@@ -26,7 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: JwtPayload) {
     // LOG DE DEPURACIÓN
     console.log(
-      '🔓 Token recibido en NestJS. Payload:',
+      'Token recibido en NestJS. Payload:',
       JSON.stringify(payload),
     );
 
@@ -46,11 +46,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ] as string) || payload.email;
 
     if (!userId) {
-      console.error('❌ Error: Token válido pero sin ID.');
+      console.error('Error: Token válido pero sin ID.');
       throw new UnauthorizedException('Token inválido: Falta User ID');
     }
 
-    console.log(`✅ Usuario validado: ID ${userId}`);
+    console.log(`Usuario validado: ID ${userId}`);
 
     // Retornamos el objeto limpio
     return { userId: userId, email: email };

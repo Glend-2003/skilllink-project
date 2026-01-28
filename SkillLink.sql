@@ -713,3 +713,6 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2026-01-20 17:04:04
+
+INSERT INTO `roles` (`id`, `name`) VALUES (1, 'Client');
+INSERT INTO `roles` (`id`, `name`) VALUES (2, 'Provider');

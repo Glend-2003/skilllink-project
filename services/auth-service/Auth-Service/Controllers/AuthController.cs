@@ -31,14 +31,15 @@ namespace AuthController.Controllers
         [HttpPost("register")]
        public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            // 1. Verificar si existe (Manual)
+  
             var userExists = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
             if (userExists != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
-            // 2. Crear Objeto User
+ 
             User user = new User()
             {
+                UserName = model.email,
                 Email = model.email,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -50,12 +51,12 @@ namespace AuthController.Controllers
 
             try 
             {
-                // 4. GUARDAR USUARIO (Directo a la BD)
+    
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                // 5. ASIGNAR ROL (Directo a la tabla intermedia)
-                // Asumimos que el Rol ID 1 es "Client". 
+                int roleId = (model.userType == "Provider") ? 2 : 1;
+
                 var userRole = new UserRole 
                 { 
                     UserId = user.Id, 
@@ -76,10 +77,10 @@ namespace AuthController.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-            // 1. Buscamos usuario E INCLUIMOS la tabla de roles
+          
             var user = await _context.Users
-                .Include(u => u.UserRoles) // Traer tabla intermedia
-                .ThenInclude(ur => ur.Role) // Traer nombre del rol
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role) 
                 .FirstOrDefaultAsync(u => u.Email == model.email);
 
             if (user != null && await _userManager.CheckPasswordAsync(user, model.password))
@@ -91,7 +92,7 @@ namespace AuthController.Controllers
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 };
 
-                // 2. Sacamos los roles de la lista cargada
+        
                 foreach (var ur in user.UserRoles)
                 {
                     if(ur.Role != null) 

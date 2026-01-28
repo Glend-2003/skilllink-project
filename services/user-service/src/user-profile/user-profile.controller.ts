@@ -35,7 +35,7 @@ export class UserProfileController {
     // 3. Convertimos el ID de String a Number para que la base de datos no se queje
     const userId = Number(req.user.userId);
 
-    console.log(`📝 Creando perfil para usuario ID: ${userId}`);
+    console.log(`Creando perfil para usuario ID: ${userId}`);
 
     return this.userProfileService.createOrUpdate(userId, createProfileDto);
   }
@@ -60,7 +60,7 @@ export class UserProfileController {
     @Body() updateDto: CreateUserProfileDto,
   ) {
     const userId = Number(req.user.userId);
-    console.log(`🔄 Actualizando perfil del usuario ID: ${userId}`);
+    console.log(`Actualizando perfil del usuario ID: ${userId}`);
     return this.userProfileService.update(userId, updateDto);
   }
 
@@ -69,7 +69,7 @@ export class UserProfileController {
   @Delete('profile')
   async deleteProfile(@Request() req: RequestWithUser) {
     const userId = Number(req.user.userId);
-    console.log(`🗑️ Eliminando perfil del usuario ID: ${userId}`);
+    console.log(`Eliminando perfil del usuario ID: ${userId}`);
     return this.userProfileService.remove(userId);
   }
 }

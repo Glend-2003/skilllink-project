@@ -30,7 +30,7 @@ app.use('/api/v1/auth', createProxyMiddleware({
 // 2. User Service
 const USER_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 app.use('/api/v1/users', createProxyMiddleware({
-    target: USER_URL,
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3001',
     changeOrigin: true,
     onProxyReq: (proxyReq, req, res) => {
         console.log(`[Gateway] Redirigiendo Users a: ${USER_URL}${req.url}`);
@@ -49,11 +49,11 @@ app.use('/api/v1/services', createProxyMiddleware({
 
 // 4. Provider Service
 const PROVIDER_URL = process.env.PROVIDER_SERVICE_URL || 'http://localhost:3003';
-app.use('/api/v1/providers', createProxyMiddleware({
-    target: PROVIDER_URL,
+app.use('/api/v1/users', createProxyMiddleware({
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3000', // Verifica el puerto
     changeOrigin: true,
-    onProxyReq: (proxyReq, req, res) => {
-        console.log(`[Gateway] Redirigiendo Provider a: ${PROVIDER_URL}${req.url}`);
+    pathRewrite: {
+        '^/api/v1/users': '/users' 
     }
 }));
 
