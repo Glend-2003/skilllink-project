@@ -1,0 +1,330 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Switch,
+} from 'react-native';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Picker } from '@react-native-picker/picker';
+import { useAuth } from '../context/AuthContext';
+import { Config } from '@/constants/Config';
+
+interface ServiceCategory {
+  categoryId: number;
+  categoryName: string;
+}
+
+interface Service {
+  serviceId: number;
+  categoryId: number;
+  serviceTitle: string;
+  serviceDescription: string;
+  basePrice?: number;
+  priceType: string;
+  estimatedDurationMinutes?: number;
+  isActive: boolean;
+}
+
+export default function EditServiceScreen() {
+  const { id } = useLocalSearchParams();
+  const { user } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+
+  const [formData, setFormData] = useState({
+    categoryId: 0,
+    serviceTitle: '',
+    serviceDescription: '',
+    basePrice: '',
+    priceType: 'fixed' as 'fixed' | 'hourly' | 'negotiable',
+    estimatedDurationMinutes: '',
+    isActive: true,
+  });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      // Cargar categorías
+      const catResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/categories`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (catResponse.ok) {
+        const catData = await catResponse.json();
+        setCategories(catData);
+      }
+
+      // Cargar servicio
+      const servicesResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (servicesResponse.ok) {
+        const services: Service[] = await servicesResponse.json();
+        const service = services.find((s) => s.serviceId === parseInt(id as string));
+
+        if (service) {
+          setFormData({
+            categoryId: service.categoryId,
+            serviceTitle: service.serviceTitle,
+            serviceDescription: service.serviceDescription,
+            basePrice: service.basePrice?.toString() || '',
+            priceType: service.priceType as 'fixed' | 'hourly' | 'negotiable',
+            estimatedDurationMinutes: service.estimatedDurationMinutes?.toString() || '',
+            isActive: service.isActive,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      Alert.alert('Error', 'Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.serviceTitle.trim()) {
+      Alert.alert('Error', 'El título del servicio es requerido');
+      return;
+    }
+
+    if (!formData.serviceDescription.trim()) {
+      Alert.alert('Error', 'La descripción es requerida');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          categoryId: formData.categoryId || null,
+          serviceTitle: formData.serviceTitle,
+          serviceDescription: formData.serviceDescription,
+          basePrice: formData.basePrice ? parseFloat(formData.basePrice) : null,
+          priceType: formData.priceType,
+          estimatedDurationMinutes: formData.estimatedDurationMinutes
+            ? parseInt(formData.estimatedDurationMinutes)
+            : null,
+          isActive: formData.isActive,
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Éxito', 'Servicio actualizado correctamente');
+        router.back();
+      } else {
+        const data = await response.json();
+        Alert.alert('Error', data.message || 'No se pudo actualizar el servicio');
+      }
+    } catch (error) {
+      console.error('Error updating service:', error);
+      Alert.alert('Error', 'Error de conexión');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Editar Servicio',
+          headerStyle: { backgroundColor: '#007AFF' },
+          headerTintColor: '#fff',
+        }}
+      />
+      <ScrollView style={styles.container}>
+        <View style={styles.section}>
+          <Text style={styles.label}>Categoría</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.categoryId}
+              onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+            >
+              {categories.map((cat) => (
+                <Picker.Item
+                  key={cat.categoryId}
+                  label={cat.categoryName}
+                  value={cat.categoryId}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Título del Servicio *</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.serviceTitle}
+            onChangeText={(text) => setFormData({ ...formData, serviceTitle: text })}
+            placeholder="Ej: Reparación de plomería"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Descripción *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.serviceDescription}
+            onChangeText={(text) => setFormData({ ...formData, serviceDescription: text })}
+            placeholder="Describe en detalle tu servicio"
+            multiline
+            numberOfLines={4}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Tipo de Precio</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.priceType}
+              onValueChange={(value) =>
+                setFormData({ ...formData, priceType: value as 'fixed' | 'hourly' | 'negotiable' })
+              }
+            >
+              <Picker.Item label="Precio Fijo" value="fixed" />
+              <Picker.Item label="Por Hora" value="hourly" />
+              <Picker.Item label="Negociable" value="negotiable" />
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Precio Base ($)</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.basePrice}
+            onChangeText={(text) => setFormData({ ...formData, basePrice: text })}
+            placeholder="Ej: 50.00"
+            keyboardType="decimal-pad"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Duración Estimada (minutos)</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.estimatedDurationMinutes}
+            onChangeText={(text) => setFormData({ ...formData, estimatedDurationMinutes: text })}
+            placeholder="Ej: 60"
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Servicio Activo</Text>
+            <Switch
+              value={formData.isActive}
+              onValueChange={(value) => setFormData({ ...formData, isActive: value })}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.saveButtonText}>Guardar Cambios</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  section: {
+    backgroundColor: '#fff',
+    padding: 20,
+    marginBottom: 1,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    margin: 20,
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

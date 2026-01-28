@@ -61,17 +61,15 @@ let io;
       )
     `);
 
-    console.log("✅ Tablas verificadas/creadas");
+    console.log("Tablas verificadas/creadas");
     
-    // Crear servidor e inicializar socket.io después de que la DB esté lista
     server = http.createServer(app);
     io = new Server(server, {
       cors: { origin: "*", methods: ["GET", "POST"] }
     });
     
-    // Configurar Socket.IO
     io.on("connection", (socket) => {
-      console.log("🔌 User connected:", socket.id);
+      console.log("User connected:", socket.id);
 
       socket.on("join_chat", ({ conversationId }) => {
         socket.join(conversationId);
@@ -100,18 +98,16 @@ let io;
       });
     });
     
-    // Iniciar servidor después de que la DB esté lista
     const PORT = process.env.PORT || 3003;
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`💬 Chat Service corriendo en http://localhost:${PORT}`);
+      console.log(`Chat Service corriendo en http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("❌ Error conectando a MySQL:", error);
+    console.error("Error conectando a MySQL:", error);
     process.exit(1);
   }
 })();
 
-// REST: Crear conversación
 app.post("/api/conversations", async (req, res) => {
   try {
     const { participant1_user_id, participant2_user_id } = req.body;
@@ -140,12 +136,11 @@ app.post("/api/conversations", async (req, res) => {
       participant2_user_id
     });
   } catch (error) {
-    console.error("❌ Error creating conversation:", error);
+    console.error(" Error creating conversation:", error);
     res.status(500).json({ error: "Error al crear conversación" });
   }
 });
 
-// REST: Obtener conversaciones
 app.get("/api/conversations/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -181,12 +176,11 @@ app.get("/api/conversations/:userId", async (req, res) => {
 
     res.json(conversations);
   } catch (error) {
-    console.error("❌ Error fetching conversations:", error);
+    console.error("Error fetching conversations:", error);
     res.status(500).json({ error: "Error al obtener conversaciones" });
   }
 });
 
-// REST: Obtener mensajes de una conversación
 app.get("/api/conversations/:conversationId/messages", async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -201,7 +195,47 @@ app.get("/api/conversations/:conversationId/messages", async (req, res) => {
 
     res.json(messages);
   } catch (error) {
-    console.error("❌ Error fetching messages:", error);
+    console.error("Error fetching messages:", error);
     res.status(500).json({ error: "Error al obtener mensajes" });
+  }
+});
+
+app.get("/api/conversations/details/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.query;
+
+    const [conversations] = await db.execute(
+      `SELECT 
+        c.conversation_id,
+        c.participant1_user_id,
+        c.participant2_user_id,
+        CASE 
+          WHEN c.participant1_user_id = ? THEN c.participant2_user_id
+          ELSE c.participant1_user_id
+        END AS other_user_id,
+        u_other.email AS other_user_email,
+        c.created_at,
+        c.last_message_at
+      FROM conversations c
+      LEFT JOIN users u_other ON u_other.user_id = (
+        CASE 
+          WHEN c.participant1_user_id = ? THEN c.participant2_user_id
+          ELSE c.participant1_user_id
+        END
+      )
+      WHERE c.conversation_id = ? 
+        AND (c.participant1_user_id = ? OR c.participant2_user_id = ?)`,
+      [userId, userId, conversationId, userId, userId]
+    );
+
+    if (conversations.length === 0) {
+      return res.status(404).json({ error: "Conversación no encontrada" });
+    }
+
+    res.json(conversations[0]);
+  } catch (error) {
+    console.error(" Error fetching conversation details:", error);
+    res.status(500).json({ error: "Error al obtener detalles de la conversación" });
   }
 });

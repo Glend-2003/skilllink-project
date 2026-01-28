@@ -7,7 +7,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuración de la base de datos
 const dbConfig = {
   host: 'localhost',
   port: 3306,
@@ -20,13 +19,12 @@ let db;
 (async () => {
   try {
     db = await mysql.createConnection(dbConfig);
-    console.log('✅ Conectado a MySQL');
+    console.log('Conectado a MySQL');
   } catch (error) {
-    console.error('❌ Error conectando a MySQL:', error);
+    console.error('Error conectando a MySQL:', error);
   }
 })();
 
-// Obtener todos los proveedores disponibles
 app.get('/api/providers', async (req, res) => {
   try {
     const query = `
@@ -50,15 +48,14 @@ app.get('/api/providers', async (req, res) => {
 
     const [providers] = await db.execute(query);
 
-    // Mapear a formato que espera la app
     const formattedProviders = providers.map((p, index) => ({
       id: p.user_id.toString(),
       name: p.business_name,
-      category: 'Servicios', // Puedes mejorar esto con categorías reales
+      category: 'Servicios', 
       rating: parseFloat(p.average_rating) || 4.5,
       location: 'Centro, Ciudad',
       description: p.business_description,
-      hourlyRate: 25 + (index * 5), // Precio dinámico de ejemplo
+      hourlyRate: 25 + (index * 5), 
       verified: p.is_verified === 1,
       yearsExperience: p.years_experience,
       reviewCount: p.review_count
@@ -71,7 +68,7 @@ app.get('/api/providers', async (req, res) => {
   }
 });
 
-// Obtener proveedor por ID
+
 app.get('/api/providers/:providerId', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -121,7 +118,7 @@ app.get('/api/providers/:providerId', async (req, res) => {
   }
 });
 
-// Obtener reseñas de un proveedor
+
 app.get('/api/providers/:providerId/reviews', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -149,7 +146,7 @@ app.get('/api/providers/:providerId/reviews', async (req, res) => {
   }
 });
 
-// Obtener servicios de un proveedor
+
 app.get('/api/providers/:providerId/services', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -183,7 +180,61 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
   }
 });
 
+
+app.get('/api/services', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        s.service_id,
+        s.service_title,
+        s.service_description,
+        s.base_price,
+        s.price_type,
+        s.estimated_duration_minutes,
+        c.category_name,
+        pp.provider_id,
+        pp.business_name as provider_name,
+        pp.is_verified as provider_verified,
+        u.user_id,
+        COALESCE(AVG(r.rating), 4.5) as average_rating,
+        COUNT(CASE WHEN r.review_id IS NOT NULL THEN 1 END) as review_count
+      FROM services s
+      JOIN service_categories c ON s.category_id = c.category_id
+      JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+      JOIN users u ON pp.user_id = u.user_id
+      LEFT JOIN reviews r ON u.user_id = r.reviewed_user_id
+      WHERE s.is_active = 1 AND s.approval_status = 'approved'
+      GROUP BY s.service_id, u.user_id
+      ORDER BY s.created_at DESC
+    `;
+
+    const [services] = await db.execute(query);
+
+
+    const formattedServices = services.map(s => ({
+      id: s.service_id.toString(),
+      providerId: s.user_id.toString(),
+      name: s.service_title,
+      category: s.category_name,
+      rating: parseFloat(s.average_rating) || 4.5,
+      location: 'Centro, Ciudad',
+      description: s.service_description,
+      hourlyRate: s.base_price || 0,
+      priceType: s.price_type,
+      estimatedDuration: s.estimated_duration_minutes,
+      verified: s.provider_verified === 1,
+      providerName: s.provider_name,
+      reviewCount: s.review_count
+    }));
+
+    res.json(formattedServices);
+  } catch (error) {
+    console.error('Error obteniendo servicios:', error);
+    res.status(500).json({ error: 'Error obteniendo servicios' });
+  }
+});
+
 const PORT = process.env.PORT || 3004;
 app.listen(PORT, () => {
-  console.log(`🏢 Provider Service corriendo en puerto ${PORT}`);
+  console.log(` Provider Service corriendo en puerto ${PORT}`);
 });

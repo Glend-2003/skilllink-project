@@ -291,15 +291,6 @@ export default function ProviderDetailScreen() {
                 />
                 <Text style={styles.contactButtonText}>Contactar</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity style={styles.scheduleButton}>
-                <MaterialCommunityIcons
-                  name="calendar"
-                  size={20}
-                  color="#3b82f6"
-                />
-                <Text style={styles.scheduleButtonText}>Agendar</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>
