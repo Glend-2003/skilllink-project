@@ -21,6 +21,12 @@ export class ProviderProfile {
   @Column({ name: 'business_description', type: 'text', nullable: true })
   businessDescription: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  latitude: number;
+
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  longitude: number;
+
   @Column({ name: 'years_experience', nullable: true })
   yearsExperience: number;
 
