@@ -1,12 +1,7 @@
 import axios from 'axios';
 
-const API_GATEWAY = 'http://localhost:3000/api/v1';
-
-export const api = axios.create({
-  baseURL: API_GATEWAY,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+const api = axios.create({
+  baseURL: 'http://localhost:3000',  // Este es tu API Gateway
 });
 
 api.interceptors.request.use((config) => {
@@ -16,3 +11,17 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Interceptor para manejar errores
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;

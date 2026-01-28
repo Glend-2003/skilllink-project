@@ -1,35 +1,66 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState, useEffect } from 'react';
+import { Login } from './components/auth/Login';
+import { Register } from './components/auth/Register';
+import { Home } from './components/client/Home';
+import { Navigation } from './Navigation';
+import { Toaster } from 'sonner';
+import { useAuth } from './components/contexts/AuthContext';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { user, isLoading } = useAuth();
+  const [currentView, setCurrentView] = useState('login');
+  const [userMode, setUserMode] = useState<'client' | 'provider'>('client');
+
+  // Si el usuario se loguea exitosamente, cambiamos a la vista 'home'
+  useEffect(() => {
+    if (user) {
+      setCurrentView('home');
+    }
+  }, [user]);
+
+  // Pantalla de carga mínima para no romper el diseño mientras validamos el token
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-green-500 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (isLoading) return null;
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <main className="w-screen min-h-screen overflow-x-hidden">
+      <Toaster position="top-right" richColors />
+      
+      {!user ? (
+        // MODO PÚBLICO: Solo Login o Registro (Diseño Figma)
+        <>
+          {currentView === 'login' && <Login onViewChange={setCurrentView} />}
+          {currentView === 'register' && <Register onViewChange={setCurrentView} />}
+        </>
+      ) : (
+        // MODO PRIVADO: Usuario autenticado
+        <>
+          <Navigation 
+            currentView={currentView} 
+            onViewChange={setCurrentView}
+            userMode={userMode}
+            onModeChange={setUserMode}
+          />
+          <div className="content">
+            {currentView === 'home' && (
+              <Home 
+                onViewChange={setCurrentView} 
+                onProviderSelect={(id) => console.log(id)} 
+              />
+            )}
+            {/* Aquí puedes agregar las otras vistas del prototipo como Chat, History, etc. */}
+          </div>
+        </>
+      )}
+    </main>
+  );
 }
 
-export default App
+export default App;
