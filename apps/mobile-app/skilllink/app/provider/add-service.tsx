@@ -14,6 +14,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import { ServiceGalleryUpload } from '@/components/ServiceGalleryUpload';
 
 interface ServiceCategory {
   categoryId: number;
@@ -27,6 +28,8 @@ export default function AddServiceScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [createdServiceId, setCreatedServiceId] = useState<number | null>(null);
+  const [providerId, setProviderId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     categoryId: 0,
@@ -40,7 +43,25 @@ export default function AddServiceScreen() {
 
   useEffect(() => {
     loadCategories();
+    loadProviderInfo();
   }, []);
+
+  const loadProviderInfo = async () => {
+    try {
+      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProviderId(data.providerId);
+      }
+    } catch (error) {
+      console.error('Error loading provider info:', error);
+    }
+  };
 
   const loadCategories = async () => {
     try {
@@ -103,8 +124,24 @@ export default function AddServiceScreen() {
       });
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Servicio creado correctamente');
-        router.back();
+        const data = await response.json();
+        setCreatedServiceId(data.serviceId);
+        Alert.alert(
+          'Éxito', 
+          'Servicio creado correctamente. Ahora puedes agregar fotos.',
+          [
+            {
+              text: 'Agregar fotos después',
+              onPress: () => router.back(),
+              style: 'cancel',
+            },
+            {
+              text: 'Agregar fotos ahora',
+              onPress: () => {
+              },
+            },
+          ]
+        );
       } else {
         const data = await response.json();
         Alert.alert('Error', data.message || 'No se pudo crear el servicio');
@@ -224,17 +261,50 @@ export default function AddServiceScreen() {
           </View>
         </View>
 
+        {createdServiceId && providerId && (
+          <View style={styles.section}>
+            <ServiceGalleryUpload
+              serviceId={createdServiceId}
+              providerId={providerId}
+              onUploadComplete={(images) => {
+                console.log('Images uploaded:', images);
+                Alert.alert(
+                  'Fotos subidas',
+                  'Las fotos se han agregado al servicio exitosamente',
+                  [
+                    {
+                      text: 'Finalizar',
+                      onPress: () => router.back(),
+                    },
+                  ]
+                );
+              }}
+            />
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || createdServiceId !== null}
         >
           {saving ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>Crear Servicio</Text>
+            <Text style={styles.saveButtonText}>
+              {createdServiceId ? 'Servicio Creado ✓' : 'Crear Servicio'}
+            </Text>
           )}
         </TouchableOpacity>
+
+        {createdServiceId && (
+          <TouchableOpacity
+            style={styles.finishButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.finishButtonText}>Finalizar sin fotos</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </>
   );
@@ -298,5 +368,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  finishButton: {
+    backgroundColor: '#6c757d',
+    margin: 20,
+    marginTop: 0,
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  finishButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

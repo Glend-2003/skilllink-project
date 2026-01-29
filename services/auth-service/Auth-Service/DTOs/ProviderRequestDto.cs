@@ -12,11 +12,6 @@ namespace Auth_Service.DTOs
         public string? Certifications { get; set; }
     }
 
-    public class UpdateProfileDto
-    {
-        public string? PhoneNumber { get; set; }
-    }
-
     public class ReviewProviderRequestDto
     {
         public int RequestId { get; set; }

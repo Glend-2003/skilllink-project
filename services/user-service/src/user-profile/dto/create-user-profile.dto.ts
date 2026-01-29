@@ -31,7 +31,6 @@ export class CreateUserProfileDto {
 
   @IsOptional()
   @IsString()
-  // Validamos que solo aceptemos estos géneros específicos (Evita basura)
   @IsIn(['Masculino', 'Femenino', 'No Binario', 'Otro', 'Prefiero no decir'])
   gender?: string;
 

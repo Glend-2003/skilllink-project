@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Search as SearchIcon, X, DollarSign, Clock } from 'lucide-react-native';
@@ -37,6 +38,7 @@ interface Service {
   verified: boolean;
   providerName: string;
   reviewCount: number;
+  profileImageUrl?: string;
 }
 
 export default function SearchScreen() {
@@ -58,7 +60,6 @@ export default function SearchScreen() {
 
   const loadInitialData = async () => {
     try {
-      // Cargar categorías y servicios en paralelo
       const [categoriesRes, servicesRes] = await Promise.all([
         fetch(`${Config.AUTH_SERVICE_URL}/categories`).catch(() => null),
         fetch(`${Config.PROVIDER_SERVICE_URL}/api/services`).catch(() => null),
@@ -85,7 +86,6 @@ export default function SearchScreen() {
     setSearching(true);
     let filtered = services;
 
-    // Filtrar por categoría seleccionada
     if (selectedCategory) {
       const selectedCategoryName = categories.find(c => c.categoryId === selectedCategory)?.categoryName;
       
@@ -96,7 +96,6 @@ export default function SearchScreen() {
       }
     }
 
-    // Filtrar por búsqueda de texto
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(service =>
@@ -178,9 +177,13 @@ export default function SearchScreen() {
             <Text style={styles.categoryBadgeText}>{item.category}</Text>
           </View>
         </View>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{item.providerName.charAt(0)}</Text>
-        </View>
+        {item.profileImageUrl ? (
+          <Image source={{ uri: item.profileImageUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{item.providerName.charAt(0)}</Text>
+          </View>
+        )}
       </View>
 
       <Text style={styles.description} numberOfLines={2}>
@@ -504,6 +507,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e0e0e0',
   },
   avatarText: {
     fontSize: 18,

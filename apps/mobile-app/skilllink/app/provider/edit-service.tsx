@@ -14,6 +14,8 @@ import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import { ServiceGalleryUpload } from '@/components/ServiceGalleryUpload';
+import { ServiceGalleryView } from '@/components/ServiceGalleryView';
 
 interface ServiceCategory {
   categoryId: number;
@@ -38,6 +40,7 @@ export default function EditServiceScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [providerId, setProviderId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     categoryId: 0,
@@ -51,11 +54,28 @@ export default function EditServiceScreen() {
 
   useEffect(() => {
     loadData();
+    loadProviderInfo();
   }, []);
+
+  const loadProviderInfo = async () => {
+    try {
+      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProviderId(data.providerId);
+      }
+    } catch (error) {
+      console.error('Error loading provider info:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
-      // Cargar categorías
       const catResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/categories`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
@@ -67,7 +87,6 @@ export default function EditServiceScreen() {
         setCategories(catData);
       }
 
-      // Cargar servicio
       const servicesResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
@@ -251,6 +270,30 @@ export default function EditServiceScreen() {
             />
           </View>
         </View>
+
+        {id && (
+          <View style={styles.section}>
+            <ServiceGalleryView
+              serviceId={parseInt(id as string)}
+              editable={true}
+              onImagesChange={() => {
+                console.log('Images updated');
+              }}
+            />
+          </View>
+        )}
+
+        {id && providerId && (
+          <View style={styles.section}>
+            <ServiceGalleryUpload
+              serviceId={parseInt(id as string)}
+              providerId={providerId}
+              onUploadComplete={(images) => {
+                Alert.alert('Éxito', 'Fotos agregadas correctamente');
+              }}
+            />
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}

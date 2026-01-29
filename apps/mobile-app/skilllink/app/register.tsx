@@ -89,7 +89,7 @@ export default function RegisterScreen() {
         const userData = {
           userId: data.userId,
           email: data.email,
-          userType: 'client', // Todos inician como cliente
+          userType: 'client',
           token: data.token,
         };
         login(userData);

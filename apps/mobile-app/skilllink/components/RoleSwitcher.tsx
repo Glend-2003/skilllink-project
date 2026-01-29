@@ -8,7 +8,7 @@ export default function RoleSwitcher() {
   console.log('🎯 RoleSwitcher: isProvider =', isProvider, 'activeRole =', activeRole);
 
   if (!isProvider) {
-    return null; // Solo mostrar si el usuario es proveedor
+    return null;
   }
 
   return (
