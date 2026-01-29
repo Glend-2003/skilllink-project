@@ -168,7 +168,8 @@ namespace AuthController.Controllers
                 phoneNumber = user.PhoneNumber,
                 userType = userType,
                 isActive = user.IsActive,
-                providerStatus = providerRequest?.Status
+                providerStatus = providerRequest?.Status,
+                profileImageUrl = user.ProfileImageUrl
             });
         }
 
@@ -185,6 +186,11 @@ namespace AuthController.Controllers
             if (!string.IsNullOrEmpty(model.PhoneNumber))
             {
                 user.PhoneNumber = model.PhoneNumber;
+            }
+
+            if (!string.IsNullOrEmpty(model.ProfileImageUrl))
+            {
+                user.ProfileImageUrl = model.ProfileImageUrl;
             }
 
             try

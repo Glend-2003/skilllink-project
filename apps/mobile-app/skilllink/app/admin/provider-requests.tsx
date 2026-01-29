@@ -199,7 +199,6 @@ export default function ProviderRequestsScreen() {
         </Text>
       </View>
 
-      {/* Services */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Servicios</Text>
         <Text style={styles.sectionText} numberOfLines={2}>
@@ -207,7 +206,6 @@ export default function ProviderRequestsScreen() {
         </Text>
       </View>
 
-      {/* Actions - Solo para solicitudes pendientes */}
       {request.status === 'pending' && (
         <View style={styles.actionsContainer}>
           <TouchableOpacity

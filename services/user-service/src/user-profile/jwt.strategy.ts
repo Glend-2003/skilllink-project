@@ -2,14 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
-// 1. Definimos una interfaz para el Payload.
-// El [key: string]: any permite que existan las claves largas de .NET sin dar error.
 interface JwtPayload {
   sub?: string;
   email?: string;
   nameid?: string;
   UserId?: string;
-  [key: string]: any; // Comodín para propiedades extrañas como las de Microsoft
+  [key: string]: any;
 }
 
 @Injectable()
@@ -24,14 +22,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    // LOG DE DEPURACIÓN
     console.log(
       '🔓 Token recibido en NestJS. Payload:',
       JSON.stringify(payload),
     );
 
-    // 2. Extracción segura usando la interfaz
-    // TypeScript ahora sabe que estas claves pueden existir gracias a la interfaz
     const userId =
       (payload[
         'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'

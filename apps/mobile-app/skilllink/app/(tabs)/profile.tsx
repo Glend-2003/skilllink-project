@@ -17,6 +17,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { User, LogOut, Mail, Phone, Shield, CheckCircle, Clock, Settings, Briefcase, List } from 'lucide-react-native';
 import { Config } from '../../constants/Config';
 import RoleSwitcher from '@/components/RoleSwitcher';
+import { ProfileImageUploader } from '@/components/ProfileImageUploader';
 
 interface UserProfile {
   userId: number;
@@ -25,6 +26,7 @@ interface UserProfile {
   userType: string;
   isActive: boolean;
   providerStatus?: 'pending' | 'approved' | 'rejected' | null;
+  profileImageUrl?: string;
 }
 
 export default function ProfileScreen() {
@@ -172,9 +174,14 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <User color="#2563eb" size={48} />
-        </View>
+        <ProfileImageUploader
+          userId={profile?.userId || 0}
+          currentImageUrl={profile?.profileImageUrl}
+          onUploadComplete={(imageUrl) => {
+            setProfile(prev => prev ? { ...prev, profileImageUrl: imageUrl } : null);
+          }}
+          token={user?.token || ''}
+        />
         <Text style={styles.headerTitle}>Mi Perfil</Text>
       </View>
 

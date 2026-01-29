@@ -7,13 +7,10 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
-// --- 1. Base de Datos ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// --- 2. Configuración de Identity (LA SOLUCIÓN) ---
-// Usamos AddIdentityCore que es mejor para APIs, y agregamos Roles explícitamente.
 builder.Services.AddIdentityCore<User>(options => 
     {
         options.Password.RequireDigit = false;
@@ -26,8 +23,7 @@ builder.Services.AddIdentityCore<User>(options =>
 
 
 builder.Services.AddScoped<IPasswordHasher<User>, Auth_Service.Services.BCryptPasswordHasher>();
-// --- 3. Configuración de Autenticación (JWT) ---
-// Agregamos esto para que sepa que usamos Tokens y no Cookies
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -52,8 +48,6 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// --- 4. Middleware ---
-
 app.UseRouting();
 
 if (app.Environment.IsDevelopment())
@@ -61,8 +55,8 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.UseAuthentication(); // <--- Identifica quién eres
-app.UseAuthorization();  // <--- Verifica qué puedes hacer
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

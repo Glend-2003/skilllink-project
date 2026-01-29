@@ -337,7 +337,6 @@ export default function CategoriesManagementScreen() {
         )}
       </View>
 
-      {/* Modal para crear/editar */}
       <Modal
         visible={modalVisible}
         animationType="slide"

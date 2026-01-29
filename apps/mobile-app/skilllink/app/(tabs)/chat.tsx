@@ -16,6 +16,7 @@ type ApiConversation = {
   last_activity_at: string | null;
   last_message_at: string | null;
   created_at: string;
+  other_user_profile_image: string | null;
 };
 
 interface ConversationItemUI {
@@ -25,6 +26,7 @@ interface ConversationItemUI {
   lastMessage: string;
   time: string;
   avatar: string;
+  profileImageUrl?: string;
 }
 
 export default function ChatScreen() {
@@ -54,6 +56,7 @@ export default function ChatScreen() {
         time: formatTime(c.last_activity_at || c.last_message_at || c.created_at),
         // PNG avatar to ensure RN Image compatibility
         avatar: `https://i.pravatar.cc/150?u=${c.other_user_id}`,
+        profileImageUrl: c.other_user_profile_image || undefined,
       }));
       setItems(mapped);
     } catch (e) {
@@ -105,7 +108,13 @@ export default function ChatScreen() {
       onPress={() => router.push(`/chat/${item.id}`)}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        {item.profileImageUrl ? (
+          <Image source={{ uri: item.profileImageUrl }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{item.providerName.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.conversationInfo}>
@@ -195,6 +204,20 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: '#e0e0e0',
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
   },
   unreadBadge: {
     position: 'absolute',

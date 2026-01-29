@@ -13,6 +13,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 import { Plus, Edit2, Trash2, DollarSign, Clock } from 'lucide-react-native';
+import { ServiceGalleryView } from '@/components/ServiceGalleryView';
 
 interface Service {
   serviceId: number;
@@ -172,6 +173,12 @@ export default function ServicesScreen() {
       <Text style={styles.description} numberOfLines={2}>
         {item.serviceDescription}
       </Text>
+
+      <ServiceGalleryView
+        serviceId={item.serviceId}
+        showUploadButton={false}
+        maxImagesToShow={3}
+      />
 
       <View style={styles.infoRow}>
         <View style={styles.infoItem}>

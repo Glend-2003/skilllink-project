@@ -155,6 +155,7 @@ app.get("/api/conversations/:userId", async (req, res) => {
           ELSE c.participant1_user_id
         END AS other_user_id,
         u_other.email AS other_user_email,
+        u_other.profile_image_url AS other_user_profile_image,
         NULL AS other_user_name,
         1 AS is_provider,
         (SELECT m.message_text FROM messages m 

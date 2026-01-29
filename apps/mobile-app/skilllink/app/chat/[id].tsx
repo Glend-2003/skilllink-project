@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, DeviceEventEmitter } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, DeviceEventEmitter, Image } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { io, Socket } from "socket.io-client";
@@ -22,6 +22,7 @@ interface Provider {
   rating: number;
   avatar: string;
   verified: boolean;
+  profileImageUrl?: string;
 }
 
 const mockProviders: Record<string, Provider> = {
@@ -125,9 +126,9 @@ export default function ChatDetail() {
               rating: providerData.rating,
               avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerData.id}`,
               verified: providerData.verified,
+              profileImageUrl: providerData.profileImageUrl,
             });
           } else {
-            // Si no es un provider registrado, usar datos básicos del email
             setProvider({
               id: conversation.other_user_id.toString(),
               name: conversation.other_user_email || 'Usuario',
@@ -171,7 +172,6 @@ export default function ChatDetail() {
         conversationId: parseInt(id as string)
       });
       
-      // Cargar mensajes previos
       loadPreviousMessages();
     });
 
@@ -210,7 +210,6 @@ export default function ChatDetail() {
     };
 
     socket.emit("send_message", messageData);
-    // Notificar a la lista de chats para refrescar inmediatamente
     DeviceEventEmitter.emit('conversation_sent', { conversationId: parseInt(id as string) });
     setText("");
   };
@@ -245,11 +244,19 @@ export default function ChatDetail() {
 
   return (
     <View style={styles.container}>
-      {/* Header con información del proveedor */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
+        
+        {provider.profileImageUrl ? (
+          <Image source={{ uri: provider.profileImageUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{provider.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+
         <View style={styles.providerInfo}>
           <Text style={styles.providerName}>{provider.name}</Text>
           <View style={styles.providerDetails}>
@@ -335,12 +342,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 50, // Para notch
+    paddingTop: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginLeft: 12,
+    backgroundColor: '#e0e0e0',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginLeft: 12,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
   },
   providerInfo: {
     flex: 1,
@@ -387,7 +415,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     padding: 16,
-    paddingBottom: 100, // Espacio para input
+    paddingBottom: 100,
   },
   messageContainer: {
     marginBottom: 12,

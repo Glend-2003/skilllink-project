@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image } from "react-native";
 import { router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ interface Provider {
   description: string;
   hourlyRate?: number;
   verified: boolean;
+  profileImageUrl?: string;
 }
 
 interface Category {
@@ -51,11 +52,9 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const { logout } = useAuth();
 
-  // Cargar servicios y categorías desde la API
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Cargar categorías desde la BD
         console.log('Cargando categorías desde:', `${Config.AUTH_SERVICE_URL}/categories`);
         const categoriesResponse = await fetch(`${Config.AUTH_SERVICE_URL}/categories`);
         
@@ -69,7 +68,6 @@ export default function HomeScreen() {
         const categoriesData = categoriesText ? JSON.parse(categoriesText) : [];
         setCategories(Array.isArray(categoriesData) ? categoriesData.filter((cat: Category) => cat.isActive) : []);
 
-        // Cargar servicios aprobados
         console.log('Cargando servicios desde:', `${Config.PROVIDER_SERVICE_URL}/api/services`);
         const servicesResponse = await fetch(`${Config.PROVIDER_SERVICE_URL}/api/services`);
         
@@ -84,7 +82,6 @@ export default function HomeScreen() {
         setAllProviders(Array.isArray(servicesData) ? servicesData : []);
         setFilteredProviders(Array.isArray(servicesData) ? servicesData : []);
         
-        // Seleccionar servicios destacados (los mejor valorados)
         if (Array.isArray(servicesData) && servicesData.length > 0) {
           const featured = [...servicesData].sort((a, b) => b.rating - a.rating).slice(0, 5);
           setFeaturedServices(featured);
@@ -103,7 +100,6 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  // Filtrar proveedores cuando cambie la categoría
   useEffect(() => {
     let filtered = allProviders;
 
@@ -125,13 +121,11 @@ export default function HomeScreen() {
   }
 
   const handleViewProfile = (provider: Provider) => {
-    // Usar providerId si existe, sino user el id del servicio
     const id = (provider as any).providerId || provider.id;
     router.push(`/provider/${id}`);
   };
 
   const handleContactProvider = (provider: Provider) => {
-    // Usar providerId si existe, sino user el id del servicio
     const id = (provider as any).providerId || provider.id;
     router.push(`/chat/${id}`);
   };
@@ -228,9 +222,13 @@ export default function HomeScreen() {
             <Text style={styles.location}>• {item.location}</Text>
           </View>
         </View>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-        </View>
+        {item.profileImageUrl ? (
+          <Image source={{ uri: item.profileImageUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+          </View>
+        )}
       </View>
 
       <Text style={styles.description} numberOfLines={2}>
@@ -714,6 +712,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#e0e0e0',
   },
   avatarText: {
     fontSize: 20,

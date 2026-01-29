@@ -31,6 +31,7 @@ app.get('/api/providers', async (req, res) => {
       SELECT 
         u.user_id,
         u.email,
+        u.profile_image_url,
         pp.provider_id,
         pp.business_name,
         pp.business_description,
@@ -58,7 +59,8 @@ app.get('/api/providers', async (req, res) => {
       hourlyRate: 25 + (index * 5), 
       verified: p.is_verified === 1,
       yearsExperience: p.years_experience,
-      reviewCount: p.review_count
+      reviewCount: p.review_count,
+      profileImageUrl: p.profile_image_url
     }));
 
     res.json(formattedProviders);
@@ -77,6 +79,7 @@ app.get('/api/providers/:providerId', async (req, res) => {
       SELECT 
         u.user_id,
         u.email,
+        u.profile_image_url,
         pp.provider_id,
         pp.business_name,
         pp.business_description,
@@ -108,7 +111,8 @@ app.get('/api/providers/:providerId', async (req, res) => {
       yearsExperience: p.years_experience,
       serviceRadius: p.service_radius_km,
       reviewCount: p.review_count,
-      email: p.email
+      email: p.email,
+      profileImageUrl: p.profile_image_url
     };
 
     res.json(provider);
@@ -154,6 +158,7 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
     const query = `
       SELECT 
         s.service_id as id,
+        s.service_id as serviceId,
         s.service_title as name,
         s.service_description as description,
         s.base_price as price,
@@ -196,6 +201,7 @@ app.get('/api/services', async (req, res) => {
         pp.business_name as provider_name,
         pp.is_verified as provider_verified,
         u.user_id,
+        u.profile_image_url,
         COALESCE(AVG(r.rating), 4.5) as average_rating,
         COUNT(CASE WHEN r.review_id IS NOT NULL THEN 1 END) as review_count
       FROM services s
@@ -224,7 +230,8 @@ app.get('/api/services', async (req, res) => {
       estimatedDuration: s.estimated_duration_minutes,
       verified: s.provider_verified === 1,
       providerName: s.provider_name,
-      reviewCount: s.review_count
+      reviewCount: s.review_count,
+      profileImageUrl: s.profile_image_url
     }));
 
     res.json(formattedServices);
