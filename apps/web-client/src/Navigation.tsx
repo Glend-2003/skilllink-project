@@ -1,8 +1,8 @@
 import { Menu, User, MessageCircle, History, LayoutDashboard, Settings, LogOut, Home, Search } from 'lucide-react';
-import { Button } from './components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from './components/ui/avatar';
-import { Switch } from './components/ui/switch';
-import { Label } from './components/ui/label';
+import { Button } from './ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 import {
   Sheet,
   SheetContent,
@@ -10,24 +10,20 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from './components/ui/sheet';
-import { useAuth } from "./components/contexts/AuthContext";
+} from './ui/sheet';
+import { UserMode } from '../types';
+import { currentUser } from '../data/mockData';
 
 interface NavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
-  userMode: 'client' | 'provider';
-  onModeChange: (mode: 'client' | 'provider') => void;
+  userMode: UserMode;
+  onModeChange: (mode: UserMode) => void;
 }
 
 export function Navigation({ currentView, onViewChange, userMode, onModeChange }: NavigationProps) {
-  const { user, logout } = useAuth();
+  const isProvider = userMode === 'provider';
 
-  const handleLogout = () => {
-    logout();
-    onViewChange('login');
-  };
-  
   const clientMenuItems = [
     { id: 'home', label: 'Inicio', icon: Home },
     { id: 'search', label: 'Buscar', icon: Search },
