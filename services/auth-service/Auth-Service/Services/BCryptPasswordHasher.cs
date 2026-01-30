@@ -6,19 +6,19 @@ namespace Auth_Service.Services
 {
     public class BCryptPasswordHasher : IPasswordHasher<User>
     {
-        // 1. Al registrarse: Encriptar con BCrypt
+        // 1. When creating a user: Hash with BCrypt
         public string HashPassword(User user, string password)
         {
-            // Genera el hash tipo $2a$11$...
+   
             return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
-        // 2. Al loguearse: Verificar con BCrypt
+        // 2. When logging in: Verify with BCrypt
         public PasswordVerificationResult VerifyHashedPassword(User user, string hashedPassword, string providedPassword)
         {
             try
             {
-                // Verificar si la contraseña coincide con el hash
+                // Verify if the password matches the hash
                 bool isValid = BCrypt.Net.BCrypt.Verify(providedPassword, hashedPassword);
 
                 if (isValid)
@@ -32,7 +32,7 @@ namespace Auth_Service.Services
             }
             catch
             {
-                // Si el formato no es válido (por si acaso), fallamos
+                // If the format is not valid (just in case), fail the verification
                 return PasswordVerificationResult.Failed;
             }
         }

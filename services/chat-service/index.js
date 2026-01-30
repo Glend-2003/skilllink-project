@@ -24,7 +24,7 @@ let io;
 (async () => {
   try {
     db = await mysql.createConnection(dbConfig);
-    console.log("✅ Conectado a MySQL");
+    console.log("Connected to MySQL database");
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS users (
@@ -61,17 +61,17 @@ let io;
       )
     `);
 
-    console.log("✅ Tablas verificadas/creadas");
+    console.log("Tables verified/created successfully");
     
-    // Crear servidor e inicializar socket.io después de que la DB esté lista
+    // Create server and initialize socket.io after the DB is ready
     server = http.createServer(app);
     io = new Server(server, {
       cors: { origin: "*", methods: ["GET", "POST"] }
     });
     
-    // Configurar Socket.IO
+    // Configure Socket.IO
     io.on("connection", (socket) => {
-      console.log("🔌 User connected:", socket.id);
+      console.log("User connected:", socket.id);
 
       socket.on("join_chat", ({ conversationId }) => {
         socket.join(conversationId);
@@ -100,24 +100,24 @@ let io;
       });
     });
     
-    // Iniciar servidor después de que la DB esté lista
+    // Start server after DB is ready
     const PORT = process.env.PORT || 3003;
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`💬 Chat Service corriendo en http://localhost:${PORT}`);
+      console.log(`Chat Service running at http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("❌ Error conectando a MySQL:", error);
+    console.error("Error connecting to MySQL:", error);
     process.exit(1);
   }
 })();
 
-// REST: Crear conversación
+// REST: Create conversation
 app.post("/api/conversations", async (req, res) => {
   try {
     const { participant1_user_id, participant2_user_id } = req.body;
 
     if (!participant1_user_id || !participant2_user_id) {
-      return res.status(400).json({ error: "Ambos IDs de participantes son requeridos" });
+      return res.status(400).json({ error: "Both participant IDs are required" });
     }
 
     const [existing] = await db.execute(
@@ -140,12 +140,12 @@ app.post("/api/conversations", async (req, res) => {
       participant2_user_id
     });
   } catch (error) {
-    console.error("❌ Error creating conversation:", error);
-    res.status(500).json({ error: "Error al crear conversación" });
+    console.error("Error creating conversation:", error);
+    res.status(500).json({ error: "Error creating conversation" });
   }
 });
 
-// REST: Obtener conversaciones
+// REST: Get conversations
 app.get("/api/conversations/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -181,12 +181,12 @@ app.get("/api/conversations/:userId", async (req, res) => {
 
     res.json(conversations);
   } catch (error) {
-    console.error("❌ Error fetching conversations:", error);
-    res.status(500).json({ error: "Error al obtener conversaciones" });
+    console.error("Error fetching conversations:", error);
+    res.status(500).json({ error: "Error fetching conversations" });
   }
 });
 
-// REST: Obtener mensajes de una conversación
+// REST: Get messages of a conversation
 app.get("/api/conversations/:conversationId/messages", async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -201,7 +201,7 @@ app.get("/api/conversations/:conversationId/messages", async (req, res) => {
 
     res.json(messages);
   } catch (error) {
-    console.error("❌ Error fetching messages:", error);
-    res.status(500).json({ error: "Error al obtener mensajes" });
+    console.error("Error fetching messages:", error);
+    res.status(500).json({ error: "Error fetching messages" });
   }
 });

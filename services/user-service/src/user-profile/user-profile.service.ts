@@ -11,60 +11,60 @@ export class UserProfileService {
     private profileRepository: Repository<UserProfile>,
   ) {}
 
-  // 1. Crear o Actualizar Perfil
+  // 1. Create or Update Profile
   async createOrUpdate(
     userId: number,
     createProfileDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
-    // Buscamos si ya existe un perfil para este usuario
+    // Check if a profile already exists for this user
     const existingProfile = await this.profileRepository.findOne({
       where: { user_id: userId },
     });
 
     if (existingProfile) {
-      // Si existe, actualizamos los campos
+      // If it exists, update the fields
       this.profileRepository.merge(existingProfile, createProfileDto);
       return this.profileRepository.save(existingProfile);
     } else {
-      // Si no existe, creamos uno nuevo vinculado al userId
+      // If it doesn't exist, create a new one linked to the userId
       const newProfile = this.profileRepository.create({
         ...createProfileDto,
-        user_id: userId, // Aquí vinculamos con el ID que viene del Token
+        user_id: userId, // Here we link with the ID that comes from the Token
       });
       return this.profileRepository.save(newProfile);
     }
   }
 
-  // 2. Obtener Perfil por ID de usuario
+  // 2. Get Profile by User ID
   async findOne(userId: number): Promise<UserProfile | null> {
     return this.profileRepository.findOne({
       where: { user_id: userId },
     });
   }
-  // 3. Actualizar Perfil (PATCH)
+  // 3. Update Profile (PATCH)
   async update(
     userId: number,
     updateDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
-    // .update() de TypeORM es muy eficiente, busca por ID y cambia solo lo que envíes
+    // TypeORM's .update() is very efficient, it looks for the ID and changes only what you send
     await this.profileRepository.update({ user_id: userId }, updateDto);
 
     // Devolvemos el perfil ya actualizado para que el usuario vea los cambios
     const updatedProfile = await this.findOne(userId);
     if (!updatedProfile) {
-      throw new Error('No se encontró el perfil después de actualizar');
+      throw new Error('Profile not found after update');
     }
     return updatedProfile;
   }
 
-  // 4. Eliminar Perfil (DELETE)
+  // 4. Delete Profile (DELETE)
   async remove(userId: number): Promise<{ message: string }> {
     const result = await this.profileRepository.delete({ user_id: userId });
 
     if (result.affected === 0) {
-      throw new Error('No se encontró un perfil para eliminar');
+      throw new Error('Profile not found for deletion');
     }
 
-    return { message: 'Perfil eliminado correctamente' };
+    return { message: 'Profile deleted successfully' };
   }
 }

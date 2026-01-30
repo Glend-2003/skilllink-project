@@ -38,5 +38,4 @@ export class CreateProviderDto {
   @IsBoolean()
   availableForWork?: boolean;
 
-  // 'isVerified', 'trustBadge' y 'verificationDate' managed internally.
 }

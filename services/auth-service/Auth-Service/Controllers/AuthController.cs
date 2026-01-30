@@ -46,7 +46,6 @@ namespace AuthController.Controllers
                 SecurityStamp = Guid.NewGuid().ToString()
             };
 
-            // 3. ENCRIPTAR CONTRASEÑA MANUALMENTE (Usando BCrypt)
             user.PasswordHash = _passwordHasher.HashPassword(user, model.password);
 
             try 

@@ -3,16 +3,16 @@ const io = require('socket.io-client');
 const socket = io('http://localhost:3003');
 
 socket.on('connect', () => {
-  console.log('Script: Conectado al servidor de chat');
+  console.log('Script: Connecting to chat service...');
   socket.emit('join_chat', { conversationId: '4', userId: 9 }); 
 });
 
 socket.on('receive_message', (data) => {
-  console.log(`Mensaje recibido de ${data.senderId}: ${data.content}`);
+  console.log(`Message received from ${data.senderId}: ${data.content}`);
 });
 
 socket.on('disconnect', () => {
-  console.log('Desconectado del servidor');
+  console.log('Disconnected from server');
 });
 
 
@@ -23,13 +23,13 @@ function sendMessage(content) {
     content: content,
   };
   socket.emit('send_message', messageData);
-  console.log(`Mensaje enviado: ${content}`);
+  console.log(`Message sent: ${content}`);
 }
 
 socket.on('connect', () => {
-  console.log('Script: Conectado');
+  console.log('Script: Connected to chat service.');
   setTimeout(() => {
-    sendMessage('Mensaje de prueba manual');
+    sendMessage('Manual test message');
   }, 1000);
 });
 
@@ -43,4 +43,4 @@ rl.on('line', (input) => {
   sendMessage(input);
 });
 
-console.log('Escribe mensajes y presiona Enter para enviar. Ctrl+C para salir.');
+console.log('Type messages and press Enter to send. Ctrl+C to exit.');
