@@ -3,8 +3,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { Config } from '@/constants/Config';
+import { useAuth } from './context/AuthContext';
 
 export default function RegisterScreen() {
+  const { login } = useAuth();
   const [step, setStep] = useState(1);
   const [userType, setUserType] = useState<'client' | 'provider'>('client');
   const [formData, setFormData] = useState({
@@ -13,6 +15,10 @@ export default function RegisterScreen() {
     phone: '',
     password: '',
     confirmPassword: '',
+    // Provider-specific fields
+    businessName: '',
+    description: '',
+    location: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -37,6 +43,13 @@ export default function RegisterScreen() {
     if (!formData.name || !formData.email || !formData.password) {
       Alert.alert("Error", "Por favor completa todos los campos obligatorios");
       return;
+    }
+
+    if (userType === 'provider') {
+      if (!formData.businessName || !formData.description || !formData.location) {
+        Alert.alert("Error", "Por favor completa todos los campos de proveedor");
+        return;
+      }
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -72,9 +85,60 @@ export default function RegisterScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert("Éxito", data.message, [
-          { text: "OK", onPress: () => router.replace("/(tabs)") },
-        ]);
+        // Save user data to auth context
+        const userData = {
+          userId: data.userId,
+          email: data.email,
+          userType: 'client',
+          token: data.token,
+        };
+        login(userData);
+
+        // If user registered as provider, create provider request
+        if (userType === 'provider') {
+          try {
+            const providerResponse = await fetch(`${Config.AUTH_SERVICE_URL}/provider-request`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${data.token}`,
+              },
+              body: JSON.stringify({
+                businessName: formData.businessName,
+                description: formData.description,
+                services: formData.description, // Using description as services
+                location: formData.location,
+              }),
+            });
+
+            if (providerResponse.ok) {
+              Alert.alert(
+                "Registro Exitoso",
+                "Tu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente. Te notificaremos cuando sea aprobada.",
+                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
+              );
+            } else {
+              const errorData = await providerResponse.json();
+              console.error('Provider request error:', errorData);
+              Alert.alert(
+                "Cuenta Creada",
+                "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
+                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
+              );
+            }
+          } catch (error) {
+            console.error('Provider request exception:', error);
+            Alert.alert(
+              "Cuenta Creada",
+              "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
+              [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
+            );
+          }
+        } else {
+          Alert.alert("Éxito", "Tu cuenta ha sido creada exitosamente", [
+            { text: "OK", onPress: () => router.replace("/(tabs)") },
+          ]);
+        }
       } else {
         Alert.alert("Error", data.message || "Error al registrar.");
       }
@@ -182,7 +246,9 @@ export default function RegisterScreen() {
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Completa tu registro</Text>
               <Text style={styles.cardDescription}>
-                Crea tu cuenta como {userType === 'client' ? 'Cliente' : 'Proveedor'}
+                {userType === 'client' 
+                  ? 'Crea tu cuenta como Cliente'
+                  : 'Crea tu cuenta y solicitud de proveedor'}
               </Text>
             </View>
             <View style={styles.cardContent}>
@@ -212,6 +278,52 @@ export default function RegisterScreen() {
                   />
                 </View>
               </View>
+
+              {userType === 'provider' && (
+                <>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Nombre del Negocio/Servicio *</Text>
+                    <View style={styles.inputContainer}>
+                      <Ionicons name="briefcase" size={20} color="#9ca3af" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Ej: Plomería García"
+                        value={formData.businessName}
+                        onChangeText={(value) => handleInputChange('businessName', value)}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Descripción de Servicios *</Text>
+                    <View style={styles.inputContainer}>
+                      <Ionicons name="document-text" size={20} color="#9ca3af" style={styles.inputIcon} />
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        placeholder="Describe detalladamente los servicios que ofreces"
+                        value={formData.description}
+                        onChangeText={(value) => handleInputChange('description', value)}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Ubicación *</Text>
+                    <View style={styles.inputContainer}>
+                      <Ionicons name="location" size={20} color="#9ca3af" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Ej: Ciudad de Guatemala, Zona 10"
+                        value={formData.location}
+                        onChangeText={(value) => handleInputChange('location', value)}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Correo electrónico *</Text>
@@ -507,6 +619,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     fontSize: 16,
+  },
+  textArea: {
+    minHeight: 80,
+    paddingTop: 12,
   },
   eyeIcon: {
     padding: 4,

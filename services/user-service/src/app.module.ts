@@ -11,7 +11,7 @@ import { UserProfileModule } from './user-profile/user-profile.module';
       host: 'localhost',
       port: 3306,
       username: 'root',
-      password: 'root', // Sin contraseña
+      password: '',
       database: 'skilllink_db',
       entities: [UserProfile],
       synchronize: true,

@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import { ServiceGalleryView } from '@/components/ServiceGalleryView';
 
 interface Provider {
   id: string;
@@ -26,10 +27,12 @@ interface Provider {
   verified: boolean;
   yearsExperience: number;
   reviewCount: number;
+  profileImageUrl?: string;
 }
 
 interface Service {
   id: string;
+  serviceId?: number;
   name: string;
   description: string;
   price: number;
@@ -189,7 +192,7 @@ export default function ProviderDetailScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#3b82f6" />
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Perfil del Proveedor</Text>
         <View style={{ width: 24 }} />
@@ -200,11 +203,18 @@ export default function ProviderDetailScreen() {
         <View style={styles.providerCard}>
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {provider.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            {provider.profileImageUrl ? (
+              <Image 
+                source={{ uri: provider.profileImageUrl }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {provider.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Provider Info */}
@@ -278,6 +288,50 @@ export default function ProviderDetailScreen() {
 
             <Text style={styles.description}>{provider.description}</Text>
 
+            {/* Info adicional */}
+            <View style={styles.infoSection}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <View style={styles.infoIconContainer}>
+                    <MaterialCommunityIcons name="star" size={20} color="#f59e0b" />
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>Calificación</Text>
+                    <Text style={styles.infoValue}>{provider.rating.toFixed(1)} / 5.0</Text>
+                  </View>
+                </View>
+                <View style={styles.infoItem}>
+                  <View style={styles.infoIconContainer}>
+                    <MaterialCommunityIcons name="account-group" size={20} color="#3b82f6" />
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>Reseñas</Text>
+                    <Text style={styles.infoValue}>{provider.reviewCount}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <View style={styles.infoIconContainer}>
+                    <MaterialCommunityIcons name="briefcase-check" size={20} color="#10b981" />
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>Experiencia</Text>
+                    <Text style={styles.infoValue}>{provider.yearsExperience} años</Text>
+                  </View>
+                </View>
+                <View style={styles.infoItem}>
+                  <View style={styles.infoIconContainer}>
+                    <MaterialCommunityIcons name="cash-multiple" size={20} color="#059669" />
+                  </View>
+                  <View>
+                    <Text style={styles.infoLabel}>Tarifa/hora</Text>
+                    <Text style={styles.infoValue}>${provider.hourlyRate}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
             {/* Buttons */}
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
@@ -290,15 +344,6 @@ export default function ProviderDetailScreen() {
                   color="white"
                 />
                 <Text style={styles.contactButtonText}>Contactar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.scheduleButton}>
-                <MaterialCommunityIcons
-                  name="calendar"
-                  size={20}
-                  color="#3b82f6"
-                />
-                <Text style={styles.scheduleButtonText}>Agendar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -344,6 +389,17 @@ export default function ProviderDetailScreen() {
                   <Text style={styles.serviceDescription}>
                     {service.description}
                   </Text>
+                  
+                  {service.serviceId && (
+                    <View style={styles.serviceGallery}>
+                      <ServiceGalleryView
+                        serviceId={service.serviceId}
+                        editable={false}
+                        maxImagesToShow={5}
+                      />
+                    </View>
+                  )}
+                  
                   <View style={styles.serviceFooter}>
                     <View style={styles.durationBadge}>
                       <MaterialCommunityIcons
@@ -465,15 +521,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 50,
+    paddingBottom: 12,
+    backgroundColor: '#3b82f6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: 'white',
   },
   backButton: {
     padding: 8,
@@ -529,6 +589,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#e0e0e0',
   },
   avatarText: {
     fontSize: 32,
@@ -700,6 +766,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 10,
   },
+  serviceGallery: {
+    marginVertical: 12,
+    marginHorizontal: -12,
+    paddingHorizontal: 12,
+  },
   serviceFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -800,5 +871,44 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 6,
     marginTop: 8,
+  },
+  infoSection: {
+    width: '100%',
+    marginVertical: 16,
+    gap: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  infoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  infoIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
   },
 });

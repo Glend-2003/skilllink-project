@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, MessageCircle } from "lucide-react-native";
+import { Home, MessageCircle, User, Search } from "lucide-react-native";
 import { Platform } from "react-native";
 
 export default function TabsLayout() {
@@ -33,12 +33,32 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="search"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <Search color={color} size={22} />
+          ),
+          tabBarLabel: 'Buscar',
+        }}
+      />
+
+      <Tabs.Screen
         name="chat"
         options={{
           tabBarIcon: ({ color }) => (
             <MessageCircle color={color} size={22} />
           ),
           tabBarLabel: 'Chats',
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <User color={color} size={22} />
+          ),
+          tabBarLabel: 'Perfil',
         }}
       />
     </Tabs>

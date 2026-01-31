@@ -93,7 +93,6 @@ export class RequestsService {
     const request = await this.findOne(id);
     const updateData: Partial<ServiceRequest> = { ...updateRequestDto };
 
-    // Si completan el servicio, guardamos la fecha
     if (
       updateRequestDto.status === 'completed' &&
       request.status !== 'completed'

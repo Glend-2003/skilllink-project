@@ -8,6 +8,7 @@ using Auth_Service.Models;
 using Auth_Service.DTOs;
 using Auth_Service.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace AuthController.Controllers
 {
@@ -31,31 +32,26 @@ namespace AuthController.Controllers
         [HttpPost("register")]
        public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
-            // 1. Verificar si existe (Manual)
             var userExists = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
             if (userExists != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
-            // 2. Crear Objeto User
             User user = new User()
             {
                 Email = model.email,
+                PhoneNumber = model.phoneNumber,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 SecurityStamp = Guid.NewGuid().ToString()
             };
 
-            // 3. ENCRIPTAR CONTRASEÑA MANUALMENTE (Usando BCrypt)
             user.PasswordHash = _passwordHasher.HashPassword(user, model.password);
 
             try 
             {
-                // 4. GUARDAR USUARIO (Directo a la BD)
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
-                // 5. ASIGNAR ROL (Directo a la tabla intermedia)
-                // Asumimos que el Rol ID 1 es "Client". 
                 var userRole = new UserRole 
                 { 
                     UserId = user.Id, 
@@ -65,7 +61,31 @@ namespace AuthController.Controllers
                 _context.UserRoles.Add(userRole);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { Status = "Success", Message = "Usuario creado exitosamente!" });
+                var authClaims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, user.Email),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Role, "Client") 
+                };
+
+                var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+                var token = new JwtSecurityToken(
+                    issuer: _configuration["Jwt:Issuer"],
+                    audience: _configuration["Jwt:Audience"],
+                    expires: DateTime.Now.AddHours(3),
+                    claims: authClaims,
+                    signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
+                );
+
+                return Ok(new 
+                { 
+                    Status = "Success", 
+                    Message = "Usuario creado exitosamente!",
+                    token = new JwtSecurityTokenHandler().WriteToken(token),
+                    userId = user.Id,
+                    email = user.Email
+                });
             }
             catch (Exception ex)
             {
@@ -76,10 +96,10 @@ namespace AuthController.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-            // 1. Buscamos usuario E INCLUIMOS la tabla de roles
+
             var user = await _context.Users
-                .Include(u => u.UserRoles) // Traer tabla intermedia
-                .ThenInclude(ur => ur.Role) // Traer nombre del rol
+                .Include(u => u.UserRoles) 
+                .ThenInclude(ur => ur.Role) 
                 .FirstOrDefaultAsync(u => u.Email == model.email);
 
             if (user != null && await _userManager.CheckPasswordAsync(user, model.password))
@@ -90,8 +110,6 @@ namespace AuthController.Controllers
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 };
-
-                // 2. Sacamos los roles de la lista cargada
                 foreach (var ur in user.UserRoles)
                 {
                     if(ur.Role != null) 
@@ -117,6 +135,251 @@ namespace AuthController.Controllers
                 });
             }
             return Unauthorized();
+        }
+
+        [Authorize]
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound(new { Status = "Error", Message = "Usuario no encontrado" });
+
+            var providerRequest = await _context.ProviderRequests
+                .Where(pr => pr.UserId == userId)
+                .OrderByDescending(pr => pr.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            var roles = user.UserRoles.Select(ur => ur.Role?.Name?.ToLower()).Where(r => r != null).ToList();
+            var userType = roles.Contains("admin") ? "admin" : 
+                          roles.Contains("provider") ? "provider" : 
+                          roles.FirstOrDefault() ?? "client";
+
+            return Ok(new
+            {
+                userId = user.Id,
+                email = user.Email,
+                phoneNumber = user.PhoneNumber,
+                userType = userType,
+                isActive = user.IsActive,
+                providerStatus = providerRequest?.Status,
+                profileImageUrl = user.ProfileImageUrl
+            });
+        }
+
+        [Authorize]
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return NotFound(new { Status = "Error", Message = "Usuario no encontrado" });
+
+            if (!string.IsNullOrEmpty(model.PhoneNumber))
+            {
+                user.PhoneNumber = model.PhoneNumber;
+            }
+
+            if (!string.IsNullOrEmpty(model.ProfileImageUrl))
+            {
+                user.ProfileImageUrl = model.ProfileImageUrl;
+            }
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Perfil actualizado exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error actualizando perfil", Detail = ex.Message });
+            }
+        }
+
+        [Authorize]
+        [HttpPost("provider-request")]
+        public async Task<IActionResult> CreateProviderRequest([FromBody] ProviderRequestDto model)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            
+            var user = await _context.Users
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return NotFound(new { Status = "Error", Message = "Usuario no encontrado" });
+
+            var isProvider = user.UserRoles.Any(ur => ur.Role?.Name == "Provider");
+            if (isProvider)
+                return BadRequest(new { Status = "Error", Message = "El usuario ya es un proveedor" });
+
+            var existingRequest = await _context.ProviderRequests
+                .Where(pr => pr.UserId == userId && pr.Status == "pending")
+                .FirstOrDefaultAsync();
+
+            if (existingRequest != null)
+                return BadRequest(new { Status = "Error", Message = "Ya tienes una solicitud pendiente" });
+
+            var providerRequest = new ProviderRequest
+            {
+                UserId = userId,
+                BusinessName = model.BusinessName,
+                Description = model.Description,
+                Services = model.Services,
+                Experience = model.Experience,
+                Location = model.Location,
+                HourlyRate = model.HourlyRate,
+                Portfolio = model.Portfolio,
+                Certifications = model.Certifications,
+                Status = "pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                _context.ProviderRequests.Add(providerRequest);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Solicitud enviada exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error enviando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "admin")]
+        [HttpGet("provider-requests")]
+        public async Task<IActionResult> GetProviderRequests([FromQuery] string? status = null)
+        {
+            var query = _context.ProviderRequests
+                .Include(pr => pr.User)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(pr => pr.Status == status);
+            }
+
+            var requests = await query
+                .OrderByDescending(pr => pr.CreatedAt)
+                .Select(pr => new
+                {
+                    requestId = pr.RequestId,
+                    userId = pr.UserId,
+                    userEmail = pr.User != null ? pr.User.Email : "",
+                    businessName = pr.BusinessName,
+                    description = pr.Description,
+                    services = pr.Services,
+                    experience = pr.Experience,
+                    location = pr.Location,
+                    hourlyRate = pr.HourlyRate,
+                    portfolio = pr.Portfolio,
+                    certifications = pr.Certifications,
+                    status = pr.Status,
+                    createdAt = pr.CreatedAt,
+                    reviewedAt = pr.ReviewedAt,
+                    reviewNotes = pr.ReviewNotes
+                })
+                .ToListAsync();
+
+            return Ok(requests);
+        }
+
+        [Authorize(Roles = "admin")]
+        [HttpPut("provider-requests/review")]
+        public async Task<IActionResult> ReviewProviderRequest([FromBody] ReviewProviderRequestDto model)
+        {
+            var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            
+            var request = await _context.ProviderRequests
+                .Include(pr => pr.User)
+                .FirstOrDefaultAsync(pr => pr.RequestId == model.RequestId);
+
+            if (request == null)
+                return NotFound(new { Status = "Error", Message = "Solicitud no encontrada" });
+
+            if (request.Status != "pending")
+                return BadRequest(new { Status = "Error", Message = "Esta solicitud ya fue revisada" });
+
+            request.Status = model.Status;
+            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedBy = adminId;
+            request.ReviewNotes = model.ReviewNotes;
+
+            try
+            {
+                if (model.Status == "approved" && request.User != null)
+                {
+                    var providerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Provider");
+                    
+                    if (providerRole != null)
+                    {
+                        var hasRole = await _context.UserRoles
+                            .AnyAsync(ur => ur.UserId == request.UserId && ur.RoleId == providerRole.Id);
+
+                        if (!hasRole)
+                        {
+                            var userRole = new UserRole
+                            {
+                                UserId = request.UserId,
+                                RoleId = providerRole.Id
+                            };
+                            _context.UserRoles.Add(userRole);
+                        }
+                    }
+                }
+
+                _context.ProviderRequests.Update(request);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Solicitud revisada exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error revisando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [HttpGet("categories")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetActiveCategories()
+        {
+            try
+            {
+                var categories = await _context.ServiceCategories
+                    .Where(c => c.IsActive)
+                    .OrderBy(c => c.DisplayOrder)
+                    .ThenBy(c => c.CategoryName)
+                    .Select(c => new
+                    {
+                        CategoryId = c.CategoryId,
+                        CategoryName = c.CategoryName,
+                        CategoryDescription = c.CategoryDescription,
+                        IconUrl = c.IconUrl,
+                        IsActive = c.IsActive,
+                        DisplayOrder = c.DisplayOrder,
+                        ServiceCount = _context.Services.Count(s => s.CategoryId == c.CategoryId && s.IsActive && s.ApprovalStatus == "approved")
+                    })
+                    .ToListAsync();
+
+                return Ok(categories);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error obteniendo categorías", Detail = ex.Message });
+            }
         }
     }
 }
