@@ -1,5 +1,13 @@
 import api from './api';
 
+export interface Provider {
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isActive: boolean;
+}
+
 export const MarketplaceService = {
   // --- Services ---
   getAllServices: async () => {
@@ -28,9 +36,33 @@ export const MarketplaceService = {
     const response = await api.get('/providers');
     return response.data;
   },
-
   getProviderByUserId: async (userId: number) => {
-    const response = await api.get(`/providers/user/${userId}`);
+    const response = await api.get(`/providers/${userId}`);
     return response.data;
-  }
+  },
+  
+  getProviderServices: async (providerId: number) => {
+    const response = await api.get(`/providers/${providerId}/services`);
+    return response.data;
+  },
+
+  getProviderProfile: async (userId: number) => {
+    const response = await api.get(`/providers/user/${userId}`); 
+    return response.data;
+  },
+
+  getProviderReviews: async (providerId: number) => {
+    const response = await api.get(`/providers/${providerId}/reviews`);
+    return response.data;
+  },
+
+  getActiveProviders: async (): Promise<Provider[]> => {
+    const response = await api.get(`/providers/active`);
+    return response.data;
+  },
+
+  getInactiveProviders: async (): Promise<Provider[]> => {
+    const response = await api.get(`/providers/inactive`);
+    return response.data;
+  },
 };

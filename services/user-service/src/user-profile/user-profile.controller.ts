@@ -44,6 +44,11 @@ export class UserProfileController {
     return this.userProfileService.findOne(userId);
   }
 
+  @Get('allUsers')
+  async findAll() {
+    return this.userProfileService.findAll();
+  }
+
   @Get(':userId')
   async findOne(@Param('userId') userId: string) {
     // <--- SACA EL ID DE LA URL

@@ -7,15 +7,15 @@ import api from '../../services/api';
 interface User {
   id: number;
   email: string;
+  name: string; 
   role?: string;
-  name?: string;
   phoneNumber?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<string>;
   logout: () => void;
   isLoading: boolean;
   updateUser: (userData: Partial<User>) => void;
@@ -53,18 +53,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUser();
   }, [token]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<string> => {
     try {
       const result = await AuthService.login({ email, password });
+    
       setToken(result.token);
       localStorage.setItem('token', result.token);
-      
-      // Configurar token en axios
       api.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
-      
-      // Cargar datos del usuario
+
       const userData = await UserService.getMyProfile();
       setUser(userData);
+
+      return userData.role || 'client'; 
     } catch (error) {
       throw error;
     }

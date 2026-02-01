@@ -59,4 +59,8 @@ export class UserProfileService {
 
     return { message: 'Perfil eliminado correctamente' };
   }
+
+  async findAll(): Promise<UserProfile[]> {
+    return await this.profileRepository.find();
+  }
 }

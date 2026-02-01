@@ -1,10 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigation } from './Navigation';
-import { Home } from './components/client/Home';
-import { SearchProviders } from './components/client/SearchProviders';
-import { ProviderDetail } from './components/client/ProviderDetail';
-import { Chat } from './components/client/Chat';
-import { History } from './components/client/History';
 import { Dashboard } from './components/provider/Dashboard';
 import { ProviderProfile } from './components/provider/ProviderProfile';
 import { Plans } from './components/provider/Plans';
@@ -15,12 +10,17 @@ import { Register } from './components/auth/Register';
 import { Onboarding } from './components/auth/Onboarding';
 import { Toaster } from './components/ui/sonner';
 import { type UserMode } from './types';
+import type { User } from './services/userService';
+import { useAuth } from './components/contexts/AuthContext';
 
 export default function App() {
+  const { user: currentUser, isLoading } = useAuth();
   const [currentView, setCurrentView] = useState('onboarding');
   const [userMode, setUserMode] = useState<UserMode>('client');
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  if (isLoading) return <div>Cargando...</div>;
 
   // Handle view changes
   const handleViewChange = (view: string) => {
@@ -45,6 +45,11 @@ export default function App() {
 
   // Render the current view
   const renderView = () => {
+    const isAuthView = ['login', 'register', 'onboarding'].includes(currentView);
+    if (!isAuthView && !currentUser) {
+      return <Login onViewChange={handleViewChange} />;
+    }
+
     switch (currentView) {
       // Auth views
       case 'login':
@@ -55,7 +60,7 @@ export default function App() {
         return <Onboarding onViewChange={handleViewChange} />;
 
       // Client views
-      case 'home':
+      /*case 'home':
         return (
           <Home 
             onViewChange={handleViewChange}
@@ -79,28 +84,31 @@ export default function App() {
       case 'chat':
         return <Chat onViewChange={handleViewChange} />;
       case 'history':
-        return <History onViewChange={handleViewChange} />;
+        return <History onViewChange={handleViewChange} />;*/
 
       // Provider views
       case 'provider-dashboard':
-        return <Dashboard onViewChange={handleViewChange} />;
+        if (!currentUser) {
+          return <Login onViewChange={handleViewChange} />;
+        }
+        return <Dashboard currentUser={currentUser!} onViewChange={handleViewChange} />;
       case 'provider-profile':
-        return <ProviderProfile onViewChange={handleViewChange} />;
+        return <ProviderProfile currentUser={currentUser!} onViewChange={handleViewChange} />;
       case 'provider-plans':
         return <Plans onViewChange={handleViewChange} />;
 
       // Admin views
       case 'admin-dashboard':
+        //if (currentUser?.userType !== 'admin') return <Home onViewChange={handleViewChange} />;
         return <AdminDashboard onViewChange={handleViewChange} />;
       case 'admin-users':
-        return <AdminUsers onViewChange={handleViewChange} />;
+        return <AdminUsers currentUser={currentUser!} onViewChange={handleViewChange} />;
 
       default:
         return <Login onViewChange={handleViewChange} />;
     }
   };
 
-  // Don't show Navigation on auth pages
   const showNavigation = currentView !== 'login' && currentView !== 'register' && currentView !== 'onboarding';
   const showAdminButton = currentView !== 'login' && currentView !== 'register' && currentView !== 'onboarding';
 
@@ -112,6 +120,7 @@ export default function App() {
           onViewChange={handleViewChange}
           userMode={userMode}
           onModeChange={handleModeChange}
+          currentUser={currentUser!}
         />
       )}
       {renderView()}

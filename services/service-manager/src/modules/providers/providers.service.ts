@@ -109,4 +109,23 @@ export class ProvidersService {
     provider.trustBadge = !provider.trustBadge;
     return await this.providerRepository.save(provider);
   }
+
+  async findProvidersByStatus(active: boolean) {
+    const providerRoleId = 2;
+
+    return await this.providerRepository
+      .createQueryBuilder('profile')
+      .innerJoin('users', 'user', 'user.user_id = profile.user_id')
+      .innerJoin('user_roles', 'ur', 'ur.user_id = user.user_id')
+      .where('ur.role_id = :roleId', { roleId: providerRoleId })
+      .andWhere('ur.is_active = :status', { status: active ? 1 : 0 })
+      .select([
+        'profile.user_id AS userId',
+        'profile.first_name AS firstName',
+        'profile.last_name AS lastName',
+        'user.email AS email',
+        'ur.is_active AS isActive'
+      ])
+      .getRawMany();
+  }
 }

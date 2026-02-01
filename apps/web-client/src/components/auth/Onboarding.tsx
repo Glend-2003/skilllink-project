@@ -81,7 +81,7 @@ export function Onboarding({ onViewChange }: OnboardingProps) {
             </div>
 
             {/* Content */}
-            <h2 className="text-2xl font-bold mb-4">{currentSlideData.title}</h2>
+            <h2 className="text-2xl font-bold mb-4 text-slate-900">{currentSlideData.title}</h2>
             <p className="text-slate-600 leading-relaxed mb-8">
               {currentSlideData.description}
             </p>
@@ -105,7 +105,7 @@ export function Onboarding({ onViewChange }: OnboardingProps) {
             <div className="space-y-3">
               <Button
                 onClick={handleNext}
-                className={`w-full bg-gradient-to-r ${currentSlideData.color} hover:opacity-90`}
+                className={`w-full bg-gradient-to-r ${currentSlideData.color} hover:opacity-90 text-white` }
               >
                 {currentSlide < slides.length - 1 ? (
                   <>
@@ -121,7 +121,7 @@ export function Onboarding({ onViewChange }: OnboardingProps) {
                 <Button
                   variant="ghost"
                   onClick={handleSkip}
-                  className="w-full text-slate-600"
+                  className="w-full !bg-transparent !text-slate-900 hover:!text-white hover:!bg-green-600 !border-none shadow-none"
                 >
                   Saltar introducción
                 </Button>
@@ -135,7 +135,7 @@ export function Onboarding({ onViewChange }: OnboardingProps) {
           <Button
             variant="link"
             onClick={() => onViewChange('login')}
-            className="text-white hover:text-white/80"
+            className="!bg-transparent text-white hover:underline !border-none shadow-none "
           >
             ¿Ya tienes cuenta? Inicia sesión
           </Button>

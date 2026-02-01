@@ -1,17 +1,43 @@
+import React, { useEffect, useState } from 'react';
 import { TrendingUp, DollarSign, Star, Eye, MessageCircle, Calendar, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { marketplaceService } from '../../services/marketplaceService';
+import { MarketplaceService } from '../../services/marketplaceService';
+import type { User } from '../../services/userService';
 
 interface DashboardProps {
+  currentUser: User;
   onViewChange: (view: string) => void;
 }
 
-export function Dashboard({ onViewChange }: DashboardProps) {
-  const recentRequests = mockServiceRequests.slice(0, 3);
-  const recentMessages = mockConversations.slice(0, 3);
+export function Dashboard({  currentUser, onViewChange }: DashboardProps) {
+  const [provider, setProvider] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const recentRequests: any[] = []; 
+  const recentMessages: any[] = [];
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await MarketplaceService.getProviderByUserId(currentUser.id);
+        setProvider(data);
+      } catch (err) {
+        console.error("Error cargando proveedor", err);
+        setError("No se pudo cargar la información de proveedor");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentUser.id]);
+
+  if (loading) return <div>Cargando estadísticas...</div>;
+  if (!provider) return <div>No se pudieron cargar los datos.</div>;
 
   const stats = [
     /*{
@@ -22,13 +48,13 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       bgColor: 'bg-blue-100',
     },*/
     {
-      title: 'Servicios completados',
-      value: providerStats.completedRequests,
+      title: 'Descripción',
+      value: provider.businessDescription || "Sin descripción",
       icon: CheckCircle,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
-    {
+    /*{
       title: 'Ganancias totales',
       value: `$${providerStats.totalEarnings.toLocaleString()}`,
       icon: DollarSign,
@@ -42,20 +68,20 @@ export function Dashboard({ onViewChange }: DashboardProps) {
       color: 'text-amber-600',
       bgColor: 'bg-amber-100',
     },
-    /*{
+    {
       title: 'Vistas este mes',
       value: providerStats.viewsThisMonth,
       icon: Eye,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-    },*/
+    },
     {
       title: 'Tasa de éxito',
       value: `${Math.round((providerStats.completedRequests / providerStats.totalRequests) * 100)}%`,
       icon: TrendingUp,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-100',
-    },
+    },*/
   ];
 
   return (

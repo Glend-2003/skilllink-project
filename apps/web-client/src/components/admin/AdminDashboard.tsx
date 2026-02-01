@@ -1,146 +1,83 @@
+import React, { useEffect, useState } from 'react';
 import { Users, DollarSign, TrendingUp, AlertCircle, UserCheck, UserX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { useEffect, useState } from 'react';
-import { UserService } from '../../services/userService';
-import { MarketplaceService } from '../../services/marketplaceService';
-import { PaymentService } from '../../services/paymentService';
 import { toast } from 'sonner';
+import { UserService, type User } from '../../services/userService';
+import { MarketplaceService, type Provider } from '../../services/marketplaceService';
+
 
 interface AdminDashboardProps {
   onViewChange: (view: string) => void;
 }
 
-interface DashboardStats {
-  title: string;
-  value: string | number;
-  icon: any;
-  color: string;
-  bgColor: string;
-  change: string;
-}
-
-interface Activity {
-  type: string;
-  message: string;
-  time: string;
-}
-
-interface Provider {
-  id: number;
-  name: string;
-  rating: number;
-  reviewCount: number;
-  verified: boolean;
-  avatar?: string;
-}
-
 export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
-  const [stats, setStats] = useState<DashboardStats[]>([]);
-  const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
-  const [providers, setProviders] = useState<Provider[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [activeProviders, setActiveProviders] = useState<Provider[]>([]);
+  const [inactiveProviders, setInactiveProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        const [userData, activeProviders, inactiveProviders] = await Promise.all([
+          UserService.getAllUsers(),
+          MarketplaceService.getActiveProviders(),
+          MarketplaceService.getInactiveProviders()
+        ]);
+
+        setUsers(userData);
+        setActiveProviders(activeProviders);
+        setInactiveProviders(inactiveProviders);
+      } catch (error) {
+        console.error("Error al cargar datos:", error);
+        toast.error("Error al sincronizar con la base de datos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      
-      // Cargar datos de usuarios
-      const users = await UserService.getAllUsers();
-      const clients = users.filter(u => u.role === 'client');
-      const providers = users.filter(u => u.role === 'provider');
-      const verifiedProviders = providers.filter(p => p.isActive);
-      
-      // Cargar servicios y pagos
-      const services = await MarketplaceService.getAllServices();
-      const completedServices = services.filter((s: any) => s.status === 'completed');
-      
-      // Calcular ingresos (esto sería idealmente desde el backend)
-      const totalRevenue = completedServices.reduce((sum: number, service: any) => {
-        return sum + (service.price || 0);
-      }, 0);
+  if (loading) return <div>Cargando usuarios reales...</div>;
 
-      // Actualizar estadísticas
-      const newStats: DashboardStats[] = [
-        {
-          title: 'Total Usuarios',
-          value: users.length,
-          icon: Users,
-          color: 'text-blue-600',
-          bgColor: 'bg-blue-100',
-          change: '+12%',
-        },
-        {
-          title: 'Proveedores Activos',
-          value: providers.length,
-          icon: UserCheck,
-          color: 'text-green-600',
-          bgColor: 'bg-green-100',
-          change: '+8%',
-        },
-        {
-          title: 'Servicios Completados',
-          value: completedServices.length,
-          icon: TrendingUp,
-          color: 'text-purple-600',
-          bgColor: 'bg-purple-100',
-          change: '+23%',
-        },
-        {
-          title: 'Ingresos Totales',
-          value: `$${totalRevenue.toLocaleString()}`,
-          icon: DollarSign,
-          color: 'text-emerald-600',
-          bgColor: 'bg-emerald-100',
-          change: '+15%',
-        },
-      ];
+  const stats = [
+    {
+      title: 'Total Usuarios',
+      value: users.length,
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100',
+      change: '+12%',
+    },
+    {
+      title: 'Proveedores Activos',
+      value: activeProviders.length,
+      icon: UserCheck,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      change: '+8%',
+    },
+    {
+      title: 'Proveedores Inactivos',
+      value: inactiveProviders.length,
+      icon: UserCheck,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      change: '+8%',
+    },
+  ];
 
-      // Actividad reciente (ejemplo - en producción vendría del backend)
-      const activity: Activity[] = [
-        { type: 'new_user', message: 'Nuevo usuario registrado: María González', time: 'Hace 5 min' },
-        { type: 'new_provider', message: 'Nuevo proveedor: Carlos Electricista', time: 'Hace 15 min' },
-        { type: 'completed', message: 'Servicio completado: Reparación de plomería', time: 'Hace 30 min' },
-        { type: 'review', message: 'Nueva reseña de 5 estrellas para Juan Pérez', time: 'Hace 1 hora' },
-        { type: 'alert', message: 'Reporte de contenido en revisión', time: 'Hace 2 horas' },
-      ];
-
-      // Proveedores top (ejemplo)
-      const topProviders: Provider[] = providers.slice(0, 5).map((p, index) => ({
-        id: p.id,
-        name: p.name,
-        rating: 4.8 - (index * 0.1), // Datos de ejemplo
-        reviewCount: 42 - (index * 5),
-        verified: p.isActive || false,
-      }));
-
-      setStats(newStats);
-      setRecentActivity(activity);
-      setProviders(topProviders);
-    } catch (error) {
-      console.error('Error loading dashboard:', error);
-      toast.error('Error al cargar datos del dashboard');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifiedProviders = providers.filter(p => p.verified).length;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">Cargando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const recentActivity = [
+    { type: 'new_user', message: 'Nuevo usuario registrado: María González', time: 'Hace 5 min' },
+    { type: 'new_provider', message: 'Nuevo proveedor: Carlos Electricista', time: 'Hace 15 min' },
+    { type: 'completed', message: 'Servicio completado: Reparación de plomería', time: 'Hace 30 min' },
+    { type: 'review', message: 'Nueva reseña de 5 estrellas para Juan Pérez', time: 'Hace 1 hora' },
+    { type: 'alert', message: 'Reporte de contenido en revisión', time: 'Hace 2 horas' },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
@@ -149,14 +86,6 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Panel Administrativo</h1>
           <p className="text-slate-600">Gestiona la plataforma SkillLink</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-2"
-            onClick={loadDashboardData}
-          >
-            Actualizar datos
-          </Button>
         </div>
 
         {/* Stats Grid */}
@@ -250,14 +179,14 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
                   <UserCheck className="w-5 h-5 text-green-600" />
                   <span className="font-medium">Verificados</span>
                 </div>
-                <span className="font-bold">{verifiedProviders}</span>
+                <span className="font-bold">{'verifiedProviders'}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-amber-600" />
                   <span className="font-medium">Pendientes verificación</span>
                 </div>
-                <span className="font-bold">{providers.length - verifiedProviders}</span>
+                <span className="font-bold">{'totalProviders -' + ' verifiedProviders'}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-red-50">
                 <div className="flex items-center gap-3">
@@ -278,15 +207,15 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {providers.map((provider, index) => (
-                <div key={provider.id} className="flex items-center gap-3">
+              {activeProviders.slice(0, 5).map((provider, index) => (
+                <div key={provider.userId} className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
                     {index + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{provider.name}</p>
+                    <p className="font-medium truncate">{provider.firstName + ' ' + provider.lastName}</p>
                     <p className="text-sm text-slate-600">
-                      {provider.rating} ★ • {provider.reviewCount} reseñas
+                      {'provider.rating'} ★ • {'provider.reviewCount'} reseñas
                     </p>
                   </div>
                 </div>

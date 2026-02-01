@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Camera, Plus, Trash2, Save, MapPin, Clock } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,17 +9,41 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { mockProviders, categoryNames } from '../../data/mockData';
 import { toast } from 'sonner';
+import { MarketplaceService } from '../../services/marketplaceService';
+import type { User } from '../../services/userService';
 
 interface ProviderProfileProps {
+  currentUser: User | null;
   onViewChange: (view: string) => void;
 }
 
-export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
-  const provider = mockProviders[0]; // Using first provider as example
-  const [isAvailable, setIsAvailable] = useState(provider.isAvailable);
-  const [services, setServices] = useState(provider.services);
+export function ProviderProfile({ currentUser, onViewChange }: ProviderProfileProps) {
+  const [provider, setProvider] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAvailable, setIsAvailable] = useState(provider.availableForWork);
+  const [services, setServices] = useState(provider.getProviderServices);
+
+  useEffect(() => {
+      const fetchData = async () => {
+        if (!currentUser?.id) return;
+        try {
+          setLoading(true);
+          const data = await MarketplaceService.getProviderByUserId(currentUser.id);
+          setProvider(data);
+        } catch (err) {
+          console.error("Error cargando proveedor", err);
+          setError("No se pudo cargar el proveedor");
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchData();
+    }, [currentUser?.id]);
+  
+    if (loading) return <div>Cargando estadísticas...</div>;
+    if (!provider) return <div>No se pudieron cargar los datos.</div>;
 
   const handleSaveProfile = () => {
     toast.success('Perfil actualizado exitosamente');
@@ -39,7 +63,7 @@ export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
   };
 
   const handleRemoveService = (serviceId: string) => {
-    setServices(services.filter(s => s.id !== serviceId));
+    setServices(services.filter((s: { id: string }) => s.id !== serviceId));
     toast.success('Servicio eliminado');
   };
 
@@ -86,9 +110,9 @@ export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(categoryNames).map(([key, name]) => (
+                        {Object.entries('categoryNames').map(([key, name]) => (
                           <SelectItem key={key} value={key}>
-                            {name}
+                            {'name'}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -108,7 +132,7 @@ export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Años de experiencia</Label>
-                    <Input defaultValue={provider.experience} />
+                    <Input defaultValue={provider.yearsExperience} />
                   </div>
                   <div>
                     <Label>Tiempo de respuesta</Label>
@@ -174,8 +198,8 @@ export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {services.map((service, index) => (
-              <Card key={service.id} className="bg-slate-50">
+            {services.map((service , index : number) => (
+              <Card key={service.id } className="bg-slate-50">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <Badge variant="outline">Servicio {index + 1}</Badge>
@@ -224,7 +248,7 @@ export function ProviderProfile({ onViewChange }: ProviderProfileProps) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {provider.gallery.map((image, index) => (
+              {provider.gallery.map((image:string, index:number) => (
                 <div key={index} className="relative aspect-square rounded-lg overflow-hidden group">
                   <img 
                     src={image} 
