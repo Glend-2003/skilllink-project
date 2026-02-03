@@ -12,6 +12,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { UserProfileService } from './user-profile.service';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
+import { CreateSavedSearchDto } from './dto/create-saved-search.dto';
 
 interface RequestWithUser {
   user: {
@@ -67,5 +68,23 @@ export class UserProfileController {
     const userId = Number(req.user.userId);
     console.log(`🗑️ Eliminando perfil del usuario ID: ${userId}`);
     return this.userProfileService.remove(userId);
+  }
+
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('saved-searches')
+  async saveSearch(
+    @Request() req: any,
+    @Body() dto: CreateSavedSearchDto
+  ) {
+    const userId = Number(req.user.userId);
+    return this.userProfileService.saveSearch(userId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('saved-searches')
+  async getSearches(@Request() req: any) {
+    const userId = Number(req.user.userId);
+    return this.userProfileService.findAllSearches(userId);
   }
 }

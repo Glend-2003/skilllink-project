@@ -3,12 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserProfile } from './user-profile.entity';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
+import { SavedSearch } from './entities/saved-search.entity';
+import { CreateSavedSearchDto } from './dto/create-saved-search.dto';
 
 @Injectable()
 export class UserProfileService {
   constructor(
     @InjectRepository(UserProfile)
     private profileRepository: Repository<UserProfile>,
+    @InjectRepository(SavedSearch)
+    private savedSearchRepository: Repository<SavedSearch>,
   ) {}
 
   async createOrUpdate(
@@ -58,5 +62,20 @@ export class UserProfileService {
     }
 
     return { message: 'Perfil eliminado correctamente' };
+  }
+
+
+  
+
+  async saveSearch(userId: number, dto: CreateSavedSearchDto) {
+    const newSearch = this.savedSearchRepository.create({
+      ...dto,
+      userId: userId,
+    });
+    return this.savedSearchRepository.save(newSearch);
+  }
+  
+  async findAllSearches(userId: number) {
+    return this.savedSearchRepository.find({ where: { userId } });
   }
 }
