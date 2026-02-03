@@ -3,12 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserProfile } from './user-profile.entity';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
+import { SavedSearch } from './entities/saved-search.entity';
+import { CreateSavedSearchDto } from './dto/create-saved-search.dto';
 
 @Injectable()
 export class UserProfileService {
   constructor(
     @InjectRepository(UserProfile)
     private profileRepository: Repository<UserProfile>,
+    @InjectRepository(SavedSearch)
+    private savedSearchRepository: Repository<SavedSearch>,
   ) {}
 
   // 1. Create or Update Profile
@@ -49,7 +53,6 @@ export class UserProfileService {
     // TypeORM's .update() is very efficient, it looks for the ID and changes only what you send
     await this.profileRepository.update({ user_id: userId }, updateDto);
 
-    // Devolvemos el perfil ya actualizado para que el usuario vea los cambios
     const updatedProfile = await this.findOne(userId);
     if (!updatedProfile) {
       throw new Error('Profile not found after update');
@@ -66,5 +69,20 @@ export class UserProfileService {
     }
 
     return { message: 'Profile deleted successfully' };
+  }
+
+
+  
+
+  async saveSearch(userId: number, dto: CreateSavedSearchDto) {
+    const newSearch = this.savedSearchRepository.create({
+      ...dto,
+      userId: userId,
+    });
+    return this.savedSearchRepository.save(newSearch);
+  }
+  
+  async findAllSearches(userId: number) {
+    return this.savedSearchRepository.find({ where: { userId } });
   }
 }

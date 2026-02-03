@@ -50,11 +50,23 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddControllers();
 
+// Configurar CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
-// --- 4. Middleware ---
-
 app.UseRouting();
+
+// Habilitar CORS
+app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {

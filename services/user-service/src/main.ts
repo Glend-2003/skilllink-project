@@ -26,7 +26,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document); //La documentación estará en /api
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(3000);
   console.log(`User-Service corriendo en: http://localhost:3000`);

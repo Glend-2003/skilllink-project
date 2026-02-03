@@ -33,6 +33,7 @@ app.get('/api/providers', async (req, res) => {
       SELECT 
         u.user_id,
         u.email,
+        u.profile_image_url,
         pp.provider_id,
         pp.business_name,
         pp.business_description,
@@ -61,7 +62,8 @@ app.get('/api/providers', async (req, res) => {
       hourlyRate: 25 + (index * 5),
       verified: p.is_verified === 1,
       yearsExperience: p.years_experience,
-      reviewCount: p.review_count
+      reviewCount: p.review_count,
+      profileImageUrl: p.profile_image_url
     }));
 
     res.json(formattedProviders);
@@ -80,6 +82,7 @@ app.get('/api/providers/:providerId', async (req, res) => {
       SELECT 
         u.user_id,
         u.email,
+        u.profile_image_url,
         pp.provider_id,
         pp.business_name,
         pp.business_description,
@@ -111,7 +114,8 @@ app.get('/api/providers/:providerId', async (req, res) => {
       yearsExperience: p.years_experience,
       serviceRadius: p.service_radius_km,
       reviewCount: p.review_count,
-      email: p.email
+      email: p.email,
+      profileImageUrl: p.profile_image_url
     };
 
     res.json(provider);
@@ -157,6 +161,7 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
     const query = `
       SELECT 
         s.service_id as id,
+        s.service_id as serviceId,
         s.service_title as name,
         s.service_description as description,
         s.base_price as price,
@@ -180,6 +185,62 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
   } catch (error) {
     console.error('Error getting services:', error);
     res.status(500).json({ error: 'Error getting services' });
+  }
+});
+
+
+app.get('/api/services', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        s.service_id,
+        s.service_title,
+        s.service_description,
+        s.base_price,
+        s.price_type,
+        s.estimated_duration_minutes,
+        c.category_name,
+        pp.provider_id,
+        pp.business_name as provider_name,
+        pp.is_verified as provider_verified,
+        u.user_id,
+        u.profile_image_url,
+        COALESCE(AVG(r.rating), 4.5) as average_rating,
+        COUNT(CASE WHEN r.review_id IS NOT NULL THEN 1 END) as review_count
+      FROM services s
+      JOIN service_categories c ON s.category_id = c.category_id
+      JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+      JOIN users u ON pp.user_id = u.user_id
+      LEFT JOIN reviews r ON u.user_id = r.reviewed_user_id
+      WHERE s.is_active = 1 AND s.approval_status = 'approved'
+      GROUP BY s.service_id, u.user_id
+      ORDER BY s.created_at DESC
+    `;
+
+    const [services] = await db.execute(query);
+
+
+    const formattedServices = services.map(s => ({
+      id: s.service_id.toString(),
+      providerId: s.user_id.toString(),
+      name: s.service_title,
+      category: s.category_name,
+      rating: parseFloat(s.average_rating) || 4.5,
+      location: 'Centro, Ciudad',
+      description: s.service_description,
+      hourlyRate: s.base_price || 0,
+      priceType: s.price_type,
+      estimatedDuration: s.estimated_duration_minutes,
+      verified: s.provider_verified === 1,
+      providerName: s.provider_name,
+      reviewCount: s.review_count,
+      profileImageUrl: s.profile_image_url
+    }));
+
+    res.json(formattedServices);
+  } catch (error) {
+    console.error('Error obteniendo servicios:', error);
+    res.status(500).json({ error: 'Error obteniendo servicios' });
   }
 });
 

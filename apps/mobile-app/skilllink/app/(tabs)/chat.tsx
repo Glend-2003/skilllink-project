@@ -16,6 +16,7 @@ type ApiConversation = {
   last_activity_at: string | null;
   last_message_at: string | null;
   created_at: string;
+  other_user_profile_image: string | null;
 };
 
 interface ConversationItemUI {
@@ -25,6 +26,7 @@ interface ConversationItemUI {
   lastMessage: string;
   time: string;
   avatar: string;
+  profileImageUrl?: string;
 }
 
 export default function ChatScreen() {
@@ -43,9 +45,17 @@ export default function ChatScreen() {
       console.log('Fetching conversations for userId:', user.userId);
       const res = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
       console.log('Response status:', res.status);
-      const data: ApiConversation[] = await res.json();
+      const data = await res.json();
       console.log('Conversations data:', data);
-      const providerConvs = (data || []).filter(c => c.is_provider === 1);
+      
+      // Verificar si es un error o un array válido
+      if (!Array.isArray(data)) {
+        console.error('API returned error:', data);
+        setConversations([]);
+        return;
+      }
+      
+      const providerConvs = data.filter(c => c.is_provider === 1);
       const mapped: ConversationItemUI[] = providerConvs.map(c => ({
         id: String(c.conversation_id),
         providerName: c.other_user_name || c.other_user_email || 'Proveedor',
@@ -54,6 +64,7 @@ export default function ChatScreen() {
         time: formatTime(c.last_activity_at || c.last_message_at || c.created_at),
         // PNG avatar to ensure RN Image compatibility
         avatar: `https://i.pravatar.cc/150?u=${c.other_user_id}`,
+        profileImageUrl: c.other_user_profile_image || undefined,
       }));
       setItems(mapped);
     } catch (e) {
@@ -105,7 +116,13 @@ export default function ChatScreen() {
       onPress={() => router.push(`/chat/${item.id}`)}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        {item.profileImageUrl ? (
+          <Image source={{ uri: item.profileImageUrl }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{item.providerName.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.conversationInfo}>
@@ -195,6 +212,20 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: '#e0e0e0',
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
   },
   unreadBadge: {
     position: 'absolute',

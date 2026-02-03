@@ -94,7 +94,14 @@ services:
       - service-manager
       - provider-service
       - chat-service
-      - payment-service
 
-volumes:
-  mysql_data:
+  # Servicio de notificaciones
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "3006:3006"
+    depends_on:
+      - mysql_db
+    environment:
+      DB_HOST: mysql_db
+      PORT: 3006

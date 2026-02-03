@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, DeviceEventEmitter } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, DeviceEventEmitter, Image } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { io, Socket } from "socket.io-client";
@@ -11,13 +11,6 @@ type Message = {
   text: string;
   sender: "me" | "other";
   timestamp: string;
-  type?: 'text' | 'service_proposal' | 'service_accepted' | 'service_rejected';
-  serviceData?: {
-    title: string;
-    description: string;
-    rate: number;
-    estimatedHours: number;
-  };
 };
 
 type ConversationStatus = 'active' | 'pending' | 'completed' | 'cancelled';
@@ -29,6 +22,7 @@ interface Provider {
   rating: number;
   avatar: string;
   verified: boolean;
+  profileImageUrl?: string;
 }
 
 const mockProviders: Record<string, Provider> = {
@@ -55,19 +49,7 @@ const initialMessages: Record<string, Message[]> = {
     { id: "1", text: "Hola, vi tu perfil de plomería", sender: "other", timestamp: "10:30" },
     { id: "2", text: "¡Hola! Claro, ¿en qué puedo ayudarte?", sender: "me", timestamp: "10:31" },
     { id: "3", text: "¿Cuánto cobrás por hora?", sender: "other", timestamp: "10:32" },
-    {
-      id: "4",
-      text: "Cobro $25 por hora. ¿Qué tipo de trabajo necesitas?",
-      sender: "me",
-      timestamp: "10:33",
-      type: "service_proposal",
-      serviceData: {
-        title: "Reparación de grifo",
-        description: "Reparación completa de grifo con repuestos incluidos",
-        rate: 25,
-        estimatedHours: 2,
-      }
-    },
+    { id: "4", text: "Cobro $25 por hora. ¿Qué tipo de trabajo necesitas?", sender: "me", timestamp: "10:33" },
   ],
   "2": [
     { id: "1", text: "Hola, necesito instalar tomacorrientes", sender: "other", timestamp: "15:20" },
@@ -84,14 +66,7 @@ export default function ChatDetail() {
   const [text, setText] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('active');
-  const [showServiceProposal, setShowServiceProposal] = useState(false);
   const [provider, setProvider] = useState<Provider | null>(null);
-  const [serviceProposal, setServiceProposal] = useState({
-    title: '',
-    description: '',
-    rate: '',
-    estimatedHours: '',
-  });
 
   const flatListRef = useRef<FlatList<Message>>(null);
 
@@ -122,12 +97,22 @@ export default function ChatDetail() {
       if (!id || !user) return;
 
       try {
-        console.log('Loading conversation info for:', id);
-        // Get conversation details
-        const conversationsRes = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
-        const conversations = await conversationsRes.json();
+        console.log('Loading conversation info for:', id, 'user:', user.userId);
         
-        const conversation = conversations.find((c: any) => c.conversation_id === parseInt(id as string));
+        // Get conversation details using the new endpoint
+        const conversationRes = await fetch(
+          `${Config.CHAT_SERVICE_URL}/api/conversations/details/${id}?userId=${user.userId}`
+        );
+        
+        if (!conversationRes.ok) {
+          console.error('Conversation not found:', conversationRes.status);
+          Alert.alert('Error', 'Conversación no encontrada');
+          router.back();
+          return;
+        }
+        
+        const conversation = await conversationRes.json();
+        console.log('Conversation loaded:', conversation);
         
         if (conversation && conversation.other_user_id) {
           // Fetch provider details
@@ -141,11 +126,23 @@ export default function ChatDetail() {
               rating: providerData.rating,
               avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerData.id}`,
               verified: providerData.verified,
+              profileImageUrl: providerData.profileImageUrl,
+            });
+          } else {
+            setProvider({
+              id: conversation.other_user_id.toString(),
+              name: conversation.other_user_email || 'Usuario',
+              category: 'Usuario',
+              rating: 0,
+              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.other_user_id}`,
+              verified: false,
             });
           }
         }
       } catch (error) {
         console.error('Error loading conversation info:', error);
+        Alert.alert('Error', 'No se pudo cargar la información de la conversación');
+        router.back();
       }
     };
 
@@ -175,7 +172,6 @@ export default function ChatDetail() {
         conversationId: parseInt(id as string)
       });
       
-      // Cargar mensajes previos
       loadPreviousMessages();
     });
 
@@ -214,123 +210,14 @@ export default function ChatDetail() {
     };
 
     socket.emit("send_message", messageData);
-    // Notificar a la lista de chats para refrescar inmediatamente
     DeviceEventEmitter.emit('conversation_sent', { conversationId: parseInt(id as string) });
     setText("");
   };
 
-  const sendServiceProposal = () => {
-    if (!serviceProposal.title || !serviceProposal.rate) {
-      Alert.alert("Error", "Por favor completa el título y la tarifa del servicio");
-      return;
-    }
 
-    const proposalMessage: Message = {
-      id: Date.now().toString(),
-      text: `Propuesta de servicio: ${serviceProposal.title}`,
-      sender: "me",
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      type: "service_proposal",
-      serviceData: {
-        title: serviceProposal.title,
-        description: serviceProposal.description,
-        rate: parseFloat(serviceProposal.rate),
-        estimatedHours: parseFloat(serviceProposal.estimatedHours) || 1,
-      }
-    };
-
-    setMessages((prev) => [...prev, proposalMessage]);
-    setShowServiceProposal(false);
-    setServiceProposal({ title: '', description: '', rate: '', estimatedHours: '' });
-  };
-
-  const acceptService = (messageId: string) => {
-    const acceptedMessage: Message = {
-      id: Date.now().toString(),
-      text: "¡Servicio aceptado! Nos pondremos en contacto pronto.",
-      sender: "other",
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      type: "service_accepted",
-    };
-
-    setMessages((prev) => [...prev, acceptedMessage]);
-    setConversationStatus('pending');
-  };
-
-  const rejectService = (messageId: string) => {
-    const rejectedMessage: Message = {
-      id: Date.now().toString(),
-      text: "Lo siento, no puedo aceptar esta propuesta en este momento.",
-      sender: "other",
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      type: "service_rejected",
-    };
-
-    setMessages((prev) => [...prev, rejectedMessage]);
-  };
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = item.sender === "me";
-
-    if (item.type === 'service_proposal' && item.serviceData) {
-      return (
-        <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-          <View style={styles.serviceProposal}>
-            <Text style={styles.serviceTitle}>{item.serviceData.title}</Text>
-            <Text style={styles.serviceDescription}>{item.serviceData.description}</Text>
-            <View style={styles.serviceDetails}>
-              <Text style={styles.serviceRate}>${item.serviceData.rate}/hora</Text>
-              <Text style={styles.serviceHours}>{item.serviceData.estimatedHours}h estimadas</Text>
-            </View>
-            <Text style={styles.serviceTotal}>
-              Total estimado: ${(item.serviceData.rate * item.serviceData.estimatedHours).toFixed(2)}
-            </Text>
-            {!isMe && conversationStatus === 'active' && (
-              <View style={styles.serviceActions}>
-                <TouchableOpacity
-                  style={[styles.serviceButton, styles.acceptButton]}
-                  onPress={() => acceptService(item.id)}
-                >
-                  <Text style={styles.acceptButtonText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.serviceButton, styles.rejectButton]}
-                  onPress={() => rejectService(item.id)}
-                >
-                  <Text style={styles.rejectButtonText}>Rechazar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-            {item.timestamp}
-          </Text>
-        </View>
-      );
-    }
-
-    if (item.type === 'service_accepted' || item.type === 'service_rejected') {
-      return (
-        <View style={styles.systemMessage}>
-          <Ionicons
-            name={item.type === 'service_accepted' ? 'checkmark-circle' : 'close-circle'}
-            size={20}
-            color={item.type === 'service_accepted' ? '#10B981' : '#EF4444'}
-          />
-          <Text style={styles.systemMessageText}>{item.text}</Text>
-          <Text style={styles.systemTimestamp}>{item.timestamp}</Text>
-        </View>
-      );
-    }
 
     return (
       <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
@@ -357,11 +244,19 @@ export default function ChatDetail() {
 
   return (
     <View style={styles.container}>
-      {/* Header con información del proveedor */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
+        
+        {provider.profileImageUrl ? (
+          <Image source={{ uri: provider.profileImageUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{provider.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+
         <View style={styles.providerInfo}>
           <Text style={styles.providerName}>{provider.name}</Text>
           <View style={styles.providerDetails}>
@@ -396,72 +291,8 @@ export default function ChatDetail() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Modal de propuesta de servicio */}
-      {showServiceProposal && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Proponer Servicio</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Título del servicio"
-              value={serviceProposal.title}
-              onChangeText={(text) => setServiceProposal(prev => ({ ...prev, title: text }))}
-            />
-
-            <TextInput
-              style={[styles.modalInput, styles.modalTextarea]}
-              placeholder="Descripción del servicio"
-              value={serviceProposal.description}
-              onChangeText={(text) => setServiceProposal(prev => ({ ...prev, description: text }))}
-              multiline
-              numberOfLines={3}
-            />
-
-            <View style={styles.modalRow}>
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginRight: 8 }]}
-                placeholder="Tarifa por hora"
-                value={serviceProposal.rate}
-                onChangeText={(text) => setServiceProposal(prev => ({ ...prev, rate: text }))}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.modalInput, { flex: 1, marginLeft: 8 }]}
-                placeholder="Horas estimadas"
-                value={serviceProposal.estimatedHours}
-                onChangeText={(text) => setServiceProposal(prev => ({ ...prev, estimatedHours: text }))}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelModalButton]}
-                onPress={() => setShowServiceProposal(false)}
-              >
-                <Text style={styles.cancelModalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmModalButton]}
-                onPress={sendServiceProposal}
-              >
-                <Text style={styles.confirmModalButtonText}>Enviar Propuesta</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
       {/* Input de mensaje */}
       <View style={styles.inputContainer}>
-        <TouchableOpacity
-          style={styles.serviceButton}
-          onPress={() => setShowServiceProposal(true)}
-        >
-          <Ionicons name="add-circle" size={20} color="#3B82F6" />
-        </TouchableOpacity>
-
         <TextInput
           style={styles.textInput}
           placeholder="Escribe un mensaje..."
@@ -511,12 +342,33 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    paddingTop: 50, // Para notch
+    paddingTop: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginLeft: 12,
+    backgroundColor: '#e0e0e0',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginLeft: 12,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
   },
   providerInfo: {
     flex: 1,
@@ -563,7 +415,7 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     padding: 16,
-    paddingBottom: 100, // Espacio para input
+    paddingBottom: 100,
   },
   messageContainer: {
     marginBottom: 12,
@@ -605,160 +457,6 @@ const styles = StyleSheet.create({
   otherTimestamp: {
     alignSelf: 'flex-start',
     color: '#9CA3AF',
-  },
-  serviceProposal: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-  },
-  serviceTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  serviceDescription: {
-    fontSize: 14,
-    color: '#4B5563',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  serviceDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  serviceRate: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  serviceHours: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  serviceTotal: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 12,
-  },
-  serviceActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  serviceButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  acceptButton: {
-    backgroundColor: '#10B981',
-  },
-  rejectButton: {
-    backgroundColor: '#EF4444',
-  },
-  acceptButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  rejectButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  systemMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    alignSelf: 'center',
-    maxWidth: '90%',
-  },
-  systemMessageText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 8,
-  },
-  systemTimestamp: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  modalTextarea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  modalRow: {
-    flexDirection: 'row',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelModalButton: {
-    backgroundColor: '#F3F4F6',
-  },
-  confirmModalButton: {
-    backgroundColor: '#3B82F6',
-  },
-  cancelModalButtonText: {
-    color: '#374151',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  confirmModalButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserProfile } from './user-profile/user-profile.entity';
 import { UserProfileModule } from './user-profile/user-profile.module';
-
+import { SavedSearch } from './user-profile/entities/saved-search.entity';
 
 @Module({
   imports: [
@@ -13,7 +13,7 @@ import { UserProfileModule } from './user-profile/user-profile.module';
       username: 'root',
       password: 'root',
       database: 'skilllink_db',
-      entities: [UserProfile],
+      entities: [UserProfile, SavedSearch],
       synchronize: true,
     }),
     UserProfileModule,

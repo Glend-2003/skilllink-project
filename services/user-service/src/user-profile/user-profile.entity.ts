@@ -46,5 +46,4 @@ export class UserProfile {
 
   @Column({ length: 50, nullable: true })
   longitude: string;
-
 }

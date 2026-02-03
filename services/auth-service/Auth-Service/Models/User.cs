@@ -28,5 +28,8 @@ namespace Auth_Service.Models
 
         [NotMapped]
         public string UserType { get; set; } = string.Empty;
+
+        [Column("profile_image_url")]
+        public string? ProfileImageUrl { get; set; }
     }
 }

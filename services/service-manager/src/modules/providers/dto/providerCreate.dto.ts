@@ -6,6 +6,9 @@ import {
   MaxLength,
   IsBoolean,
   IsOptional,
+  IsNumber,
+  IsLatitude,
+  IsLongitude,
 } from 'class-validator';
 
 export class CreateProviderDto {
@@ -23,6 +26,16 @@ export class CreateProviderDto {
   })
   @IsString()
   businessDescription!: string;
+
+  @IsNotEmpty({ message: 'La latitud es obligatoria' })
+  @IsNumber()
+  @IsLatitude()
+  latitude!: number;
+
+  @IsNotEmpty({ message: 'La longitud es obligatoria' })
+  @IsNumber()
+  @IsLongitude()
+  longitude!: number;
 
   @IsNotEmpty({ message: 'Indica tus años de experiencia' })
   @IsInt()

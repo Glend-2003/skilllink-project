@@ -1,0 +1,65 @@
+### Gallery API - Testing Endpoints
+### Asegúrate de tener el service-manager corriendo en el puerto 3004
+
+@baseUrl = http://localhost:3004
+@providerId = 1
+@serviceId = 5
+
+### 1. Upload Single Image
+POST {{baseUrl}}/gallery/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="providerId"
+
+{{providerId}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="serviceId"
+
+{{serviceId}}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="imageTitle"
+
+Trabajo terminado - Ejemplo
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="imageDescription"
+
+Descripción del trabajo realizado
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="displayOrder"
+
+0
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="test-image.jpg"
+Content-Type: image/jpeg
+
+< ./test-image.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### 2. Get all images for a service
+GET {{baseUrl}}/gallery/service/{{serviceId}}
+
+### 3. Get single image by ID
+GET {{baseUrl}}/gallery/1
+
+### 4. Create gallery entry with URL (método anterior)
+POST {{baseUrl}}/gallery
+Content-Type: application/json
+
+{
+  "serviceId": {{serviceId}},
+  "providerId": {{providerId}},
+  "imageUrl": "https://example.com/image.jpg",
+  "imageTitle": "Título de ejemplo",
+  "imageDescription": "Descripción de ejemplo",
+  "displayOrder": 0
+}
+
+### 5. Delete image
+DELETE {{baseUrl}}/gallery/1
+
+### 6. Toggle approval
+PATCH {{baseUrl}}/gallery/1/approve
+
+### 7. Get provider images (if you add this endpoint)
+GET {{baseUrl}}/gallery/provider/{{providerId}}

@@ -4,6 +4,9 @@ const http = require("http");
 const { Server } = require("socket.io");
 const mysql = require("mysql2/promise");
 const cors = require("cors");
+const axios = require("axios");
+
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
 
 const app = express();
 app.use(cors());
@@ -97,6 +100,44 @@ let io;
         };
 
         io.to(conversationId).emit("receive_message", message);
+
+        // Send push notification to receiver
+        try {
+          const [conversation] = await db.execute(
+            `SELECT participant1_user_id, participant2_user_id FROM conversations WHERE conversation_id = ?`,
+            [conversationId]
+          );
+
+          if (conversation.length > 0) {
+            const receiverId = conversation[0].participant1_user_id === sender_user_id 
+              ? conversation[0].participant2_user_id 
+              : conversation[0].participant1_user_id;
+
+            // Get sender info
+            const [senderInfo] = await db.execute(
+              `SELECT email FROM users WHERE user_id = ?`,
+              [sender_user_id]
+            );
+
+            const senderName = senderInfo[0]?.email?.split('@')[0] || 'Usuario';
+
+            // Send notification
+            await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send`, {
+              userId: receiverId,
+              title: 'Nuevo mensaje',
+              body: `${senderName}: ${message_text.substring(0, 50)}${message_text.length > 50 ? '...' : ''}`,
+              data: {
+                type: 'chat',
+                conversationId: conversationId,
+                senderId: sender_user_id
+              }
+            }).catch(err => {
+              console.error('Error sending push notification:', err.message);
+            });
+          }
+        } catch (error) {
+          console.error('Error processing notification:', error);
+        }
       });
     });
     
@@ -160,6 +201,7 @@ app.get("/api/conversations/:userId", async (req, res) => {
           ELSE c.participant1_user_id
         END AS other_user_id,
         u_other.email AS other_user_email,
+        u_other.profile_image_url AS other_user_profile_image,
         NULL AS other_user_name,
         1 AS is_provider,
         (SELECT m.message_text FROM messages m 
@@ -203,5 +245,45 @@ app.get("/api/conversations/:conversationId/messages", async (req, res) => {
   } catch (error) {
     console.error("Error fetching messages:", error);
     res.status(500).json({ error: "Error fetching messages" });
+  }
+});
+
+app.get("/api/conversations/details/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.query;
+
+    const [conversations] = await db.execute(
+      `SELECT 
+        c.conversation_id,
+        c.participant1_user_id,
+        c.participant2_user_id,
+        CASE 
+          WHEN c.participant1_user_id = ? THEN c.participant2_user_id
+          ELSE c.participant1_user_id
+        END AS other_user_id,
+        u_other.email AS other_user_email,
+        c.created_at,
+        c.last_message_at
+      FROM conversations c
+      LEFT JOIN users u_other ON u_other.user_id = (
+        CASE 
+          WHEN c.participant1_user_id = ? THEN c.participant2_user_id
+          ELSE c.participant1_user_id
+        END
+      )
+      WHERE c.conversation_id = ? 
+        AND (c.participant1_user_id = ? OR c.participant2_user_id = ?)`,
+      [userId, userId, conversationId, userId, userId]
+    );
+
+    if (conversations.length === 0) {
+      return res.status(404).json({ error: "Conversación no encontrada" });
+    }
+
+    res.json(conversations[0]);
+  } catch (error) {
+    console.error(" Error fetching conversation details:", error);
+    res.status(500).json({ error: "Error al obtener detalles de la conversación" });
   }
 });
