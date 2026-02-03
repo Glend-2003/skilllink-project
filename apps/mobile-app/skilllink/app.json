@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para mostrar tu dirección en el mapa y conectarte con clientes cercanos."
-      }
+      },
+      "bundleIdentifier": "com.glend2003.skilllink"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,8 +29,12 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ]
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.glend2003.skilllink",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -44,10 +49,23 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Permite a SkillLink usar tu ubicación para conectarte con proveedores cercanos."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9e4a356-e519-4d5f-a4fc-111663cfa689"
+      }
+    },
+    "owner": "geraldcc"
   }
 }

@@ -34,3 +34,14 @@ services:
     depends_on:
       - user-service
       - chat-service
+
+  # Servicio de notificaciones
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "3006:3006"
+    depends_on:
+      - mysql_db
+    environment:
+      DB_HOST: mysql_db
+      PORT: 3006
