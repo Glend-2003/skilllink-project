@@ -339,6 +339,71 @@ namespace AuthController.Controllers
                             _context.UserRoles.Add(userRole);
                         }
                     }
+
+                    // Send push notification to user
+                    try
+                    {
+                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
+                        using var httpClient = new HttpClient();
+                        
+                        var notificationData = new
+                        {
+                            userId = request.UserId,
+                            title = "¡Solicitud Aprobada!",
+                            body = "Tu solicitud para ser proveedor ha sido aprobada. Ya puedes ofrecer tus servicios.",
+                            data = new
+                            {
+                                type = "provider_approved",
+                                requestId = request.RequestId
+                            }
+                        };
+
+                        var content = new StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(notificationData),
+                            Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        // Log but don't fail the request if notification fails
+                        Console.WriteLine($"Error sending notification: {notifEx.Message}");
+                    }
+                }
+                else if (model.Status == "rejected" && request.User != null)
+                {
+                    // Send rejection notification
+                    try
+                    {
+                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
+                        using var httpClient = new HttpClient();
+                        
+                        var notificationData = new
+                        {
+                            userId = request.UserId,
+                            title = "Solicitud Rechazada",
+                            body = model.ReviewNotes ?? "Tu solicitud para ser proveedor ha sido rechazada. Contacta al soporte para más información.",
+                            data = new
+                            {
+                                type = "provider_rejected",
+                                requestId = request.RequestId
+                            }
+                        };
+
+                        var content = new StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(notificationData),
+                            Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        Console.WriteLine($"Error sending notification: {notifEx.Message}");
+                    }
                 }
 
                 _context.ProviderRequests.Update(request);

@@ -124,12 +124,22 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
           }),
         });
 
+        let updateResult;
+        try {
+          const responseText = await updateResponse.text();
+          updateResult = responseText ? JSON.parse(responseText) : {};
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError);
+          updateResult = {};
+        }
+        
         if (updateResponse.ok) {
           setImageUrl(newImageUrl);
           onUploadComplete(newImageUrl);
           Alert.alert('Éxito', 'Foto de perfil actualizada');
         } else {
-          throw new Error('Error actualizando perfil');
+          console.error('Error actualizando perfil:', updateResult);
+          throw new Error(updateResult.message || updateResult.Message || 'Error actualizando perfil');
         }
       } else {
         throw new Error(uploadResult.message || 'Error al subir la imagen');
