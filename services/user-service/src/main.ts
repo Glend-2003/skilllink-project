@@ -29,6 +29,6 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
 
   await app.listen(3004);
-  console.log(`🚀 User-Service corriendo en: http://localhost:3004`);
+  console.log(`User-Service corriendo en: http://localhost:3004`);
 }
 bootstrap();
