@@ -45,9 +45,17 @@ export default function ChatScreen() {
       console.log('Fetching conversations for userId:', user.userId);
       const res = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
       console.log('Response status:', res.status);
-      const data: ApiConversation[] = await res.json();
+      const data = await res.json();
       console.log('Conversations data:', data);
-      const providerConvs = (data || []).filter(c => c.is_provider === 1);
+      
+      // Verificar si es un error o un array válido
+      if (!Array.isArray(data)) {
+        console.error('API returned error:', data);
+        setConversations([]);
+        return;
+      }
+      
+      const providerConvs = data.filter(c => c.is_provider === 1);
       const mapped: ConversationItemUI[] = providerConvs.map(c => ({
         id: String(c.conversation_id),
         providerName: c.other_user_name || c.other_user_email || 'Proveedor',

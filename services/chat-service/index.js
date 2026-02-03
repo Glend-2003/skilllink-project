@@ -4,6 +4,9 @@ const http = require("http");
 const { Server } = require("socket.io");
 const mysql = require("mysql2/promise");
 const cors = require("cors");
+const axios = require("axios");
+
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
 
 const app = express();
 app.use(cors());
@@ -95,6 +98,44 @@ let io;
         };
 
         io.to(conversationId).emit("receive_message", message);
+
+        // Send push notification to receiver
+        try {
+          const [conversation] = await db.execute(
+            `SELECT participant1_user_id, participant2_user_id FROM conversations WHERE conversation_id = ?`,
+            [conversationId]
+          );
+
+          if (conversation.length > 0) {
+            const receiverId = conversation[0].participant1_user_id === sender_user_id 
+              ? conversation[0].participant2_user_id 
+              : conversation[0].participant1_user_id;
+
+            // Get sender info
+            const [senderInfo] = await db.execute(
+              `SELECT email FROM users WHERE user_id = ?`,
+              [sender_user_id]
+            );
+
+            const senderName = senderInfo[0]?.email?.split('@')[0] || 'Usuario';
+
+            // Send notification
+            await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send`, {
+              userId: receiverId,
+              title: 'Nuevo mensaje',
+              body: `${senderName}: ${message_text.substring(0, 50)}${message_text.length > 50 ? '...' : ''}`,
+              data: {
+                type: 'chat',
+                conversationId: conversationId,
+                senderId: sender_user_id
+              }
+            }).catch(err => {
+              console.error('Error sending push notification:', err.message);
+            });
+          }
+        } catch (error) {
+          console.error('Error processing notification:', error);
+        }
       });
     });
     

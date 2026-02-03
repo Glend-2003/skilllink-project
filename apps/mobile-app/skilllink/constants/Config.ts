@@ -16,7 +16,7 @@ const getServerIP = () => {
   } catch {}
 
 
-  return '10.147.20.114'; 
+  return '192.168.100.177'; 
 };
 
 const SERVER_IP = getServerIP();
@@ -28,6 +28,7 @@ export const Config = {
   API_GATEWAY_URL: `http://${SERVER_IP}:3000`,
   PROVIDER_SERVICE_URL: `http://${SERVER_IP}:3004`,
   SERVICE_MANAGER_URL: `http://${SERVER_IP}:3005`,
+  NOTIFICATION_SERVICE_URL: `http://${SERVER_IP}:3006`,
 };
 
 export const API_URL = Config.API_GATEWAY_URL;

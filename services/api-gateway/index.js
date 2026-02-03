@@ -14,7 +14,7 @@ app.use('/api/v1/auth', createProxyMiddleware({
     pathRewrite: { '^/api/v1/auth': '' }
 }));
 
-// Services (NestJS) - Puerto 3002
+// Service-Manager (Node + Express) - Puerto 3002
 app.use('/api/v1', createProxyMiddleware({
     target: 'http://localhost:3002',
     changeOrigin: true,
