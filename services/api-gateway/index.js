@@ -14,10 +14,21 @@ app.use('/api/v1/auth', createProxyMiddleware({
     pathRewrite: { '^/api/v1/auth': '' }
 }));
 
-// Services (NestJS) - Puerto 3002
-app.use('/api/v1/services', createProxyMiddleware({
+// Service-Manager (Node + Express) - Puerto 3002
+app.use('/api/v1', createProxyMiddleware({
     target: 'http://localhost:3002',
-    changeOrigin: true
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+
+        console.log(`[Gateway] Recibido: ${path}`);
+        return path.replace('/api/v1', ''); 
+    },
+    onProxyReq: (proxyReq, req) => {
+        console.log(`[Gateway] Redirigiendo a Service-Manager: ${req.method} ${proxyReq.path}`);
+    },
+    onError: (err) => {
+        console.error('[Gateway Error]', err.message);
+    }
 }));
 
 // Chat (Node + WebSocket) - Puerto 3003
