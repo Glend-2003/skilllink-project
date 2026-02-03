@@ -25,7 +25,8 @@ namespace Auth_Service.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<UserRole> UserRoles { get; set; } 
-        [Column("user_type")]
+        //not mapped properties
+        [NotMapped]
         public string UserType { get; set; } = string.Empty;
 
         [Column("profile_image_url")]

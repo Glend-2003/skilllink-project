@@ -45,7 +45,7 @@ export class RequestsService {
       estimatedCost: serviceFound.basePrice,
     });
 
-    // 3. Guardamos
+    // Add relations
     return await this.requestRepository.save(newRequest);
   }
 
