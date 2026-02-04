@@ -22,15 +22,59 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
       try {
         setLoading(true);
         
-        const [userData, activeProviders, inactiveProviders] = await Promise.all([
+        const [userData, allProviders, verifiedProviders, unverifiedProviders] = await Promise.all([
           UserService.getAllUsers(),
-          MarketplaceService.getActiveProviders(),
-          MarketplaceService.getInactiveProviders()
+          MarketplaceService.getProviders(),
+          MarketplaceService.getVerifiedProviders(),
+          MarketplaceService.getUnverifiedProviders()
         ]);
 
+        console.log("Estadísticas:", {
+          totalUsuarios: userData.length,
+          totalProveedores: allProviders.length,
+          verificados: verifiedProviders.length,
+          noVerificados: unverifiedProviders.length
+        });
+
         setUsers(userData);
-        setActiveProviders(activeProviders);
-        setInactiveProviders(inactiveProviders);
+        setActiveProviders(verifiedProviders);  
+        setInactiveProviders(unverifiedProviders);  
+        
+        const stats = [
+          {
+            title: 'Total Usuarios',
+            value: userData.length,
+            icon: Users,
+            color: 'text-blue-600',
+            bgColor: 'bg-blue-100',
+            change: '+12%',
+          },
+          {
+            title: 'Proveedores Verificados',
+            value: verifiedProviders.length,
+            icon: UserCheck,
+            color: 'text-green-600',
+            bgColor: 'bg-green-100',
+            change: '+8%',
+          },
+          {
+            title: 'Proveedores por Verificar',
+            value: unverifiedProviders.length,
+            icon: AlertCircle,
+            color: 'text-amber-600',
+            bgColor: 'bg-amber-100',
+            change: '+5%',
+          },
+          {
+            title: 'Total Proveedores',
+            value: allProviders.length,
+            icon: Users,
+            color: 'text-purple-600',
+            bgColor: 'bg-purple-100',
+            change: '+15%',
+          },
+        ];
+        
       } catch (error) {
         console.error("Error al cargar datos:", error);
         toast.error("Error al sincronizar con la base de datos");
@@ -208,7 +252,7 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
             </CardHeader>
             <CardContent className="space-y-3">
               {activeProviders.slice(0, 5).map((provider, index) => (
-                <div key={provider.userId} className="flex items-center gap-3">
+                <div key={provider.id} className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-bold">
                     {index + 1}
                   </span>

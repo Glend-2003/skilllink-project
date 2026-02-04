@@ -1,4 +1,4 @@
-import { MessageCircle, History, LayoutDashboard, Settings, LogOut, Home, Search } from 'lucide-react';
+import { MessageCircle, History, LayoutDashboard, Settings, LogOut, Home, Search, UserIcon } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Avatar, AvatarFallback } from './components/ui/avatar';
 import { Switch } from './components/ui/switch';
@@ -26,7 +26,7 @@ export function Navigation({ currentView, onViewChange, userMode, onModeChange, 
 
   const providerMenuItems = [
     { id: 'provider-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    //{ id: 'provider-profile', label: 'Mi Perfil', icon: User },
+    { id: 'provider-profile', label: 'Mi Perfil', icon: UserIcon },
     { id: 'provider-plans', label: 'Planes', icon: Settings },
   ];
 

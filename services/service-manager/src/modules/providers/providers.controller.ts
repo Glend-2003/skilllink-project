@@ -29,6 +29,19 @@ export class ProvidersController {
     return this.providersService.findAll();
   }
 
+    
+  //Get active providers
+  @Get('active')
+  async getActiveProviders() {
+    return await this.providersService.findProvidersByStatus(true);
+  }
+
+  //Get inactive providers
+  @Get('inactive')
+  async getInactiveProviders() {
+    return await this.providersService.findProvidersByStatus(false);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.providersService.findOne(id);
@@ -63,16 +76,5 @@ export class ProvidersController {
   toggleTrustBadge(@Param('id', ParseIntPipe) id: number) {
     return this.providersService.toggleTrustBadge(id);
   }
-  
-  //Get active providers
-  @Get('active')
-  async getActiveProviders() {
-    return await this.providersService.findProvidersByStatus(true);
-  }
 
-  //Get inactive providers
-  @Get('inactive')
-  async getInactiveProviders() {
-    return await this.providersService.findProvidersByStatus(false);
-  }
 }

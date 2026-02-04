@@ -36,7 +36,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const loadUser = async () => {
       if (token) {
         try {
-          // Configurar token en axios
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           const userData = await UserService.getMyProfile();
@@ -53,18 +52,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUser();
   }, [token]);
 
-  const login = async (email: string, password: string): Promise<string> => {
+  const login = async (email: string, password: string) => {
     try {
-      const result = await AuthService.login({ email, password });
-    
-      setToken(result.token);
-      localStorage.setItem('token', result.token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${result.token}`;
+      const response = await AuthService.login({ email, password });
+      
+      const responseData = response; 
+      const roleValue = (responseData.userType || "").toString();
+      
+      const loggedUser = {
+        id: responseData.userId,
+        email: responseData.email,
+        name: responseData.name,
+        role: roleValue
+      };
 
-      const userData = await UserService.getMyProfile();
-      setUser(userData);
+      setUser(loggedUser);
 
-      return userData.role || 'client'; 
+      localStorage.setItem('token', responseData.token);
+      localStorage.setItem('user', JSON.stringify(loggedUser));
+
+      return roleValue;
     } catch (error) {
       throw error;
     }

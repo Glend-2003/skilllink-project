@@ -20,32 +20,25 @@ export function Login({ onViewChange }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    if (!email || !password) {
-      toast.error('Por favor completa todos los campos');
-      return;
-    }
-
     try {
       const userRole = await login(email, password);
-      toast.success('¡Bienvenido de nuevo!');
+      const roleStr = userRole.toString().toLowerCase();
 
-      switch (userRole.toLowerCase()) {
-        case 'admin':
-          onViewChange('admin-dashboard');
-          break;
-        case 'provider':
-          onViewChange('provider-dashboard');
-          break;
-        case 'client':
-        default:
-          onViewChange('home');
-          break;
+      // Forzamos la redirección basada en el ID 3
+      if (roleStr === 'admin' || roleStr === '3') {
+        onViewChange('admin-dashboard');
+      } else if (roleStr === 'provider' || roleStr === '2') {
+        onViewChange('provider-dashboard');
+      } else {
+        onViewChange('home');
       }
+      
+      toast.success('¡Bienvenido administrador!');
     } catch (error: any) {
       console.error("Error en login:", error);
       const message = error.response?.data?.message || 'Correo o contraseña incorrectos';

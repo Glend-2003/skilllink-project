@@ -10,27 +10,49 @@ import { Register } from './components/auth/Register';
 import { Onboarding } from './components/auth/Onboarding';
 import { Toaster } from './components/ui/sonner';
 import { type UserMode } from './types';
-import type { User } from './services/userService';
 import { useAuth } from './components/contexts/AuthContext';
+import { Home } from './components/client/Home';
+import { ProviderDetail } from './components/client/ProviderDetail';
 
 export default function App() {
   const { user: currentUser, isLoading } = useAuth();
+  const userRole = currentUser?.role?.toLowerCase();
   const [currentView, setCurrentView] = useState('onboarding');
   const [userMode, setUserMode] = useState<UserMode>('client');
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  useEffect(() => {
+    if (currentUser) {
+      const role = currentUser.role?.toString().toLowerCase();
+      if (role === 'admin' || role === '3') {
+          setCurrentView('admin-dashboard');
+      } else if (role === 'provider' || role === '2') {
+          setCurrentView('provider-dashboard');
+          setUserMode('provider');
+      } else {
+          setCurrentView('home');
+          setUserMode('client');
+      }
+    }
+}, [currentUser]);
 
-  if (isLoading) return <div>Cargando...</div>;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Cargando perfil...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Handle view changes
   const handleViewChange = (view: string) => {
     setCurrentView(view);
   };
 
-  // Handle mode changes
   const handleModeChange = (mode: UserMode) => {
     setUserMode(mode);
-    // Auto-switch view when changing mode
     if (mode === 'provider') {
       setCurrentView('provider-dashboard');
     } else {
@@ -38,38 +60,28 @@ export default function App() {
     }
   };
 
-  // Handle provider selection
   const handleProviderSelect = (providerId: string) => {
     setSelectedProviderId(providerId);
   };
 
-  // Render the current view
   const renderView = () => {
-    const isAuthView = ['login', 'register', 'onboarding'].includes(currentView);
-    if (!isAuthView && !currentUser) {
-      return <Login onViewChange={handleViewChange} />;
+    if (!currentUser) {
+      switch (currentView) {
+        case 'register':
+          return <Register onViewChange={handleViewChange} />;
+        case 'onboarding':
+          return <Onboarding onViewChange={handleViewChange} />;
+        case 'login':
+        default:
+          return <Login onViewChange={handleViewChange} />;
+      }
     }
 
     switch (currentView) {
-      // Auth views
-      case 'login':
-        return <Login onViewChange={handleViewChange} />;
-      case 'register':
-        return <Register onViewChange={handleViewChange} />;
-      case 'onboarding':
-        return <Onboarding onViewChange={handleViewChange} />;
-
-      // Client views
-      /*case 'home':
+      //Client
+      case 'home':
         return (
           <Home 
-            onViewChange={handleViewChange}
-            onProviderSelect={handleProviderSelect}
-          />
-        );
-      case 'search':
-        return (
-          <SearchProviders
             onViewChange={handleViewChange}
             onProviderSelect={handleProviderSelect}
           />
@@ -81,36 +93,38 @@ export default function App() {
             onViewChange={handleViewChange}
           />
         );
-      case 'chat':
-        return <Chat onViewChange={handleViewChange} />;
-      case 'history':
-        return <History onViewChange={handleViewChange} />;*/
 
-      // Provider views
+      //Provider
       case 'provider-dashboard':
-        if (!currentUser) {
-          return <Login onViewChange={handleViewChange} />;
-        }
-        return <Dashboard currentUser={currentUser!} onViewChange={handleViewChange} />;
+        return <Dashboard currentUser={currentUser} onViewChange={handleViewChange} />;
       case 'provider-profile':
-        return <ProviderProfile currentUser={currentUser!} onViewChange={handleViewChange} />;
+        return <ProviderProfile currentUser={currentUser} onViewChange={handleViewChange} />;
       case 'provider-plans':
         return <Plans onViewChange={handleViewChange} />;
 
-      // Admin views
+      //Admin
       case 'admin-dashboard':
-        //if (currentUser?.userType !== 'admin') return <Home onViewChange={handleViewChange} />;
+        if (userRole !== 'admin' && userRole !== '3') {
+          setCurrentView('home');
+          return <Home onViewChange={handleViewChange}
+            onProviderSelect={handleProviderSelect} />;
+        }
         return <AdminDashboard onViewChange={handleViewChange} />;
       case 'admin-users':
-        return <AdminUsers currentUser={currentUser!} onViewChange={handleViewChange} />;
+        if (userRole !== 'admin') {
+          return <Home onViewChange={handleViewChange} onProviderSelect={handleProviderSelect} />;
+        }
+        return <AdminUsers currentUser={currentUser} onViewChange={handleViewChange} />;
 
       default:
-        return <Login onViewChange={handleViewChange} />;
+        if (userRole === 'admin') return <AdminDashboard onViewChange={handleViewChange} />;
+        if (userRole === 'provider') return <Dashboard currentUser={currentUser} onViewChange={handleViewChange} />;
+        return <Home onViewChange={handleViewChange} onProviderSelect={handleProviderSelect} />;
     }
   };
 
-  const showNavigation = currentView !== 'login' && currentView !== 'register' && currentView !== 'onboarding';
-  const showAdminButton = currentView !== 'login' && currentView !== 'register' && currentView !== 'onboarding';
+  const isAuthPage = ['login', 'register', 'onboarding'].includes(currentView);
+  const showNavigation = !isAuthPage && !!currentUser;
 
   return (
     <div className="min-h-screen bg-white">
@@ -123,17 +137,19 @@ export default function App() {
           currentUser={currentUser!}
         />
       )}
-      {renderView()}
-      <Toaster />
+      
+      <main>
+        {renderView()}
+      </main>
 
-      {/* Admin Access Button (for demo purposes) */}
-      {showAdminButton && (
+      <Toaster />
+      {currentUser && (
         <button
-          onClick={() => handleViewChange('admin-dashboard')}
+          onClick={() => handleViewChange(userRole === 'admin' ? 'admin-dashboard' : 'home')}
           className="fixed bottom-4 right-4 w-12 h-12 bg-slate-900 text-white rounded-full shadow-lg hover:bg-slate-800 flex items-center justify-center text-xs font-bold z-50"
-          title="Admin Panel"
+          title="Panel de Control"
         >
-          A
+          {currentUser.role?.charAt(0).toUpperCase() || 'U'}
         </button>
       )}
     </div>
