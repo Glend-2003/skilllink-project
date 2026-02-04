@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, DollarSign, TrendingUp, AlertCircle, UserCheck, UserX } from 'lucide-react';
+import { Users, DollarSign, TrendingUp, AlertCircle, UserCheck, UserX, ListTree } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
@@ -205,9 +205,10 @@ export function AdminDashboard({ onViewChange }: AdminDashboardProps) {
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-3"
+                onClick={() => onViewChange('admin-categories')}
               >
-                <TrendingUp className="w-5 h-5" />
-                Ver estadísticas
+                <ListTree className="w-5 h-5" />
+                Gestionar categorías
               </Button>
             </CardContent>
           </Card>

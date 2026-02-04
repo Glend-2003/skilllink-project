@@ -13,6 +13,7 @@ import { type UserMode } from './types';
 import { useAuth } from './components/contexts/AuthContext';
 import { Home } from './components/client/Home';
 import { ProviderDetail } from './components/client/ProviderDetail';
+import { AdminCategories } from './components/admin/AdminCategories';
 
 export default function App() {
   const { user: currentUser, isLoading } = useAuth();
@@ -115,6 +116,12 @@ export default function App() {
           return <Home onViewChange={handleViewChange} onProviderSelect={handleProviderSelect} />;
         }
         return <AdminUsers currentUser={currentUser} onViewChange={handleViewChange} />;
+      case 'admin-categories':
+        if (userRole !== 'admin' && userRole !== '3') {
+          setCurrentView('home');
+          return <Home onViewChange={handleViewChange} onProviderSelect={handleProviderSelect} />;
+        }
+        return <AdminCategories onViewChange={handleViewChange} />;
 
       default:
         if (userRole === 'admin') return <AdminDashboard onViewChange={handleViewChange} />;

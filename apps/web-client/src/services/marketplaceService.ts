@@ -175,4 +175,13 @@ export const MarketplaceService = {
       return [];
     }
   },
+  verifyProvider: async (providerId: number) => {
+    const response = await api.patch(`/api/v1/providers/${providerId}/verify`);
+    return response.data;
+  },
+
+  toggleTrustBadge: async (providerId: number) => {
+    const response = await api.patch(`/api/v1/providers/${providerId}/trust-badge`);
+    return response.data;
+  },
 };
