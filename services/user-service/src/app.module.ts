@@ -8,7 +8,7 @@ import { SavedSearch } from './user-profile/entities/saved-search.entity';
   imports: [
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: 'localhost',
+      host:'mysql_db',
       port: 3306,
       username: 'root',
       password: 'root',

@@ -1,54 +1,78 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const morgan = require('morgan');
 require('dotenv').config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(morgan('dev'));
 
-// Auth (.NET) - Puerto 5293
-app.use('/api/v1/auth', createProxyMiddleware({
-    target: 'http://localhost:5293/api/auth',
+// 1. Auth Service (C#/.NET)
+app.use(createProxyMiddleware({
+    pathFilter: '/api/v1/auth',
+    target: process.env.AUTH_SERVICE_URL || 'http://auth_service:8080',
     changeOrigin: true,
-    pathRewrite: { '^/api/v1/auth': '' }
-}));
-
-// Service-Manager (Node + Express) - Puerto 3002
-app.use('/api/v1', createProxyMiddleware({
-    target: 'http://localhost:3002',
-    changeOrigin: true,
-    pathRewrite: (path, req) => {
-
-        console.log(`[Gateway] Recibido: ${path}`);
-        return path.replace('/api/v1', ''); 
+    pathRewrite: {
+        '^/api/v1/auth': '/api/Auth'
     },
-    onProxyReq: (proxyReq, req) => {
-        console.log(`[Gateway] Redirigiendo a Service-Manager: ${req.method} ${proxyReq.path}`);
-    },
-    onError: (err) => {
-        console.error('[Gateway Error]', err.message);
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[Auth Proxy] Reenviando ${req.method} ${req.url} -> ${proxyReq.path}`);
     }
 }));
 
-// Chat (Node + WebSocket) - Puerto 3003
+// 2. User Service (NestJS)
+app.use('/api/v1/users', createProxyMiddleware({
+    target: process.env.USER_SERVICE_URL || 'http://user-service:3000',
+    changeOrigin: true,
+    pathRewrite: {
+        '^/api/v1/users': '/users'
+    }
+}));
+
+// 3. Service Manager (Reports, Settings, Services, Categories)
+app.use('/api/v1', createProxyMiddleware({
+    target: process.env.SERVICE_MANAGER_URL || 'http://service-manager:3000',
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+        if (path.startsWith('/api/v1/auth') || path.startsWith('/api/v1/users') || path.startsWith('/api/v1/chat') || path.startsWith('/api/v1/reviews') || path.startsWith('/api/v1/payments')) {
+            return path;
+        }
+        return path.replace('/api/v1', '');
+    },
+    onProxyReq: (proxyReq, req) => {
+        console.log(`[Gateway] Proxying ${req.method} ${req.url} -> ${proxyReq.path}`);
+    }
+}));
+
+// 4. Chat Service
 app.use('/api/v1/chat', createProxyMiddleware({
-    target: 'http://localhost:3003',
+    target: process.env.CHAT_SERVICE_URL || 'http://chat-service:3003',
     changeOrigin: true,
     ws: true
 }));
 
-// Reviews (Python) - Puerto 8000
+// 5. Reviews Service (Python)
 app.use('/api/v1/reviews', createProxyMiddleware({
-    target: 'http://localhost:8000',
+    target: process.env.REVIEWS_SERVICE_URL || 'http://reviews-service:8000',
     changeOrigin: true,
-    pathRewrite: { '^/api/v1/reviews': '/' }
+    pathRewrite: { 
+        '^/api/v1/reviews': '/' 
+    }
 }));
 
-// Profiles (NestJS) - Puerto 3004
-app.use('/api/v1/users', createProxyMiddleware({
-    target: 'http://localhost:3004',
+// 6. Payment Service
+app.use('/api/v1/payments', createProxyMiddleware({
+    target: process.env.PAYMENT_SERVICE_URL || 'http://payment-service:8081',
     changeOrigin: true
 }));
 
-app.listen(3000, () => console.log('🚀 API Gateway on port 3000'));
+app.get('/', (req, res) => {
+    res.send('API Gateway SkillLink is running correctly!');
+});
+
+app.listen(PORT, () => {
+    console.log(`API Gateway running on port ${PORT}`);
+});

@@ -36,8 +36,10 @@ namespace AuthController.Controllers
             if (userExists != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
+ 
             User user = new User()
             {
+                UserName = model.email,
                 Email = model.email,
                 PhoneNumber = model.phoneNumber,
                 IsActive = true,
@@ -49,8 +51,11 @@ namespace AuthController.Controllers
 
             try 
             {
+    
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
+
+                int roleId = (model.userType == "Provider") ? 2 : 1;
 
                 var userRole = new UserRole 
                 { 
@@ -96,9 +101,9 @@ namespace AuthController.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-
+          
             var user = await _context.Users
-                .Include(u => u.UserRoles) 
+                .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role) 
                 .FirstOrDefaultAsync(u => u.Email == model.email);
 
@@ -110,6 +115,8 @@ namespace AuthController.Controllers
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 };
+
+        
                 foreach (var ur in user.UserRoles)
                 {
                     if(ur.Role != null) 

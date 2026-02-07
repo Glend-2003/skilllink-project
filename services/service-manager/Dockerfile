@@ -1,23 +1,24 @@
-# Usa una imagen ligera de Node
-FROM node:18-alpine
+FROM node:18-alpine AS builder
 
-# Crea la carpeta de trabajo dentro del contenedor
 WORKDIR /usr/src/app
 
-# Copia los archivos de dependencias
 COPY package*.json ./
 
-# Instala las dependencias
-RUN npm install
-
-# Copia el resto del código
+RUN npm install && \
+    npm install @nestjs/config @nestjs/passport passport passport-jwt cloudinary streamifier @types/multer --save
+    
 COPY . .
 
-# Compila el código (NestJS)
-RUN npm run build
+RUN ./node_modules/.bin/tsc
 
-# Expone el puerto (el mismo que en tu main.ts)
-EXPOSE 3004
+FROM node:18-alpine
 
-# Comando para iniciar
-CMD ["npm", "run", "start:prod"]
+WORKDIR /usr/src/app
+
+COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/package*.json ./
+
+EXPOSE 3000
+
+CMD ["node", "dist/main"]
