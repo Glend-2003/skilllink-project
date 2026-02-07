@@ -51,14 +51,14 @@ export class RequestsController {
     return this.requestsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.requestsService.findOne(id);
-  }
-
   @Get('provider/:id')
   findByProvider(@Param('id', ParseIntPipe) providerId: number) {
     return this.requestsService.findAllByProvider(providerId);
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.requestsService.findOne(id);
   }
 
   @Patch(':id')

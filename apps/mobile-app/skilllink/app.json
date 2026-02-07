@@ -33,8 +33,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.glend2003.skilllink",
-      "googleServicesFile": "./android/app/google-services.json"
+      "package": "com.glend2003.skilllink"
     },
     "web": {
       "bundler": "metro",
@@ -48,12 +47,6 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Permite a SkillLink usar tu ubicación para conectarte con proveedores cercanos."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "color": "#ffffff"
         }
       ]
     ],

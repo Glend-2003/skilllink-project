@@ -26,7 +26,7 @@ npm install
 ### 3. Environment Setup
 Create a `.env` file in the root directory with the following variables:
 ```
-PORT=3003
+PORT=3002
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -43,7 +43,7 @@ Start the chat service:
 npm start
 ```
 
-The service will run on `http://localhost:3003` by default.
+The service will run on `http://localhost:3002` by default.
 
 ## API Endpoints
 - WebSocket events:

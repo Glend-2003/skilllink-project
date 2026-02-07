@@ -1,6 +1,6 @@
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -37,21 +37,15 @@ export default function ChatScreen() {
 
   const fetchConversations = useCallback(async () => {
     if (!user || !user.userId) {
-      console.log('No user or userId:', user);
       return;
     }
     setLoading(true);
     try {
-      console.log('Fetching conversations for userId:', user.userId);
-      const res = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
-      console.log('Response status:', res.status);
+      const res = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${user.userId}`);
       const data = await res.json();
-      console.log('Conversations data:', data);
       
-      // Verificar si es un error o un array válido
       if (!Array.isArray(data)) {
-        console.error('API returned error:', data);
-        setConversations([]);
+        setItems([]);
         return;
       }
       
@@ -110,38 +104,82 @@ export default function ChatScreen() {
     return `${n} conversación${n !== 1 ? 'es' : ''}`;
   }, [items]);
 
-  const renderConversation = ({ item }: { item: ConversationItemUI }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => router.push(`/chat/${item.id}`)}
-    >
-      <View style={styles.avatarContainer}>
-        {item.profileImageUrl ? (
-          <Image source={{ uri: item.profileImageUrl }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{item.providerName.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-      </View>
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${conversationId}`, {
+        method: 'DELETE',
+      });
 
-      <View style={styles.conversationInfo}>
-        <View style={styles.headerRow}>
-          <Text style={styles.providerName} numberOfLines={1}>
-            {item.providerName}
-          </Text>
-          <Text style={styles.time}>{item.time}</Text>
+      if (response.ok) {
+        setItems(prevItems => prevItems.filter(item => item.id !== conversationId));
+      } else {
+        Alert.alert('Error', 'No se pudo eliminar la conversación');
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      Alert.alert('Error', 'Error al eliminar la conversación');
+    }
+  };
+
+  const confirmDelete = (conversationId: string, providerName: string) => {
+    Alert.alert(
+      'Eliminar conversación',
+      `¿Estás seguro de que deseas eliminar la conversación con ${providerName}?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => deleteConversation(conversationId),
+        },
+      ]
+    );
+  };
+
+  const renderConversation = ({ item }: { item: ConversationItemUI }) => (
+    <View style={styles.conversationWrapper}>
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() => router.push(`/chat/${item.id}`)}
+      >
+        <View style={styles.avatarContainer}>
+          {item.profileImageUrl ? (
+            <Image source={{ uri: item.profileImageUrl }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{item.providerName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
         </View>
 
-        <Text style={styles.category}>{item.providerCategory}</Text>
+        <View style={styles.conversationInfo}>
+          <View style={styles.headerRow}>
+            <Text style={styles.providerName} numberOfLines={1}>
+              {item.providerName}
+            </Text>
+            <Text style={styles.time}>{item.time}</Text>
+          </View>
 
-        <Text style={styles.lastMessage} numberOfLines={1}>
-          {item.lastMessage}
-        </Text>
-      </View>
+          <Text style={styles.category}>{item.providerCategory}</Text>
 
-      <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-    </TouchableOpacity>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.lastMessage}
+          </Text>
+        </View>
+
+        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={styles.deleteIconButton}
+        onPress={() => confirmDelete(item.id, item.providerName)}
+      >
+        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+      </TouchableOpacity>
+    </View>
   );
 
   return (
@@ -190,6 +228,9 @@ const styles = StyleSheet.create({
   conversationsList: {
     paddingBottom: 20,
   },
+  conversationWrapper: {
+    position: 'relative',
+  },
   conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -203,6 +244,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  deleteIconButton: {
+    position: 'absolute',
+    top: 8,
+    right: 28,
+    padding: 8,
+    zIndex: 10,
   },
   avatarContainer: {
     position: 'relative',

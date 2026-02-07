@@ -9,10 +9,11 @@ app.use(express.json());
 
 // Configuration of the MySQL database connection
 const dbConfig = {
-  host: 'localhost',
-  port: 3306,
-  user: 'root',
-  database: 'skilllink_db'
+  host: process.env.DB_HOST || 'mysql_db',
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'skilllink_db'
 };
 
 let db;
@@ -20,7 +21,6 @@ let db;
 (async () => {
   try {
     db = await mysql.createConnection(dbConfig);
-    console.log('Connected to MySQL');
   } catch (error) {
     console.error('Error connecting to MySQL:', error);
   }
@@ -122,6 +122,60 @@ app.get('/api/providers/:providerId', async (req, res) => {
   } catch (error) {
     console.error('Error getting provider:', error);
     res.status(500).json({ error: 'Error getting provider' });
+  }
+});
+
+
+// Get provider profile by user_id
+app.get('/api/providers/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const query = `
+      SELECT 
+        pp.provider_id as id,
+        pp.provider_id,
+        pp.business_name,
+        pp.business_description,
+        pp.years_experience,
+        pp.service_radius_km,
+        pp.is_verified as verified,
+        u.user_id,
+        u.email,
+        u.profile_image_url as profileImageUrl,
+        COALESCE(AVG(r.rating), 0) as rating,
+        COUNT(CASE WHEN r.review_id IS NOT NULL THEN 1 END) as reviewCount
+      FROM provider_profiles pp
+      JOIN users u ON pp.user_id = u.user_id
+      LEFT JOIN reviews r ON u.user_id = r.reviewed_user_id
+      WHERE pp.user_id = ?
+      GROUP BY pp.provider_id, u.user_id
+    `;
+
+    const [providers] = await db.execute(query, [userId]);
+
+    if (providers.length === 0) {
+      return res.status(404).json({ error: 'Provider profile not found for this user' });
+    }
+
+    const provider = providers[0];
+    res.json({
+      id: provider.id,
+      providerId: provider.provider_id,
+      businessName: provider.business_name,
+      description: provider.business_description,
+      yearsExperience: provider.years_experience,
+      serviceRadius: provider.service_radius_km,
+      verified: provider.verified === 1,
+      userId: provider.user_id,
+      email: provider.email,
+      profileImageUrl: provider.profileImageUrl,
+      rating: parseFloat(provider.rating) || 0,
+      reviewCount: provider.reviewCount
+    });
+  } catch (error) {
+    console.error('Error getting provider profile by user_id:', error);
+    res.status(500).json({ error: 'Error getting provider profile' });
   }
 });
 
@@ -239,12 +293,187 @@ app.get('/api/services', async (req, res) => {
 
     res.json(formattedServices);
   } catch (error) {
-    console.error('Error obteniendo servicios:', error);
-    res.status(500).json({ error: 'Error obteniendo servicios' });
+    console.error('Error getting services:', error);
+    res.status(500).json({ error: 'Error getting services' });
   }
 });
 
-const PORT = process.env.PORT || 3004;
+// Provider Request - Create (User submits request to become provider)
+app.post('/api/provider-request', async (req, res) => {
+  try {
+    const { businessName, description, services, location } = req.body;
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    // Extract userId from token (assuming JWT format "Bearer <token>")
+    const token = authHeader.split(' ')[1];
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(Buffer.from(base64, 'base64').toString());
+    const userId = payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // Check if user already has a pending or approved request
+    const [existingRequests] = await db.execute(
+      'SELECT * FROM provider_requests WHERE user_id = ? AND status IN ("pending", "approved")',
+      [userId]
+    );
+
+    if (existingRequests.length > 0) {
+      return res.status(400).json({ 
+        error: 'You already have a pending or approved provider request'
+      });
+    }
+
+    // Insert new provider request
+    await db.execute(
+      `INSERT INTO provider_requests 
+       (user_id, business_name, description, services, location, status, created_at) 
+       VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
+      [userId, businessName, description, services, location]
+    );
+
+    res.status(201).json({ 
+      message: 'Provider request submitted successfully',
+      status: 'pending'
+    });
+  } catch (error) {
+    console.error('Error creating provider request:', error);
+    res.status(500).json({ error: 'Error creating provider request' });
+  }
+});
+
+// Provider Requests Endpoints (Admin)
+
+// Get all provider requests (with optional status filter)
+app.get('/api/provider-requests', async (req, res) => {
+  try {
+    const { status } = req.query;
+    
+    let query = `
+      SELECT 
+        pr.*,
+        u.email as userEmail
+      FROM provider_requests pr
+      JOIN users u ON pr.user_id = u.user_id
+    `;
+    
+    const params = [];
+    if (status) {
+      query += ' WHERE pr.status = ?';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY pr.created_at DESC';
+    
+    const [requests] = await db.execute(query, params);
+    
+    const formattedRequests = requests.map(r => ({
+      requestId: r.request_id,
+      userId: r.user_id,
+      userEmail: r.userEmail,
+      businessName: r.business_name,
+      description: r.description,
+      services: r.services,
+      experience: r.experience,
+      location: r.location,
+      hourlyRate: r.hourly_rate,
+      portfolio: r.portfolio,
+      certifications: r.certifications,
+      status: r.status,
+      createdAt: r.created_at,
+      reviewedAt: r.reviewed_at,
+      reviewedBy: r.reviewed_by,
+      reviewNotes: r.review_notes
+    }));
+    
+    res.json(formattedRequests);
+  } catch (error) {
+    console.error('Error fetching provider requests:', error);
+    res.status(500).json({ error: 'Error fetching provider requests' });
+  }
+});
+
+// Review a provider request (approve/reject)
+app.put('/api/provider-requests/review', async (req, res) => {
+  try {
+    const { requestId, status, reviewNotes } = req.body;
+    
+    if (!requestId || !status) {
+      return res.status(400).json({ error: 'requestId and status are required' });
+    }
+    
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be approved or rejected' });
+    }
+    
+    // Update request status
+    await db.execute(
+      `UPDATE provider_requests 
+       SET status = ?, reviewed_at = NOW(), review_notes = ? 
+       WHERE request_id = ?`,
+      [status, reviewNotes || null, requestId]
+    );
+    
+    // If approved, create provider profile
+    if (status === 'approved') {
+      // Get request details
+      const [requests] = await db.execute(
+        'SELECT * FROM provider_requests WHERE request_id = ?',
+        [requestId]
+      );
+      
+      if (requests.length > 0) {
+        const request = requests[0];
+        
+        // Check if provider profile already exists
+        const [existing] = await db.execute(
+          'SELECT provider_id FROM provider_profiles WHERE user_id = ?',
+          [request.user_id]
+        );
+        
+        if (existing.length === 0) {
+          // Create provider profile with only available columns
+          await db.execute(
+            `INSERT INTO provider_profiles 
+             (user_id, business_name, business_description) 
+             VALUES (?, ?, ?)`,
+            [
+              request.user_id,
+              request.business_name,
+              request.description
+            ]
+          );
+          
+          // Update user_type to 'provider' in users table
+          await db.execute(
+            `UPDATE users SET user_type = 'provider' WHERE user_id = ?`,
+            [request.user_id]
+          );
+          
+          // Add provider role (role_id = 2) to user_roles table
+          await db.execute(
+            `INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 2)`,
+            [request.user_id]
+          );
+        }
+      }
+    }
+    
+    res.json({ message: `Request ${status} successfully` });
+  } catch (error) {
+    console.error('Error reviewing provider request:', error);
+    res.status(500).json({ error: 'Error reviewing provider request' });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Provider Service running on port ${PORT}`);
 });

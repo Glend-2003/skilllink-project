@@ -4,16 +4,23 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  JoinColumn,
+  OneToOne,
 } from 'typeorm';
+import { User } from './user.entity';
 
 @Entity('provider_profiles')
 export class ProviderProfile {
   @PrimaryGeneratedColumn({ name: 'provider_id' })
   providerId: number;
 
-  // user_id one to one relationship assumed
+  // user_id one to one relationship
   @Column({ name: 'user_id', unique: true })
   userId: number;
+
+  @OneToOne(() => User)
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
   @Column({ name: 'business_name', length: 200 })
   businessName: string;

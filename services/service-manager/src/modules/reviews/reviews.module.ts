@@ -5,7 +5,7 @@ import { ReviewsController } from './reviews.controller';
 import { Review } from './entities/review.entity';
 import { ServiceRequest } from '../requests/entities/request.entity';
 import { ProviderProfile } from '../providers/entities/provider.entity';
-import { AuthModule } from 'src/config/auth.module';
+import { AuthModule } from '../../config/auth.module';
 
 @Module({
   imports: [

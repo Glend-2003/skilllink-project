@@ -46,6 +46,13 @@ export class Service {
   isActive: boolean;
 
   // Administrative fields
+  @Column({
+    type: 'enum',
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    name: 'approval_status',
+  })
+  approvalStatus: string;
 
   @Column({ name: 'is_verified', default: false })
   isVerified: boolean;

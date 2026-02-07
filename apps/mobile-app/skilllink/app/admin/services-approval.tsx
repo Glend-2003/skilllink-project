@@ -46,11 +46,11 @@ export default function ServicesApprovalScreen() {
   const loadServices = async () => {
     try {
       const endpoint = filter === 'pending' 
-        ? '/api/admin/services/pending'
-        : '/api/admin/services/all';
+        ? '/api/v1/services/admin/pending'
+        : '/api/v1/services/admin/all';
 
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}${endpoint}`,
+        `${Config.API_GATEWAY_URL}${endpoint}`,
         {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
@@ -113,9 +113,9 @@ export default function ServicesApprovalScreen() {
   const approveService = async (serviceId: number) => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/services/${serviceId}/approve`,
+        `${Config.API_GATEWAY_URL}/api/v1/services/admin/${serviceId}/approve`,
         {
-          method: 'PUT',
+          method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${user?.token}`,
           },
@@ -137,9 +137,9 @@ export default function ServicesApprovalScreen() {
   const rejectService = async (serviceId: number) => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/services/${serviceId}/reject`,
+        `${Config.API_GATEWAY_URL}/api/v1/services/admin/${serviceId}/reject`,
         {
-          method: 'PUT',
+          method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${user?.token}`,
             'Content-Type': 'application/json',
@@ -163,7 +163,11 @@ export default function ServicesApprovalScreen() {
   const getPriceDisplay = (service: PendingService) => {
     if (!service.basePrice) return 'Precio a negociar';
     
-    const price = `$${service.basePrice.toFixed(2)}`;
+    const priceNum = typeof service.basePrice === 'string' 
+      ? parseFloat(service.basePrice) 
+      : service.basePrice;
+    
+    const price = `$${priceNum.toFixed(2)}`;
     
     if (service.priceType === 'hourly') return `${price}/hora`;
     if (service.priceType === 'negotiable') return `${price} (negociable)`;

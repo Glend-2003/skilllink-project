@@ -27,6 +27,11 @@ export class ServicesController {
     return this.servicesService.findAll();
   }
 
+  @Get('provider/:providerId')
+  findByProvider(@Param('providerId', ParseIntPipe) providerId: number) {
+    return this.servicesService.findByProvider(providerId);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.servicesService.findOne(id);
@@ -49,5 +54,41 @@ export class ServicesController {
   @Patch(':id/verify')
   verify(@Param('id', ParseIntPipe) id: number) {
     return this.servicesService.verifyService(id);
+  }
+
+  // Admin endpoints
+  @Get('admin/pending')
+  async findPending() {
+    const services = await this.servicesService.findPending();
+    return services.map(service => ({
+      ...service,
+      providerBusinessName: service.provider?.businessName || 'Sin nombre',
+      providerEmail: service.provider?.user?.email || 'Sin email',
+      categoryName: service.category?.categoryName || 'Sin categoría',
+    }));
+  }
+
+  @Get('admin/all')
+  async findAllForAdmin() {
+    const services = await this.servicesService.findAllForAdmin();
+    return services.map(service => ({
+      ...service,
+      providerBusinessName: service.provider?.businessName || 'Sin nombre',
+      providerEmail: service.provider?.user?.email || 'Sin email',
+      categoryName: service.category?.categoryName || 'Sin categoría',
+    }));
+  }
+
+  @Patch('admin/:id/approve')
+  approve(@Param('id', ParseIntPipe) id: number) {
+    return this.servicesService.approveService(id);
+  }
+
+  @Patch('admin/:id/reject')
+  reject(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason?: string },
+  ) {
+    return this.servicesService.rejectService(id, body.reason);
   }
 }

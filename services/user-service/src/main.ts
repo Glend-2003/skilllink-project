@@ -1,4 +1,4 @@
-import 'reflect-metadata'; // <--- ESTA DEBE IR PRIMERO SIEMPRE
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -13,14 +13,14 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Changed to false to allow extra fields
       transform: true,
     }),
   );
 
   const config = new DocumentBuilder()
     .setTitle('SkillLink User Service')
-    .setDescription('API para la gestión de perfiles de usuario')
+    .setDescription('User profile management API')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -28,7 +28,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(3000);
-  console.log(`User-Service corriendo en: http://localhost:3000`);
+  await app.listen(3001);
+  console.log(`User Service running on port 3001`);
 }
 bootstrap();

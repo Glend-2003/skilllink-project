@@ -1,6 +1,6 @@
 const io = require('socket.io-client');
 
-const socket = io('http://localhost:3003');
+const socket = io('http://localhost:3002');
 
 socket.on('connect', () => {
   console.log('Script: Connecting to chat service...');

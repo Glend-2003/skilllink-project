@@ -80,7 +80,9 @@ export class ServicesService {
   async findAll() {
     return this.serviceRepository.find({
       relations: {
-        provider: true,
+        provider: {
+          user: true,
+        },
         category: true,
       },
     });
@@ -90,12 +92,39 @@ export class ServicesService {
     const service = await this.serviceRepository.findOne({
       where: { serviceId: id },
       relations: {
-        provider: true,
+        provider: {
+          user: true,
+        },
         category: true,
       },
     });
     if (!service) throw new NotFoundException('Servicio no encontrado');
     return service;
+  }
+
+  async findByProvider(providerId: number) {
+    // Validate if ProviderProfile exists
+    const provider = await this.providerProfile.findOne({
+      where: { providerId },
+    });
+    if (!provider) {
+      throw new NotFoundException(
+        `Proveedor con el ID ${providerId} no encontrado`,
+      );
+    }
+
+    return this.serviceRepository.find({
+      where: { providerId },
+      relations: {
+        category: true,
+        provider: {
+          user: true,
+        },
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
   }
 
   async remove(id: number) {
@@ -109,6 +138,52 @@ export class ServicesService {
     const service = await this.findOne(id);
     service.isVerified = !service.isVerified;
     service.verificationDate = service.isVerified ? new Date() : null;
+    await this.serviceRepository.save(service);
+    return this.findOne(id);
+  }
+
+  // Admin methods for service approval
+  async findPending() {
+    return await this.serviceRepository.find({
+      where: { approvalStatus: 'pending' },
+      relations: {
+        provider: {
+          user: true,
+        },
+        category: true,
+      },
+      order: {
+        createdAt: 'ASC',
+      },
+    });
+  }
+
+  async findAllForAdmin() {
+    return await this.serviceRepository.find({
+      relations: {
+        provider: {
+          user: true,
+        },
+        category: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async approveService(id: number) {
+    const service = await this.findOne(id);
+    service.approvalStatus = 'approved';
+    service.isActive = true;
+    await this.serviceRepository.save(service);
+    return this.findOne(id);
+  }
+
+  async rejectService(id: number, reason?: string) {
+    const service = await this.findOne(id);
+    service.approvalStatus = 'rejected';
+    service.isActive = false;
     await this.serviceRepository.save(service);
     return this.findOne(id);
   }

@@ -62,6 +62,7 @@ export class RequestsService {
       .leftJoinAndSelect('request.service', 'service')
       .leftJoinAndSelect('service.category', 'category')
       .leftJoinAndSelect('request.provider', 'provider')
+      .leftJoinAndSelect('request.review', 'review')
       .where('request.clientUserId = :userId', { userId })
       .orderBy('request.createdAt', 'DESC');
 

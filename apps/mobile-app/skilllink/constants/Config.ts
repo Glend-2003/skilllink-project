@@ -15,20 +15,20 @@ const getServerIP = () => {
     }
   } catch {}
 
-
-  return '192.168.100.177'; 
+  return '10.147.20.114'; 
 };
 
 const SERVER_IP = getServerIP();
 
 export const Config = {
   SERVER_IP,
-  AUTH_SERVICE_URL: `http://${SERVER_IP}:5293/api/auth`,
-  CHAT_SERVICE_URL: `http://${SERVER_IP}:3003`,
+  AUTH_SERVICE_URL: `http://${SERVER_IP}:3000/api/v1/auth`,
+  CHAT_SERVICE_URL: `http://${SERVER_IP}:3004`,
   API_GATEWAY_URL: `http://${SERVER_IP}:3000`,
-  PROVIDER_SERVICE_URL: `http://${SERVER_IP}:3004`,
-  SERVICE_MANAGER_URL: `http://${SERVER_IP}:3005`,
+  PROVIDER_SERVICE_URL: `http://${SERVER_IP}:3003`,
+  SERVICE_MANAGER_URL: `http://${SERVER_IP}:3002`,
   NOTIFICATION_SERVICE_URL: `http://${SERVER_IP}:3006`,
+  USER_SERVICE_URL: `http://${SERVER_IP}:3001`,
 };
 
 export const API_URL = Config.API_GATEWAY_URL;

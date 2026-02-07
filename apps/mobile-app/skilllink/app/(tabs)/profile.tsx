@@ -13,7 +13,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../context/RoleContext';
-// import { useNotification } from '../context/NotificationContext'; // Temporal: esperando build con Firebase
 import { useRouter, useFocusEffect } from 'expo-router';
 import { User, LogOut, Mail, Phone, Shield, CheckCircle, Clock, Settings, Briefcase, List, Bell } from 'lucide-react-native';
 import { Config } from '../../constants/Config';
@@ -28,6 +27,8 @@ interface UserProfile {
   isActive: boolean;
   providerStatus?: 'pending' | 'approved' | 'rejected' | null;
   profileImageUrl?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export default function ProfileScreen() {
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
   const unreadCount = 0;
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [userProfileData, setUserProfileData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -68,6 +70,29 @@ export default function ProfileScreen() {
         setPhoneNumber(data.phoneNumber || '');
         await AsyncStorage.setItem('userProfile', JSON.stringify(data));
         await reloadProviderStatus();
+        
+        // Load user_profiles data
+        try {
+          const userProfileResponse = await fetch(`${Config.USER_SERVICE_URL}/user-profile/me`, {
+            headers: {
+              'Authorization': `Bearer ${user?.token}`,
+            },
+          });
+          if (userProfileResponse.ok) {
+            const userProfileData = await userProfileResponse.json();
+            setUserProfileData(userProfileData);
+            // Update profile with names from user_profiles
+            if (userProfileData.first_name || userProfileData.last_name) {
+              setProfile(prev => prev ? {
+                ...prev,
+                first_name: userProfileData.first_name,
+                last_name: userProfileData.last_name
+              } : null);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading user profile data:', error);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -185,7 +210,11 @@ export default function ProfileScreen() {
           }}
           token={user?.token || ''}
         />
-        <Text style={styles.headerTitle}>Mi Perfil</Text>
+        <Text style={styles.headerTitle}>
+          {userProfileData?.first_name && userProfileData?.last_name 
+            ? `${userProfileData.first_name} ${userProfileData.last_name}` 
+            : 'Mi Perfil'}
+        </Text>
       </View>
 
       {isProvider && <RoleSwitcher />}
@@ -194,7 +223,6 @@ export default function ProfileScreen() {
         {/* User Type Badge */}
         <View style={styles.badgeContainer}>
           <View style={[styles.badge, profile?.userType === 'provider' ? styles.providerBadge : styles.clientBadge]}>
-            <Shield color="white" size={16} />
             <Text style={styles.badgeText}>
               {profile?.userType === 'provider' ? 'Proveedor' : 'Cliente'}
             </Text>
@@ -213,10 +241,7 @@ export default function ProfileScreen() {
 
         {/* Email */}
         <View style={styles.fieldContainer}>
-          <View style={styles.fieldLabel}>
-            <Mail color="#64748b" size={20} />
-            <Text style={styles.labelText}>Correo electrónico</Text>
-          </View>
+          <Text style={styles.labelText}>Correo electrónico</Text>
           <TextInput
             style={[styles.input, styles.disabledInput]}
             value={profile?.email}
@@ -226,10 +251,7 @@ export default function ProfileScreen() {
 
         {/* Phone Number */}
         <View style={styles.fieldContainer}>
-          <View style={styles.fieldLabel}>
-            <Phone color="#64748b" size={20} />
-            <Text style={styles.labelText}>Teléfono</Text>
-          </View>
+          <Text style={styles.labelText}>Teléfono</Text>
           <TextInput
             style={[styles.input, !isEditing && styles.disabledInput]}
             value={phoneNumber}
@@ -275,6 +297,14 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Complete Profile Button */}
+        <TouchableOpacity
+          style={[styles.button, styles.completeProfileButton]}
+          onPress={() => router.push('/profile/complete-profile')}
+        >
+          <Text style={styles.completeProfileButtonText}>Completar Información Personal</Text>
+        </TouchableOpacity>
+
         {/* Become Provider Button */}
         {profile?.userType !== 'provider' && profile?.providerStatus !== 'approved' && (
           <TouchableOpacity
@@ -282,7 +312,6 @@ export default function ProfileScreen() {
             onPress={handleBecomeProvider}
             disabled={profile?.providerStatus === 'pending'}
           >
-            <Shield color="white" size={20} />
             <Text style={styles.primaryButtonText}>
               {profile?.providerStatus === 'pending'
                 ? 'Solicitud en Revisión'
@@ -291,21 +320,6 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
         
-        {/* Notifications Button */}
-        <TouchableOpacity
-          style={[styles.button, styles.providerOptionButton]}
-          onPress={() => router.push('/profile/notifications')}
-        >
-          <View style={styles.notificationButtonContent}>
-            <Bell color="#007AFF" size={20} />
-            <Text style={styles.providerOptionText}>Notificaciones</Text>
-            {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
 
         {isProvider && activeRole === 'provider' && (
           <View style={styles.providerSection}>
@@ -313,15 +327,20 @@ export default function ProfileScreen() {
               style={[styles.button, styles.providerOptionButton]}
               onPress={() => router.push('/provider/edit-profile')}
             >
-              <Briefcase color="#007AFF" size={20} />
               <Text style={styles.providerOptionText}>Editar Perfil de Proveedor</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.providerOptionButton]}
+              onPress={() => router.push('/provider/provider-requests')}
+            >
+              <Text style={styles.providerOptionText}>Solicitudes Recibidas</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.button, styles.providerOptionButton]}
               onPress={() => router.push('/provider/services')}
             >
-              <List color="#007AFF" size={20} />
               <Text style={styles.providerOptionText}>Gestionar Servicios</Text>
             </TouchableOpacity>
           </View>
@@ -335,7 +354,6 @@ export default function ProfileScreen() {
               style={[styles.button, styles.adminButton]}
               onPress={() => router.push('/admin/services-approval')}
             >
-              <Shield color="#fff" size={20} />
               <Text style={styles.primaryButtonText}>Aprobar Servicios</Text>
             </TouchableOpacity>
 
@@ -343,7 +361,6 @@ export default function ProfileScreen() {
               style={[styles.button, styles.adminButton]}
               onPress={() => router.push('/admin/provider-requests')}
             >
-              <Settings color="#fff" size={20} />
               <Text style={styles.primaryButtonText}>Solicitudes de Proveedores</Text>
             </TouchableOpacity>
 
@@ -351,7 +368,6 @@ export default function ProfileScreen() {
               style={[styles.button, styles.adminButton]}
               onPress={() => router.push('/admin/categories-management')}
             >
-              <Settings color="#fff" size={20} />
               <Text style={styles.primaryButtonText}>Gestionar Categorías</Text>
             </TouchableOpacity>
           </View>
@@ -362,7 +378,6 @@ export default function ProfileScreen() {
           style={[styles.button, styles.logoutButton]}
           onPress={handleLogout}
         >
-          <LogOut color="#ef4444" size={20} />
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </View>
@@ -505,6 +520,15 @@ const styles = StyleSheet.create({
   providerButton: {
     backgroundColor: '#10b981',
     marginBottom: 16,
+  },
+  completeProfileButton: {
+    backgroundColor: '#8b5cf6',
+    marginBottom: 16,
+  },
+  completeProfileButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   providerSection: {
     marginBottom: 16,

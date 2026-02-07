@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,15 +18,25 @@ import { ServiceGalleryView } from '@/components/ServiceGalleryView';
 
 interface Provider {
   id: string;
-  name: string;
-  category: string;
-  rating: number;
-  location: string;
-  description: string;
-  hourlyRate: number;
-  verified: boolean;
+  providerId: number;
+  businessName: string;
+  businessDescription: string;
   yearsExperience: number;
-  reviewCount: number;
+  isVerified: boolean;
+  user?: {
+    userId: number;
+    profileImageUrl?: string;
+    email: string;
+  };
+  // Legacy fields for compatibility
+  name?: string;
+  category?: string;
+  rating?: number;
+  location?: string;
+  description?: string;
+  hourlyRate?: number;
+  verified?: boolean;
+  reviewCount?: number;
   profileImageUrl?: string;
 }
 
@@ -48,35 +58,65 @@ interface Review {
   date: string;
 }
 
+interface ServiceRequest {
+  requestId: number;
+  requestTitle: string;
+  requestDescription: string;
+  serviceAddress: string;
+  addressDetails?: string;
+  contactPhone?: string;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  estimatedCost: number;
+  finalCost: number | null;
+  preferredDate: string;
+  preferredTime: string;
+  createdAt: string;
+  clientUserId: number;
+  service: {
+    serviceName: string;
+    category: {
+      categoryName: string;
+    };
+  };
+}
+
 const { width } = Dimensions.get('window');
 
 export default function ProviderDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { id } = params;
   const router = useRouter();
   const { user } = useAuth();
+  
   const providerId = id as string;
 
   const [provider, setProvider] = useState<Provider | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('services');
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  // Check if viewing own profile
+  const isOwnProfile = useMemo(() => {
+    const result = user?.userId?.toString() === provider?.id;
+    return result;
+  }, [user?.userId, provider?.id]);
 
   useEffect(() => {
     const loadProviderDetails = async () => {
       try {
-        console.log('Loading provider with ID:', providerId);
+        const url = `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}`;
         
-        // Fetch provider details
-        const providerRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}`
-        );
-        console.log('Provider response status:', providerRes.status);
-        
+        const providerRes = await fetch(url);
         if (providerRes.ok) {
           const providerData = await providerRes.json();
-          console.log('Provider data:', providerData);
           setProvider(providerData);
+
+          if (user?.userId && providerData?.id === user.userId.toString()) {
+            await loadRequests(providerId);
+          }
         } else {
           console.error('Provider API error:', providerRes.status);
           const errorText = await providerRes.text();
@@ -86,7 +126,7 @@ export default function ProviderDetailScreen() {
 
         // Fetch services
         const servicesRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}/services`
+          `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}/services`
         );
         if (servicesRes.ok) {
           const servicesData = await servicesRes.json();
@@ -95,7 +135,7 @@ export default function ProviderDetailScreen() {
 
         // Fetch reviews
         const reviewsRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}/reviews`
+          `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}/reviews`
         );
         if (reviewsRes.ok) {
           const reviewsData = await reviewsRes.json();
@@ -114,6 +154,62 @@ export default function ProviderDetailScreen() {
     }
   }, [providerId]);
 
+  const loadRequests = async (provId: string) => {
+    setLoadingRequests(true);
+    try {
+      const token = user?.token;
+      const response = await fetch(
+        `${Config.API_GATEWAY_URL}/api/v1/requests/provider/${provId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setRequests(data);
+      }
+    } catch (error) {
+      console.error('Error loading requests:', error);
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  const handleUpdateRequestStatus = async (requestId: number, status: string, finalCost?: number) => {
+    try {
+      const token = user?.token;
+      const body: any = { status };
+      if (finalCost !== undefined) {
+        body.finalCost = finalCost;
+      }
+
+      const response = await fetch(
+        `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (response.ok) {
+        Alert.alert('Éxito', 'Estado de solicitud actualizado');
+        await loadRequests(providerId);
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar la solicitud');
+      }
+    } catch (error) {
+      console.error('Error updating request:', error);
+      Alert.alert('Error', 'Error al actualizar solicitud');
+    }
+  };
+
   const handleContactProvider = async () => {
     if (!user) {
       Alert.alert('Error', 'Debes iniciar sesión para contactar proveedores');
@@ -126,16 +222,7 @@ export default function ProviderDetailScreen() {
     }
 
     try {
-      console.log('User data:', user);
-      console.log('Creating conversation with provider:', providerId);
-      console.log('Chat Service URL:', Config.CHAT_SERVICE_URL);
-      console.log('Payload:', {
-        participant1_user_id: user.userId,
-        participant2_user_id: parseInt(providerId as string),
-      });
-
-      // Create or get conversation
-      const response = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,13 +231,10 @@ export default function ProviderDetailScreen() {
         }),
       });
 
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (response.ok) {
         const conversationId = data.conversation_id;
-        console.log('Navigating to chat:', conversationId);
         router.push(`/chat/${conversationId}`);
       } else {
         Alert.alert('Error', 'No se pudo crear la conversación');
@@ -203,15 +287,15 @@ export default function ProviderDetailScreen() {
         <View style={styles.providerCard}>
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            {provider.profileImageUrl ? (
+            {(provider.user?.profileImageUrl || provider.profileImageUrl) ? (
               <Image 
-                source={{ uri: provider.profileImageUrl }} 
+                source={{ uri: provider.user?.profileImageUrl || provider.profileImageUrl }} 
                 style={styles.avatarImage}
               />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
-                  {provider.name.charAt(0).toUpperCase()}
+                  {provider.businessName?.charAt(0).toUpperCase() || provider.name?.charAt(0).toUpperCase() || 'P'}
                 </Text>
               </View>
             )}
@@ -220,8 +304,8 @@ export default function ProviderDetailScreen() {
           {/* Provider Info */}
           <View style={styles.providerInfo}>
             <View style={styles.nameSection}>
-              <Text style={styles.providerName}>{provider.name}</Text>
-              {provider.verified && (
+              <Text style={styles.providerName}>{provider.businessName || provider.name}</Text>
+              {(provider.isVerified || provider.verified) && (
                 <View style={styles.verifiedBadge}>
                   <MaterialCommunityIcons
                     name="check-circle"
@@ -241,113 +325,174 @@ export default function ProviderDetailScreen() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <MaterialCommunityIcons
                     key={i}
-                    name={i < Math.floor(provider.rating) ? 'star' : 'star-outline'}
+                    name={i < Math.floor(provider.rating || 4.5) ? 'star' : 'star-outline'}
                     size={16}
                     color="#f59e0b"
                   />
                 ))}
               </View>
               <Text style={styles.ratingText}>
-                {provider.rating.toFixed(1)} ({provider.reviewCount} reseñas)
+                {(provider.rating || 4.5).toFixed(1)} ({provider.reviewCount || 0} reseñas)
               </Text>
             </View>
 
             {/* Details */}
             <View style={styles.detailsContainer}>
-              <View style={styles.detailItem}>
-                <MaterialCommunityIcons
-                  name="map-marker"
-                  size={16}
-                  color="#6b7280"
-                />
-                <Text style={styles.detailText}>{provider.location}</Text>
-              </View>
-
-              <View style={styles.detailItem}>
-                <MaterialCommunityIcons
-                  name="briefcase"
-                  size={16}
-                  color="#6b7280"
-                />
+              {provider.location && <Text style={styles.detailText}>{provider.location}</Text>}
+              <Text style={styles.detailText}>
+                {provider.yearsExperience} años de experiencia
+              </Text>
+              {provider.hourlyRate && (
                 <Text style={styles.detailText}>
-                  {provider.yearsExperience} años de experiencia
+                  ${provider.hourlyRate}/hora
                 </Text>
-              </View>
-
-              <View style={styles.detailItem}>
-                <MaterialCommunityIcons
-                  name="cash"
-                  size={16}
-                  color="#6b7280"
-                />
-                <Text style={styles.detailText}>
-                  Desde ${provider.hourlyRate}/hora
-                </Text>
-              </View>
+              )}
             </View>
 
-            <Text style={styles.description}>{provider.description}</Text>
-
-            {/* Info adicional */}
-            <View style={styles.infoSection}>
-              <View style={styles.infoRow}>
-                <View style={styles.infoItem}>
-                  <View style={styles.infoIconContainer}>
-                    <MaterialCommunityIcons name="star" size={20} color="#f59e0b" />
-                  </View>
-                  <View>
-                    <Text style={styles.infoLabel}>Calificación</Text>
-                    <Text style={styles.infoValue}>{provider.rating.toFixed(1)} / 5.0</Text>
-                  </View>
-                </View>
-                <View style={styles.infoItem}>
-                  <View style={styles.infoIconContainer}>
-                    <MaterialCommunityIcons name="account-group" size={20} color="#3b82f6" />
-                  </View>
-                  <View>
-                    <Text style={styles.infoLabel}>Reseñas</Text>
-                    <Text style={styles.infoValue}>{provider.reviewCount}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.infoRow}>
-                <View style={styles.infoItem}>
-                  <View style={styles.infoIconContainer}>
-                    <MaterialCommunityIcons name="briefcase-check" size={20} color="#10b981" />
-                  </View>
-                  <View>
-                    <Text style={styles.infoLabel}>Experiencia</Text>
-                    <Text style={styles.infoValue}>{provider.yearsExperience} años</Text>
-                  </View>
-                </View>
-                <View style={styles.infoItem}>
-                  <View style={styles.infoIconContainer}>
-                    <MaterialCommunityIcons name="cash-multiple" size={20} color="#059669" />
-                  </View>
-                  <View>
-                    <Text style={styles.infoLabel}>Tarifa/hora</Text>
-                    <Text style={styles.infoValue}>${provider.hourlyRate}</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
+            <Text style={styles.description}>{provider.businessDescription || provider.description}</Text>
 
             {/* Buttons */}
             <View style={styles.buttonsContainer}>
-              <TouchableOpacity
-                style={styles.contactButton}
-                onPress={handleContactProvider}
-              >
-                <MaterialCommunityIcons
-                  name="message-text"
-                  size={20}
-                  color="white"
-                />
-                <Text style={styles.contactButtonText}>Contactar</Text>
-              </TouchableOpacity>
+              {isOwnProfile ? (
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => router.push('/provider/edit-profile')}
+                >
+                  <Text style={styles.contactButtonText}>Editar Perfil</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={handleContactProvider}
+                >
+                  <Text style={styles.contactButtonText}>Contactar</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
+
+        {/* Solicitudes Recibidas (solo si es perfil propio) */}
+        {isOwnProfile && (
+          <View style={styles.requestsSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Solicitudes Recibidas</Text>
+              <View style={styles.requestsBadge}>
+                <Text style={styles.requestsBadgeText}>{requests.filter(r => r.status === 'pending').length}</Text>
+              </View>
+            </View>
+
+            {loadingRequests ? (
+              <ActivityIndicator size="small" color="#3b82f6" style={{ marginTop: 16 }} />
+            ) : requests.length > 0 ? (
+              <View style={styles.requestsList}>
+                {requests.slice(0, 3).map((request) => (
+                  <TouchableOpacity
+                    key={request.requestId}
+                    style={styles.requestCard}
+                    onPress={() => {
+                      Alert.alert(
+                        request.requestTitle,
+                        `${request.requestDescription}\n\nServicio: ${request.service.serviceName}\nFecha: ${new Date(request.preferredDate).toLocaleDateString()}\nHora: ${request.preferredTime}\nDirecci\u00f3n: ${request.serviceAddress}${request.addressDetails ? `\n${request.addressDetails}` : ''}\nTel\u00e9fono: ${request.contactPhone || 'No especificado'}\nCosto estimado: $${request.estimatedCost}`,
+                        request.status === 'pending' ? [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Rechazar',
+                            style: 'destructive',
+                            onPress: () => handleUpdateRequestStatus(request.requestId, 'cancelled'),
+                          },
+                          {
+                            text: 'Aceptar',
+                            onPress: () => {
+                              Alert.prompt(
+                                'Costo Final',
+                                'Ingresa el costo final del servicio:',
+                                (text) => {
+                                  const cost = parseFloat(text);
+                                  if (!isNaN(cost) && cost > 0) {
+                                    handleUpdateRequestStatus(request.requestId, 'accepted', cost);
+                                  } else {
+                                    Alert.alert('Error', 'Ingresa un costo v\u00e1lido');
+                                  }
+                                },
+                                'plain-text',
+                                request.estimatedCost.toString()
+                              );
+                            },
+                          },
+                        ] : request.status === 'accepted' ? [
+                          { text: 'Cerrar', style: 'cancel' },
+                          {
+                            text: 'Iniciar Trabajo',
+                            onPress: () => handleUpdateRequestStatus(request.requestId, 'in_progress'),
+                          },
+                        ] : request.status === 'in_progress' ? [
+                          { text: 'Cerrar', style: 'cancel' },
+                          {
+                            text: 'Completar',
+                            onPress: () => handleUpdateRequestStatus(request.requestId, 'completed'),
+                          },
+                        ] : [{ text: 'Cerrar' }]
+                      );
+                    }}
+                  >
+                    <View style={styles.requestHeader}>
+                      <Text style={styles.requestTitle}>{request.requestTitle}</Text>
+                      <View style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            request.status === 'pending' ? '#FEF3C7' :
+                            request.status === 'accepted' ? '#D1FAE5' :
+                            request.status === 'in_progress' ? '#DBEAFE' :
+                            request.status === 'completed' ? '#E5E7EB' :
+                            '#FEE2E2'
+                        }
+                      ]}>
+                        <Text style={[
+                          styles.statusText,
+                          {
+                            color:
+                              request.status === 'pending' ? '#F59E0B' :
+                              request.status === 'accepted' ? '#10B981' :
+                              request.status === 'in_progress' ? '#3B82F6' :
+                              request.status === 'completed' ? '#6B7280' :
+                              '#EF4444'
+                          }
+                        ]}>
+                          {request.status === 'pending' ? 'Pendiente' :
+                           request.status === 'accepted' ? 'Aceptada' :
+                           request.status === 'in_progress' ? 'En Progreso' :
+                           request.status === 'completed' ? 'Completada' : 'Cancelada'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.requestService}>{request.service.serviceName}</Text>
+                    <Text style={styles.requestDescription} numberOfLines={2}>{request.requestDescription}</Text>
+                    <View style={styles.requestFooter}>
+                      <Text style={styles.requestInfoText}>
+                        {new Date(request.preferredDate).toLocaleDateString()}
+                      </Text>
+                      <Text style={styles.requestInfoText}>${request.finalCost || request.estimatedCost}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {requests.length > 3 && (
+                  <TouchableOpacity
+                    style={styles.viewAllButton}
+                    onPress={() => router.push('/provider/provider-requests')}
+                  >
+                    <Text style={styles.viewAllText}>Ver todas ({requests.length})</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.emptyRequests}>
+                <Text style={styles.emptyRequestsText}>No hay solicitudes</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
@@ -399,20 +544,6 @@ export default function ProviderDetailScreen() {
                       />
                     </View>
                   )}
-                  
-                  <View style={styles.serviceFooter}>
-                    <View style={styles.durationBadge}>
-                      <MaterialCommunityIcons
-                        name="clock"
-                        size={14}
-                        color="#6b7280"
-                      />
-                      <Text style={styles.durationText}>{service.duration}</Text>
-                    </View>
-                    <TouchableOpacity style={styles.serviceButton}>
-                      <Text style={styles.serviceButtonText}>Solicitar</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
               ))
             ) : (
@@ -428,8 +559,8 @@ export default function ProviderDetailScreen() {
         {activeTab === 'reviews' && (
           <View style={styles.tabContent}>
             {reviews.length > 0 ? (
-              reviews.map((review) => (
-                <View key={review.id} style={styles.reviewCard}>
+              reviews.map((review, index) => (
+                <View key={`review-${index}`} style={styles.reviewCard}>
                   <View style={styles.reviewHeader}>
                     <Text style={styles.reviewName}>{review.userName}</Text>
                     <Text style={styles.reviewDate}>{review.date}</Text>
@@ -478,31 +609,9 @@ export default function ProviderDetailScreen() {
               <View style={styles.separator} />
 
               <Text style={styles.aboutTitle}>Verificación</Text>
-              <View
-                style={[
-                  styles.verificationBadge,
-                  { backgroundColor: provider.verified ? '#d1fae5' : '#fee2e2' },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={
-                    provider.verified ? 'check-circle' : 'alert-circle'
-                  }
-                  size={20}
-                  color={provider.verified ? '#059669' : '#dc2626'}
-                />
-                <Text
-                  style={{
-                    color: provider.verified ? '#059669' : '#dc2626',
-                    marginLeft: 8,
-                    fontWeight: '600',
-                  }}
-                >
-                  {provider.verified
-                    ? 'Cuenta verificada'
-                    : 'Cuenta no verificada'}
-                </Text>
-              </View>
+              <Text style={styles.aboutText}>
+                {provider.verified ? 'Cuenta verificada' : 'Cuenta no verificada'}
+              </Text>
             </View>
           </View>
         )}
@@ -910,5 +1019,134 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
+  },
+  editButton: {
+    backgroundColor: '#10b981',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  // Estilos para solicitudes
+  requestsSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    flex: 1,
+  },
+  requestsBadge: {
+    backgroundColor: '#3b82f6',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  requestsBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  requestsList: {
+    gap: 12,
+  },
+  requestCard: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3b82f6',
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  requestTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+    marginRight: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  requestService: {
+    fontSize: 13,
+    color: '#3b82f6',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  requestDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  requestInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  requestInfoText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: 'white',
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  emptyRequests: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyRequestsText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
   },
 });

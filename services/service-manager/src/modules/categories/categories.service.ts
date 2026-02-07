@@ -53,4 +53,37 @@ export class CategoriesService {
     const category = await this.findOne(id);
     return await this.categoryRepository.remove(category);
   }
+
+  // Admin methods
+  async findAllWithCount() {
+    const categories = await this.categoryRepository
+      .createQueryBuilder('category')
+      .leftJoin('category.services', 'service')
+      .select([
+        'category.categoryId',
+        'category.categoryName',
+        'category.categoryDescription',
+        'category.iconUrl',
+        'category.isActive',
+        'category.displayOrder',
+        'category.parentCategoryId',
+        'category.createdAt',
+      ])
+      .addSelect('COUNT(service.serviceId)', 'serviceCount')
+      .groupBy('category.categoryId')
+      .orderBy('category.displayOrder', 'ASC')
+      .getRawAndEntities();
+
+    // Combine raw count with entities
+    return categories.entities.map((category, index) => ({
+      ...category,
+      serviceCount: parseInt(categories.raw[index].serviceCount) || 0,
+    }));
+  }
+
+  async toggleStatus(id: number) {
+    const category = await this.findOne(id);
+    category.isActive = !category.isActive;
+    return await this.categoryRepository.save(category);
+  }
 }

@@ -20,7 +20,7 @@ async function bootstrap() {
     }),
   );
   
-  const port = process.env.PORT || 3005;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(` Service Manager running on port ${port}`);
 }

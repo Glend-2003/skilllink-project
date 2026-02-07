@@ -27,7 +27,6 @@ let io;
 (async () => {
   try {
     db = await mysql.createConnection(dbConfig);
-    console.log("Connected to MySQL database");
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS users (
@@ -63,8 +62,6 @@ let io;
         FOREIGN KEY (sender_user_id) REFERENCES users(user_id) ON DELETE CASCADE
       )
     `);
-
-    console.log("Tables verified/created successfully");
     
     // Create server and initialize socket.io after the DB is ready
     server = http.createServer(app);
@@ -74,7 +71,6 @@ let io;
     
     // Configure Socket.IO
     io.on("connection", (socket) => {
-      console.log("User connected:", socket.id);
 
       socket.on("join_chat", ({ conversationId }) => {
         socket.join(conversationId);
@@ -142,9 +138,9 @@ let io;
     });
     
     // Start server after DB is ready
-    const PORT = process.env.PORT || 3003;
+    const PORT = process.env.PORT || 3000;
     server.listen(PORT, "0.0.0.0", () => {
-      console.log(`Chat Service running at http://localhost:${PORT}`);
+      console.log(`Chat Service running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Error connecting to MySQL:", error);
@@ -278,12 +274,37 @@ app.get("/api/conversations/details/:conversationId", async (req, res) => {
     );
 
     if (conversations.length === 0) {
-      return res.status(404).json({ error: "Conversación no encontrada" });
+      return res.status(404).json({ error: "Conversation not found" });
     }
 
     res.json(conversations[0]);
   } catch (error) {
     console.error(" Error fetching conversation details:", error);
-    res.status(500).json({ error: "Error al obtener detalles de la conversación" });
+    res.status(500).json({ error: "Error fetching conversation details" });
+  }
+});
+
+app.delete("/api/conversations/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const [conversation] = await db.execute(
+      `SELECT conversation_id FROM conversations WHERE conversation_id = ?`,
+      [conversationId]
+    );
+
+    if (conversation.length === 0) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    await db.execute(
+      `DELETE FROM conversations WHERE conversation_id = ?`,
+      [conversationId]
+    );
+
+    res.json({ message: "Conversation deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting conversation:", error);
+    res.status(500).json({ error: "Error deleting conversation" });
   }
 });

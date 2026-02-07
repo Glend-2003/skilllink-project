@@ -44,7 +44,7 @@ export default function ServicesScreen() {
 
   const loadServices = async () => {
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/services`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -88,7 +88,7 @@ export default function ServicesScreen() {
   const deleteService = async (serviceId: number) => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services/${serviceId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/provider/services/${serviceId}`,
         {
           method: 'DELETE',
           headers: {
