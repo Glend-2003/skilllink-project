@@ -7,6 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Configuration of the MySQL database connection
 const dbConfig = {
   host: 'localhost',
   port: 3306,
@@ -19,12 +20,13 @@ let db;
 (async () => {
   try {
     db = await mysql.createConnection(dbConfig);
-    console.log('Conectado a MySQL');
+    console.log('Connected to MySQL');
   } catch (error) {
-    console.error('Error conectando a MySQL:', error);
+    console.error('Error connecting to MySQL:', error);
   }
 })();
 
+// Get all available providers
 app.get('/api/providers', async (req, res) => {
   try {
     const query = `
@@ -49,14 +51,15 @@ app.get('/api/providers', async (req, res) => {
 
     const [providers] = await db.execute(query);
 
+    // Map to the format expected by the app
     const formattedProviders = providers.map((p, index) => ({
       id: p.user_id.toString(),
       name: p.business_name,
-      category: 'Servicios', 
+      category: 'Servicios',
       rating: parseFloat(p.average_rating) || 4.5,
       location: 'Centro, Ciudad',
       description: p.business_description,
-      hourlyRate: 25 + (index * 5), 
+      hourlyRate: 25 + (index * 5),
       verified: p.is_verified === 1,
       yearsExperience: p.years_experience,
       reviewCount: p.review_count,
@@ -65,12 +68,12 @@ app.get('/api/providers', async (req, res) => {
 
     res.json(formattedProviders);
   } catch (error) {
-    console.error('Error obteniendo proveedores:', error);
-    res.status(500).json({ error: 'Error obteniendo proveedores' });
+    console.error('Error getting providers:', error);
+    res.status(500).json({ error: 'Error getting providers' });
   }
 });
 
-
+// Get provider by ID
 app.get('/api/providers/:providerId', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -98,7 +101,7 @@ app.get('/api/providers/:providerId', async (req, res) => {
     const [providers] = await db.execute(query, [providerId]);
 
     if (providers.length === 0) {
-      return res.status(404).json({ error: 'Proveedor no encontrado' });
+      return res.status(404).json({ error: 'Provider not found' });
     }
 
     const p = providers[0];
@@ -117,12 +120,12 @@ app.get('/api/providers/:providerId', async (req, res) => {
 
     res.json(provider);
   } catch (error) {
-    console.error('Error obteniendo proveedor:', error);
-    res.status(500).json({ error: 'Error obteniendo proveedor' });
+    console.error('Error getting provider:', error);
+    res.status(500).json({ error: 'Error getting provider' });
   }
 });
 
-
+// Get provider reviews
 app.get('/api/providers/:providerId/reviews', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -145,12 +148,12 @@ app.get('/api/providers/:providerId/reviews', async (req, res) => {
     const [reviews] = await db.execute(query, [providerId]);
     res.json(reviews);
   } catch (error) {
-    console.error('Error obteniendo reseñas:', error);
-    res.status(500).json({ error: 'Error obteniendo reseñas' });
+    console.error('Error getting reviews:', error);
+    res.status(500).json({ error: 'Error getting reviews' });
   }
 });
 
-
+// Get provider services
 app.get('/api/providers/:providerId/services', async (req, res) => {
   try {
     const { providerId } = req.params;
@@ -180,8 +183,8 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
     const [services] = await db.execute(query, [providerId]);
     res.json(services);
   } catch (error) {
-    console.error('Error obteniendo servicios:', error);
-    res.status(500).json({ error: 'Error obteniendo servicios' });
+    console.error('Error getting services:', error);
+    res.status(500).json({ error: 'Error getting services' });
   }
 });
 
@@ -243,5 +246,5 @@ app.get('/api/services', async (req, res) => {
 
 const PORT = process.env.PORT || 3004;
 app.listen(PORT, () => {
-  console.log(` Provider Service corriendo en puerto ${PORT}`);
+  console.log(`Provider Service running on port ${PORT}`);
 });

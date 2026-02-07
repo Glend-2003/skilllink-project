@@ -13,8 +13,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../context/RoleContext';
+// import { useNotification } from '../context/NotificationContext'; // Temporal: esperando build con Firebase
 import { useRouter, useFocusEffect } from 'expo-router';
-import { User, LogOut, Mail, Phone, Shield, CheckCircle, Clock, Settings, Briefcase, List } from 'lucide-react-native';
+import { User, LogOut, Mail, Phone, Shield, CheckCircle, Clock, Settings, Briefcase, List, Bell } from 'lucide-react-native';
 import { Config } from '../../constants/Config';
 import RoleSwitcher from '@/components/RoleSwitcher';
 import { ProfileImageUploader } from '@/components/ProfileImageUploader';
@@ -32,6 +33,8 @@ interface UserProfile {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { activeRole, isProvider, reloadProviderStatus } = useRole();
+  // const { unreadCount } = useNotification(); // Temporal: esperando build con Firebase
+  const unreadCount = 0;
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -287,6 +290,22 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
         )}
+        
+        {/* Notifications Button */}
+        <TouchableOpacity
+          style={[styles.button, styles.providerOptionButton]}
+          onPress={() => router.push('/profile/notifications')}
+        >
+          <View style={styles.notificationButtonContent}>
+            <Bell color="#007AFF" size={20} />
+            <Text style={styles.providerOptionText}>Notificaciones</Text>
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
 
         {isProvider && activeRole === 'provider' && (
           <View style={styles.providerSection}>
@@ -524,5 +543,27 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
+  },
+  notificationButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    right: -10,
+    top: -8,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

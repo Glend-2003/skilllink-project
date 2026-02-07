@@ -7,10 +7,13 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
+// --- 1. Database ---
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+// --- 2. Identity Configuration (THE SOLUTION) ---
+// We use AddIdentityCore which is better for APIs, and explicitly add Roles.
 builder.Services.AddIdentityCore<User>(options => 
     {
         options.Password.RequireDigit = false;
@@ -23,6 +26,7 @@ builder.Services.AddIdentityCore<User>(options =>
 
 
 builder.Services.AddScoped<IPasswordHasher<User>, Auth_Service.Services.BCryptPasswordHasher>();
+// --- 3. JWT Configuration 
 
 builder.Services.AddAuthentication(options =>
 {
@@ -46,9 +50,23 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddControllers();
 
+// Configurar CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+               .AllowAnyMethod()
+               .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 app.UseRouting();
+
+// Habilitar CORS
+app.UseCors("AllowAll");
 
 if (app.Environment.IsDevelopment())
 {

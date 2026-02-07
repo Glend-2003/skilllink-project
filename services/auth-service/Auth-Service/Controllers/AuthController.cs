@@ -36,8 +36,10 @@ namespace AuthController.Controllers
             if (userExists != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
+ 
             User user = new User()
             {
+                UserName = model.email,
                 Email = model.email,
                 PhoneNumber = model.phoneNumber,
                 IsActive = true,
@@ -49,8 +51,11 @@ namespace AuthController.Controllers
 
             try 
             {
+    
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
+
+                int roleId = (model.userType == "Provider") ? 2 : 1;
 
                 var userRole = new UserRole 
                 { 
@@ -96,9 +101,9 @@ namespace AuthController.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-
+          
             var user = await _context.Users
-                .Include(u => u.UserRoles) 
+                .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role) 
                 .FirstOrDefaultAsync(u => u.Email == model.email);
 
@@ -110,6 +115,8 @@ namespace AuthController.Controllers
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 };
+
+        
                 foreach (var ur in user.UserRoles)
                 {
                     if(ur.Role != null) 
@@ -338,6 +345,71 @@ namespace AuthController.Controllers
                             };
                             _context.UserRoles.Add(userRole);
                         }
+                    }
+
+                    // Send push notification to user
+                    try
+                    {
+                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
+                        using var httpClient = new HttpClient();
+                        
+                        var notificationData = new
+                        {
+                            userId = request.UserId,
+                            title = "¡Solicitud Aprobada!",
+                            body = "Tu solicitud para ser proveedor ha sido aprobada. Ya puedes ofrecer tus servicios.",
+                            data = new
+                            {
+                                type = "provider_approved",
+                                requestId = request.RequestId
+                            }
+                        };
+
+                        var content = new StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(notificationData),
+                            Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        // Log but don't fail the request if notification fails
+                        Console.WriteLine($"Error sending notification: {notifEx.Message}");
+                    }
+                }
+                else if (model.Status == "rejected" && request.User != null)
+                {
+                    // Send rejection notification
+                    try
+                    {
+                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
+                        using var httpClient = new HttpClient();
+                        
+                        var notificationData = new
+                        {
+                            userId = request.UserId,
+                            title = "Solicitud Rechazada",
+                            body = model.ReviewNotes ?? "Tu solicitud para ser proveedor ha sido rechazada. Contacta al soporte para más información.",
+                            data = new
+                            {
+                                type = "provider_rejected",
+                                requestId = request.RequestId
+                            }
+                        };
+
+                        var content = new StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(notificationData),
+                            Encoding.UTF8,
+                            "application/json"
+                        );
+
+                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                    }
+                    catch (Exception notifEx)
+                    {
+                        Console.WriteLine($"Error sending notification: {notifEx.Message}");
                     }
                 }
 

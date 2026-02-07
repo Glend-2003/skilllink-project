@@ -12,10 +12,12 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { UserProfileService } from './user-profile.service';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
+import { CreateSavedSearchDto } from './dto/create-saved-search.dto';
 
+// 1. We define an interface for the Request object
 interface RequestWithUser {
   user: {
-    userId: string;
+    userId: string; // .NET sends it as a string in the claim
     email: string;
   };
 }
@@ -26,13 +28,15 @@ export class UserProfileController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post('profile')
+  // 2. We use the interface in the @Request() parameter
   async createProfile(
     @Request() req: RequestWithUser,
     @Body() createProfileDto: CreateUserProfileDto,
   ) {
+    // 3. We convert the ID from String to Number so the database doesn't complain
     const userId = Number(req.user.userId);
 
-    console.log(`📝 Creando perfil para usuario ID: ${userId}`);
+    console.log(`Creating profile for user ID: ${userId}`);
 
     return this.userProfileService.createOrUpdate(userId, createProfileDto);
   }
@@ -51,8 +55,13 @@ export class UserProfileController {
 
   @Get(':userId')
   async findOne(@Param('userId') userId: string) {
-    // <--- SACA EL ID DE LA URL
+
     return this.userProfileService.findOne(+userId);
+  }
+
+  @Get('profiles')
+  async findAll() {
+    return this.userProfileService.findAll();
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -62,15 +71,34 @@ export class UserProfileController {
     @Body() updateDto: CreateUserProfileDto,
   ) {
     const userId = Number(req.user.userId);
-    console.log(`🔄 Actualizando perfil del usuario ID: ${userId}`);
+    console.log(`Updating profile for user ID: ${userId}`);
     return this.userProfileService.update(userId, updateDto);
   }
 
+  // DELETE PROFILE
   @UseGuards(AuthGuard('jwt'))
   @Delete('profile')
   async deleteProfile(@Request() req: RequestWithUser) {
     const userId = Number(req.user.userId);
-    console.log(`🗑️ Eliminando perfil del usuario ID: ${userId}`);
+    console.log(`Deleting profile for user ID: ${userId}`);
     return this.userProfileService.remove(userId);
+  }
+
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('saved-searches')
+  async saveSearch(
+    @Request() req: any,
+    @Body() dto: CreateSavedSearchDto
+  ) {
+    const userId = Number(req.user.userId);
+    return this.userProfileService.saveSearch(userId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('saved-searches')
+  async getSearches(@Request() req: any) {
+    const userId = Number(req.user.userId);
+    return this.userProfileService.findAllSearches(userId);
   }
 }

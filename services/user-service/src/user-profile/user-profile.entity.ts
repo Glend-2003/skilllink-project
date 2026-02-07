@@ -41,7 +41,6 @@ export class UserProfile {
   @Column({ length: 100, nullable: true })
   country: string;
 
-  // Latitud/Longitud suelen ser decimales, pero string funciona por ahora
   @Column({ length: 50, nullable: true })
   latitude: string;
 

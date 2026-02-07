@@ -23,6 +23,7 @@ namespace Auth_Service.Data
         {
             base.OnModelCreating(builder);
 
+            // 1. Mapping User
             builder.Entity<User>(entity =>
             {
                 entity.ToTable("users");
@@ -44,17 +45,20 @@ namespace Auth_Service.Data
                 entity.Ignore(e => e.TwoFactorEnabled);
             });
 
+            // 2. Mapping Role
             builder.Entity<Role>().ToTable("roles");
 
+            // 3. MAPPING THE INTERMEDIARY TABLE (user_roles)
             builder.Entity<UserRole>(entity =>
             {
                 entity.ToTable("user_roles");
-                entity.HasKey(ur => new { ur.UserId, ur.RoleId }); 
-
+                entity.HasKey(ur => new { ur.UserId, ur.RoleId }); // Composite key
+                // Relationship with User
                 entity.HasOne(ur => ur.User)
                     .WithMany(u => u.UserRoles)
                     .HasForeignKey(ur => ur.UserId);
 
+                // Relationship with Role
                 entity.HasOne(ur => ur.Role)
                     .WithMany(r => r.UserRoles)
                     .HasForeignKey(ur => ur.RoleId);
