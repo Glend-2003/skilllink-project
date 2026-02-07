@@ -54,6 +54,11 @@ export class UserProfileController {
     return this.userProfileService.findOne(+userId);
   }
 
+  @Get('profiles')
+  async findAll() {
+    return this.userProfileService.findAll();
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Patch('profile')
   async updateProfile(

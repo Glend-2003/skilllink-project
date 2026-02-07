@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Servicio de Base de Datos
   mysql_db:
@@ -23,7 +21,8 @@ services:
     ports:
       - "5001:8080"
     environment:
-      - ConnectionStrings__DefaultConnection=Server=mysql_db;Database=skilllink_db;User=root;Password=root;
+      - ConnectionStrings__DefaultConnection=Server=skilllink_db;Port=3306;Database=skilllink_db;User=root;Password=root;
+      - ASPNETCORE_URLS=http://+:8080
     depends_on:
       - mysql_db
 
@@ -66,7 +65,7 @@ services:
   payment-service:
     build: ./services/payment-service
     ports:
-      - "8081:8080"
+      - "3005:8081"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/skilllink_db
       - SPRING_DATASOURCE_USERNAME=root
@@ -87,7 +86,7 @@ services:
       - SERVICE_MANAGER_URL=http://service-manager:3000
       - PROVIDER_SERVICE_URL=http://provider-service:3000
       - CHAT_SERVICE_URL=http://chat-service:3000
-      - PAYMENT_SERVICE_URL=http://payment-service:8080
+      - PAYMENT_SERVICE_URL=http://payment-service:8081
     depends_on:
       - auth-service
       - user-service
@@ -95,9 +94,10 @@ services:
       - provider-service
       - chat-service
 
-  # Servicio de notificaciones
+# Servicio de notificaciones
   notification-service:
     build: ./services/notification-service
+    container_name: notification_service
     ports:
       - "3006:3006"
     depends_on:
@@ -105,3 +105,7 @@ services:
     environment:
       DB_HOST: mysql_db
       PORT: 3006
+
+
+volumes:
+  mysql_data:

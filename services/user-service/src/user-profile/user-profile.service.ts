@@ -45,6 +45,12 @@ export class UserProfileService {
       where: { user_id: userId },
     });
   }
+
+  async findAll(): Promise<UserProfile[]> {
+    return this.profileRepository.find();
+  }
+
+
   // 3. Update Profile (PATCH)
   async update(
     userId: number,

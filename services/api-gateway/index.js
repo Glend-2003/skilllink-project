@@ -11,11 +11,15 @@ app.use(cors());
 app.use(morgan('dev'));
 
 // 1. Auth Service (C#/.NET)
-app.use('/api/v1/auth', createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL || 'http://auth-service:8080',
+app.use(createProxyMiddleware({
+    pathFilter: '/api/v1/auth',
+    target: process.env.AUTH_SERVICE_URL || 'http://auth_service:8080',
     changeOrigin: true,
     pathRewrite: {
-        '^/api/v1/auth': '/api/auth'
+        '^/api/v1/auth': '/api/Auth'
+    },
+    onProxyReq: (proxyReq, req, res) => {
+        console.log(`[Auth Proxy] Reenviando ${req.method} ${req.url} -> ${proxyReq.path}`);
     }
 }));
 
