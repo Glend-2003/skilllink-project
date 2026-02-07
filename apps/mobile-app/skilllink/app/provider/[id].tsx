@@ -18,15 +18,25 @@ import { ServiceGalleryView } from '@/components/ServiceGalleryView';
 
 interface Provider {
   id: string;
-  name: string;
-  category: string;
-  rating: number;
-  location: string;
-  description: string;
-  hourlyRate: number;
-  verified: boolean;
+  providerId: number;
+  businessName: string;
+  businessDescription: string;
   yearsExperience: number;
-  reviewCount: number;
+  isVerified: boolean;
+  user?: {
+    userId: number;
+    profileImageUrl?: string;
+    email: string;
+  };
+  // Legacy fields for compatibility
+  name?: string;
+  category?: string;
+  rating?: number;
+  location?: string;
+  description?: string;
+  hourlyRate?: number;
+  verified?: boolean;
+  reviewCount?: number;
   profileImageUrl?: string;
 }
 
@@ -73,9 +83,11 @@ interface ServiceRequest {
 const { width } = Dimensions.get('window');
 
 export default function ProviderDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const { id } = params;
   const router = useRouter();
   const { user } = useAuth();
+  
   const providerId = id as string;
 
   const [provider, setProvider] = useState<Provider | null>(null);
@@ -89,37 +101,20 @@ export default function ProviderDetailScreen() {
   // Check if viewing own profile
   const isOwnProfile = useMemo(() => {
     const result = user?.userId?.toString() === provider?.id;
-    console.log('isOwnProfile calculation:', {
-      userId: user?.userId,
-      userIdString: user?.userId?.toString(),
-      providerId: provider?.id,
-      result
-    });
     return result;
   }, [user?.userId, provider?.id]);
 
   useEffect(() => {
     const loadProviderDetails = async () => {
       try {
-        console.log('Loading provider with ID:', providerId);
+        const url = `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}`;
         
-        // Fetch provider details
-        const providerRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}`
-        );
-        console.log('Provider response status:', providerRes.status);
-        
+        const providerRes = await fetch(url);
         if (providerRes.ok) {
           const providerData = await providerRes.json();
-          console.log('Provider data:', providerData);
-          console.log('Current user:', user);
-          console.log('Provider ID type:', typeof providerData.id, 'value:', providerData.id);
-          console.log('User ID type:', typeof user?.userId, 'value:', user?.userId);
           setProvider(providerData);
 
-          // Fetch requests if own profile
           if (user?.userId && providerData?.id === user.userId.toString()) {
-            console.log('Loading requests for own profile');
             await loadRequests(providerId);
           }
         } else {
@@ -131,7 +126,7 @@ export default function ProviderDetailScreen() {
 
         // Fetch services
         const servicesRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}/services`
+          `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}/services`
         );
         if (servicesRes.ok) {
           const servicesData = await servicesRes.json();
@@ -140,7 +135,7 @@ export default function ProviderDetailScreen() {
 
         // Fetch reviews
         const reviewsRes = await fetch(
-          `${Config.PROVIDER_SERVICE_URL}/api/providers/${providerId}/reviews`
+          `${Config.API_GATEWAY_URL}/api/v1/providers/${providerId}/reviews`
         );
         if (reviewsRes.ok) {
           const reviewsData = await reviewsRes.json();
@@ -164,7 +159,7 @@ export default function ProviderDetailScreen() {
     try {
       const token = user?.token;
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/provider/${provId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/provider/${provId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -192,7 +187,7 @@ export default function ProviderDetailScreen() {
       }
 
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/${requestId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
         {
           method: 'PATCH',
           headers: {
@@ -227,16 +222,7 @@ export default function ProviderDetailScreen() {
     }
 
     try {
-      console.log('User data:', user);
-      console.log('Creating conversation with provider:', providerId);
-      console.log('Chat Service URL:', Config.CHAT_SERVICE_URL);
-      console.log('Payload:', {
-        participant1_user_id: user.userId,
-        participant2_user_id: parseInt(providerId as string),
-      });
-
-      // Create or get conversation
-      const response = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -245,13 +231,10 @@ export default function ProviderDetailScreen() {
         }),
       });
 
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (response.ok) {
         const conversationId = data.conversation_id;
-        console.log('Navigating to chat:', conversationId);
         router.push(`/chat/${conversationId}`);
       } else {
         Alert.alert('Error', 'No se pudo crear la conversación');
@@ -304,15 +287,15 @@ export default function ProviderDetailScreen() {
         <View style={styles.providerCard}>
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            {provider.profileImageUrl ? (
+            {(provider.user?.profileImageUrl || provider.profileImageUrl) ? (
               <Image 
-                source={{ uri: provider.profileImageUrl }} 
+                source={{ uri: provider.user?.profileImageUrl || provider.profileImageUrl }} 
                 style={styles.avatarImage}
               />
             ) : (
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>
-                  {provider.name.charAt(0).toUpperCase()}
+                  {provider.businessName?.charAt(0).toUpperCase() || provider.name?.charAt(0).toUpperCase() || 'P'}
                 </Text>
               </View>
             )}
@@ -321,8 +304,8 @@ export default function ProviderDetailScreen() {
           {/* Provider Info */}
           <View style={styles.providerInfo}>
             <View style={styles.nameSection}>
-              <Text style={styles.providerName}>{provider.name}</Text>
-              {provider.verified && (
+              <Text style={styles.providerName}>{provider.businessName || provider.name}</Text>
+              {(provider.isVerified || provider.verified) && (
                 <View style={styles.verifiedBadge}>
                   <MaterialCommunityIcons
                     name="check-circle"
@@ -342,29 +325,31 @@ export default function ProviderDetailScreen() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <MaterialCommunityIcons
                     key={i}
-                    name={i < Math.floor(provider.rating) ? 'star' : 'star-outline'}
+                    name={i < Math.floor(provider.rating || 4.5) ? 'star' : 'star-outline'}
                     size={16}
                     color="#f59e0b"
                   />
                 ))}
               </View>
               <Text style={styles.ratingText}>
-                {provider.rating.toFixed(1)} ({provider.reviewCount} reseñas)
+                {(provider.rating || 4.5).toFixed(1)} ({provider.reviewCount || 0} reseñas)
               </Text>
             </View>
 
             {/* Details */}
             <View style={styles.detailsContainer}>
-              <Text style={styles.detailText}>{provider.location}</Text>
+              {provider.location && <Text style={styles.detailText}>{provider.location}</Text>}
               <Text style={styles.detailText}>
                 {provider.yearsExperience} años de experiencia
               </Text>
-              <Text style={styles.detailText}>
-                ${provider.hourlyRate}/hora
-              </Text>
+              {provider.hourlyRate && (
+                <Text style={styles.detailText}>
+                  ${provider.hourlyRate}/hora
+                </Text>
+              )}
             </View>
 
-            <Text style={styles.description}>{provider.description}</Text>
+            <Text style={styles.description}>{provider.businessDescription || provider.description}</Text>
 
             {/* Buttons */}
             <View style={styles.buttonsContainer}>

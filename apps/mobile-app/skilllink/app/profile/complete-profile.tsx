@@ -50,7 +50,6 @@ export default function CompleteProfileScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        console.log('Permiso de ubicación denegado');
         return;
       }
 
@@ -63,10 +62,8 @@ export default function CompleteProfileScreen() {
         latitude: location.coords.latitude.toString(),
         longitude: location.coords.longitude.toString(),
       }));
-
-      console.log('📍 Ubicación obtenida:', location.coords.latitude, location.coords.longitude);
     } catch (error) {
-      console.error('Error obteniendo ubicación:', error);
+      console.error('Error getting location:', error);
     } finally {
       setLoadingLocation(false);
     }
@@ -74,11 +71,20 @@ export default function CompleteProfileScreen() {
 
   const loadExistingProfile = async () => {
     try {
-      const response = await fetch(`${Config.USER_SERVICE_URL}/user-profile/me`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/user-profile/me`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
       });
+      
+      if (response.status === 401) {
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please log in again.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
 
       if (response.ok) {
         const profile = await response.json();
@@ -121,17 +127,13 @@ export default function CompleteProfileScreen() {
 
   const handleSave = async () => {
     if (!formData.first_name || !formData.last_name) {
-      Alert.alert('Error', 'El nombre y apellido son obligatorios');
+      Alert.alert('Error', 'First name and last name are required');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('💾 Guardando perfil:', JSON.stringify(formData, null, 2));
-      console.log('🔍 existingProfile:', existingProfile);
-      
-      // Always use POST to /user-profile/me which handles both create and update
-      const response = await fetch(`${Config.USER_SERVICE_URL}/user-profile/me`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/user-profile/me`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -140,25 +142,23 @@ export default function CompleteProfileScreen() {
         body: JSON.stringify(formData),
       });
 
-      console.log('📡 Response status:', response.status);
       const responseText = await response.text();
-      console.log('📡 Response body:', responseText);
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Perfil actualizado correctamente', [
+        Alert.alert('Success', 'Profile updated successfully', [
           { text: 'OK', onPress: () => router.back() }
         ]);
       } else {
         try {
           const errorData = JSON.parse(responseText);
-          Alert.alert('Error', errorData.message || 'No se pudo actualizar el perfil');
+          Alert.alert('Error', errorData.message || 'Could not update profile');
         } catch {
-          Alert.alert('Error', `Error del servidor (${response.status})`);
+          Alert.alert('Error', `Server error (${response.status})`);
         }
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'No se pudo conectar con el servidor');
+      Alert.alert('Error', 'Could not connect to server');
     } finally {
       setLoading(false);
     }

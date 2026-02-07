@@ -78,7 +78,7 @@ export default function ChatDetail() {
     if (!id || !user) return;
     
     try {
-      const response = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${id}/messages`);
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${id}/messages`);
       if (response.ok) {
         const prevMessages = await response.json();
         const formattedMessages: Message[] = prevMessages.map((msg: any) => ({
@@ -100,11 +100,8 @@ export default function ChatDetail() {
       if (!id || !user) return;
 
       try {
-        console.log('Loading conversation info for:', id, 'user:', user.userId);
-        
-        // Get conversation details using the new endpoint
         const conversationRes = await fetch(
-          `${Config.CHAT_SERVICE_URL}/api/conversations/details/${id}?userId=${user.userId}`
+          `${Config.API_GATEWAY_URL}/api/v1/chat/conversations/details/${id}?userId=${user.userId}`
         );
         
         if (!conversationRes.ok) {
@@ -115,24 +112,17 @@ export default function ChatDetail() {
         }
         
         const conversation = await conversationRes.json();
-        console.log('Conversation loaded:', conversation);
         
         if (conversation && conversation.other_user_id) {
           // Fetch provider profile by user_id to get providerId
           const providerProfileRes = await fetch(
-            `${Config.PROVIDER_SERVICE_URL}/api/providers/user/${conversation.other_user_id}`
+            `${Config.API_GATEWAY_URL}/api/v1/providers/user/${conversation.other_user_id}`
           );
           
           if (providerProfileRes.ok) {
             const providerProfile = await providerProfileRes.json();
-            console.log('Provider profile loaded:', providerProfile);
-            console.log('Provider profile keys:', Object.keys(providerProfile));
-            console.log('Provider ID from profile:', providerProfile.id);
-            console.log('Provider providerId from profile:', providerProfile.providerId);
             
-            // Try both possible field names
             const actualProviderId = providerProfile.id || providerProfile.providerId;
-            console.log('Using providerId:', actualProviderId);
             
             setProvider({
               id: conversation.other_user_id.toString(),
@@ -146,7 +136,6 @@ export default function ChatDetail() {
             });
           } else {
             const errorText = await providerProfileRes.text();
-            console.log('Not a provider - status:', providerProfileRes.status, 'error:', errorText);
             setProvider({
               id: conversation.other_user_id.toString(),
               name: conversation.other_user_email || 'Usuario',
@@ -171,7 +160,6 @@ export default function ChatDetail() {
   }, [id]);
 
   useEffect(() => {
-    console.log('useEffect triggered, id:', id, 'user:', user, 'isLoading:', isLoading);
     if (!id || !user || isLoading) return;
 
     const newSocket = io(Config.CHAT_SERVICE_URL, {
@@ -185,7 +173,6 @@ export default function ChatDetail() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('Socket connected, joining chat with conversationId:', id);
       newSocket.emit("join_chat", { 
         conversationId: parseInt(id as string)
       });
@@ -194,7 +181,6 @@ export default function ChatDetail() {
     });
 
     newSocket.on("receive_message", (data) => {
-      console.log('Received message:', data);
       const newMessage: Message = {
         id: data.message_id?.toString() || Date.now().toString() + Math.random(),
         text: data.message_text,
@@ -314,10 +300,6 @@ export default function ChatDetail() {
         <TouchableOpacity
           style={styles.attachButton}
           onPress={() => {
-            console.log('+ button pressed');
-            console.log('Provider:', provider);
-            console.log('ProviderId:', provider?.providerId);
-            
             if (!provider?.providerId) {
               Alert.alert(
                 'No es un proveedor',

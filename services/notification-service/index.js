@@ -13,13 +13,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'notification-service' });
 });
 
-// Endpoint para enviar notificaciones
 app.post('/api/notifications/send', async (req, res) => {
   try {
     const { userId, title, message, type } = req.body;
-    console.log(`Sending notification to user ${userId}: ${title}`);
-    
-    // TODO: Implementar lógica de notificaciones (push, email, etc.)
     
     res.json({ 
       success: true, 

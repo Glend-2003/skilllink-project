@@ -98,8 +98,8 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 
       formData.append('userId', userId.toString());
 
-      // Upload to service-manager
-      const uploadResponse = await fetch(`${Config.SERVICE_MANAGER_URL}/profile/upload-image`, {
+      // Upload to service-manager via API Gateway
+      const uploadResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/profile/upload-image`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -112,8 +112,8 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
       if (uploadResponse.ok) {
         const newImageUrl = uploadResult.imageUrl;
         
-        // Update user profile in auth-service
-        const updateResponse = await fetch(`${Config.AUTH_SERVICE_URL}/profile`, {
+        // Update user profile in auth-service via API Gateway
+        const updateResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/auth/profile`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,

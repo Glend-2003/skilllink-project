@@ -4,8 +4,7 @@ WORKDIR /usr/src/app
 
 COPY package*.json ./
 
-RUN npm install && \
-    npm install @nestjs/config @nestjs/passport passport passport-jwt cloudinary streamifier @types/multer --save
+RUN npm install
     
 COPY . .
 
@@ -18,7 +17,8 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package*.json ./
+COPY --from=builder /usr/src/app/tsconfig.json ./
 
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["node", "-r", "tsconfig-paths/register", "dist/main"]

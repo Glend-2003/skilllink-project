@@ -1,21 +1,58 @@
-import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
 import { router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 
-interface Provider {
-  id: string;
+// Interface for provider list items (from GET /api/v1/providers/)
+interface ProviderListItem {
+  id: string;  // This is the userId
   name: string;
   category: string;
-  rating: number;
-  location: string;
-  avatar?: string;
-  description: string;
+  rating?: number;
+  location?: string;
+  description?: string;
   hourlyRate?: number;
   verified: boolean;
+  yearsExperience?: number;
+  reviewCount?: number;
   profileImageUrl?: string;
+}
+
+// Interface for service items with nested provider info
+interface Provider {
+  id?: string;
+  serviceId: number;
+  providerId: number;
+  serviceTitle: string;
+  serviceDescription: string;
+  basePrice: string;
+  priceType: string;
+  isActive: boolean;
+  isVerified: boolean;
+  category: string | {
+    categoryId: number;
+    categoryName: string;
+    categoryDescription?: string;
+    iconUrl?: string;
+    isActive: boolean;
+    displayOrder?: number;
+  };
+  provider: {
+    providerId: number;
+    businessName: string;
+    businessDescription: string;
+    yearsExperience: number;
+    isVerified: boolean;
+    user?: {
+      userId: number;
+      profileImageUrl?: string;
+      email: string;
+    };
+  };
+  rating?: number;
+  location?: string;
 }
 
 interface Category {
@@ -50,12 +87,11 @@ export default function HomeScreen() {
   const [featuredServices, setFeaturedServices] = useState<Provider[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('Cargando categorías desde:', `${Config.AUTH_SERVICE_URL}/categories`);
         const categoriesResponse = await fetch(`${Config.AUTH_SERVICE_URL}/categories`);
         
         if (!categoriesResponse.ok) {
@@ -63,20 +99,17 @@ export default function HomeScreen() {
         }
         
         const categoriesText = await categoriesResponse.text();
-        console.log('Respuesta categorías (primeros 200 chars):', categoriesText.substring(0, 200));
         
         const categoriesData = categoriesText ? JSON.parse(categoriesText) : [];
         setCategories(Array.isArray(categoriesData) ? categoriesData.filter((cat: Category) => cat.isActive) : []);
 
-        console.log('Cargando servicios desde:', `${Config.PROVIDER_SERVICE_URL}/api/services`);
-        const servicesResponse = await fetch(`${Config.PROVIDER_SERVICE_URL}/api/services`);
+        const servicesResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`);
         
         if (!servicesResponse.ok) {
           throw new Error(`Error servicios: ${servicesResponse.status} ${servicesResponse.statusText}`);
         }
         
         const servicesText = await servicesResponse.text();
-        console.log('Respuesta servicios (primeros 200 chars):', servicesText.substring(0, 200));
         
         const servicesData = servicesText ? JSON.parse(servicesText) : [];
         setAllProviders(Array.isArray(servicesData) ? servicesData : []);
@@ -87,8 +120,7 @@ export default function HomeScreen() {
           setFeaturedServices(featured);
         }
       } catch (error) {
-        console.error('Error cargando datos:', error);
-        console.error('Detalles del error:', error instanceof Error ? error.message : 'Error desconocido');
+        console.error('Error loading data:', error);
         setAllProviders([]);
         setCategories([]);
         setFeaturedServices([]);
@@ -104,7 +136,12 @@ export default function HomeScreen() {
     let filtered = allProviders;
 
     if (selectedCategory) {
-      filtered = filtered.filter(provider => provider.category === selectedCategory);
+      filtered = filtered.filter(provider => {
+        const categoryName = typeof provider.category === 'string' 
+          ? provider.category 
+          : provider.category?.categoryName;
+        return categoryName === selectedCategory;
+      });
     }
 
     setFilteredProviders(filtered);
@@ -120,14 +157,57 @@ export default function HomeScreen() {
     );
   }
 
-  const handleViewProfile = (provider: Provider) => {
-    const id = (provider as any).providerId || provider.id;
+  // This function is no longer needed - removed
+
+  const handleViewServiceProvider = (service: Provider) => {
+    const id = service.provider?.user?.userId;
+    
+    if (!id) {
+      return;
+    }
+    
     router.push(`/provider/${id}`);
   };
 
-  const handleContactProvider = (provider: Provider) => {
-    const id = (provider as any).providerId || provider.id;
-    router.push(`/chat/${id}`);
+  const handleContactServiceProvider = async (service: Provider) => {
+    const providerId = service.provider?.user?.userId;
+    
+    if (!providerId) {
+      console.error('No provider ID found for service:', service);
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Error', 'You must log in to contact the provider');
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${Config.API_GATEWAY_URL}/api/v1/chat/conversations`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            participant1_user_id: user.userId,
+            participant2_user_id: providerId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al crear conversación');
+      }
+
+      const conversation = await response.json();
+      
+      router.push(`/chat/${conversation.conversation_id}`);
+    } catch (error) {
+      console.error('Error contacting provider:', error);
+      Alert.alert('Error', 'Could not start conversation');
+    }
   };
 
   const renderCategory = ({ item }: { item: Category }) => {
@@ -170,11 +250,11 @@ export default function HomeScreen() {
   const renderFeaturedService = ({ item }: { item: Provider }) => (
     <TouchableOpacity 
       style={styles.featuredCard} 
-      onPress={() => handleViewProfile(item)}
+      onPress={() => handleViewServiceProvider(item)}
     >
       <View style={styles.featuredHeader}>
-        {item.profileImageUrl ? (
-          <Image source={{ uri: item.profileImageUrl }} style={styles.featuredAvatarImage} />
+        {item.provider?.user?.profileImageUrl ? (
+          <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.featuredAvatarImage} />
         ) : (
           <View style={styles.featuredAvatar}>
             <Ionicons name="person" size={28} color="#FFF" />
@@ -182,19 +262,21 @@ export default function HomeScreen() {
         )}
         <View style={styles.featuredRating}>
           <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.featuredRatingText}>{item.rating.toFixed(1)}</Text>
+          <Text style={styles.featuredRatingText}>{(item.rating || 4.5).toFixed(1)}</Text>
         </View>
       </View>
 
-      <Text style={styles.featuredName} numberOfLines={1}>{item.name}</Text>
-      <Text style={styles.featuredCategory}>{item.category}</Text>
+      <Text style={styles.featuredName} numberOfLines={1}>{item.serviceTitle}</Text>
+      <Text style={styles.featuredCategory}>
+        {typeof item.category === 'string' ? item.category : item.category?.categoryName || 'Sin categoría'}
+      </Text>
       <Text style={styles.featuredDescription} numberOfLines={2}>
-        {item.description}
+        {item.serviceDescription}
       </Text>
 
       <View style={styles.featuredFooter}>
-        <Text style={styles.featuredPrice}>${item.hourlyRate || '---'}/hr</Text>
-        {item.verified && (
+        <Text style={styles.featuredPrice}>${item.basePrice}</Text>
+        {item.isVerified && (
           <Text style={styles.verifiedText}>Verificado</Text>
         )}
       </View>
@@ -202,21 +284,23 @@ export default function HomeScreen() {
   );
 
   const renderProvider = ({ item }: { item: Provider }) => (
-    <TouchableOpacity style={styles.providerCard} onPress={() => handleViewProfile(item)}>
+    <TouchableOpacity style={styles.providerCard} onPress={() => handleViewServiceProvider(item)}>
       <View style={styles.providerHeader}>
         <View style={styles.providerInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.providerName}>{item.name}</Text>
+            <Text style={styles.providerName}>{item.serviceTitle}</Text>
           </View>
-          <Text style={styles.providerCategory}>{item.category}</Text>
+          <Text style={styles.providerCategory}>
+            {typeof item.category === 'string' ? item.category : item.category?.categoryName || 'Sin categoría'}
+          </Text>
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={14} color="#F59E0B" />
-            <Text style={styles.rating}>{item.rating}</Text>
-            <Text style={styles.location}>• {item.location}</Text>
+            <Text style={styles.rating}>{item.rating || 4.5}</Text>
+            <Text style={styles.location}>• {item.provider?.businessName || 'Proveedor'}</Text>
           </View>
         </View>
-        {item.profileImageUrl ? (
-          <Image source={{ uri: item.profileImageUrl }} style={styles.avatarImage} />
+        {item.provider?.user?.profileImageUrl ? (
+          <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.avatarImage} />
         ) : (
           <View style={styles.avatar}>
             <Ionicons name="person" size={28} color="#FFF" />
@@ -225,15 +309,15 @@ export default function HomeScreen() {
       </View>
 
       <Text style={styles.description} numberOfLines={2}>
-        {item.description}
+        {item.serviceDescription}
       </Text>
 
       <View style={styles.providerFooter}>
-        <Text style={styles.rate}>${item.hourlyRate}/hora</Text>
+        <Text style={styles.rate}>${item.basePrice}</Text>
         <TouchableOpacity
           style={styles.contactButton}
           onPress={() => {
-            handleContactProvider(item);
+            handleContactServiceProvider(item);
           }}
         >
           <Text style={styles.contactButtonText}>Contactar</Text>
@@ -274,7 +358,7 @@ export default function HomeScreen() {
           </View>
           <FlatList
             data={featuredServices}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.serviceId?.toString() || item.id?.toString() || Math.random().toString()}
             renderItem={renderFeaturedService}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -313,7 +397,7 @@ export default function HomeScreen() {
 
       <FlatList
         data={filteredProviders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.serviceId?.toString() || item.id?.toString() || Math.random().toString()}
         renderItem={renderProvider}
         scrollEnabled={false}
         ListEmptyComponent={

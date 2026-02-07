@@ -188,10 +188,6 @@ export default function ProfileScreen() {
         return null;
     }
   };
-          {profile?.first_name && profile?.last_name 
-            ? `${profile.first_name} ${profile.last_name}` 
-            : 'Mi Perfil'}
-        
 
   if (isLoading) {
     return (

@@ -11,6 +11,9 @@ import {
   Modal,
   TextInput,
   Switch,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
@@ -53,7 +56,7 @@ export default function CategoriesManagementScreen() {
   const loadCategories = async () => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/categories`,
+        `${Config.API_GATEWAY_URL}/api/v1/admin/categories`,
         {
           headers: {
             'Authorization': `Bearer ${user?.token}`,
@@ -116,10 +119,26 @@ export default function CategoriesManagementScreen() {
 
     try {
       const url = editingCategory
-        ? `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/categories/${editingCategory.categoryId}`
-        : `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/categories`;
+        ? `${Config.API_GATEWAY_URL}/api/v1/admin/categories/${editingCategory.categoryId}`
+        : `${Config.API_GATEWAY_URL}/api/v1/admin/categories`;
 
       const method = editingCategory ? 'PUT' : 'POST';
+
+      // Only send non-empty fields
+      const payload: any = {
+        categoryName: formData.categoryName.trim(),
+      };
+
+      if (formData.categoryDescription.trim()) {
+        payload.categoryDescription = formData.categoryDescription.trim();
+      }
+
+      if (formData.iconUrl.trim()) {
+        payload.iconUrl = formData.iconUrl.trim();
+      }
+
+      payload.isActive = formData.isActive;
+      payload.displayOrder = formData.displayOrder;
 
       const response = await fetch(url, {
         method,
@@ -127,7 +146,7 @@ export default function CategoriesManagementScreen() {
           'Authorization': `Bearer ${user?.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -138,7 +157,8 @@ export default function CategoriesManagementScreen() {
         setModalVisible(false);
         loadCategories();
       } else {
-        Alert.alert('Error', 'No se pudo guardar la categoría');
+        const error = await response.json();
+        Alert.alert('Error', error.message || 'No se pudo guardar la categoría');
       }
     } catch (error) {
       console.error('Error saving category:', error);
@@ -172,7 +192,7 @@ export default function CategoriesManagementScreen() {
   const deleteCategory = async (categoryId: number) => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/categories/${categoryId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/admin/categories/${categoryId}`,
         {
           method: 'DELETE',
           headers: {
@@ -197,7 +217,7 @@ export default function CategoriesManagementScreen() {
   const toggleCategoryStatus = async (categoryId: number) => {
     try {
       const response = await fetch(
-        `${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/admin/categories/${categoryId}/toggle`,
+        `${Config.API_GATEWAY_URL}/api/v1/admin/categories/${categoryId}/toggle`,
         {
           method: 'PUT',
           headers: {
@@ -343,7 +363,10 @@ export default function CategoriesManagementScreen() {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -354,50 +377,56 @@ export default function CategoriesManagementScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.form}>
-              <Text style={styles.label}>Nombre *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.categoryName}
-                onChangeText={(text) => setFormData({ ...formData, categoryName: text })}
-                placeholder="Ej: Plomería, Electricidad"
-              />
-
-              <Text style={styles.label}>Descripción</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={formData.categoryDescription}
-                onChangeText={(text) => setFormData({ ...formData, categoryDescription: text })}
-                placeholder="Descripción de la categoría"
-                multiline
-                numberOfLines={3}
-              />
-
-              <Text style={styles.label}>Icono URL</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.iconUrl}
-                onChangeText={(text) => setFormData({ ...formData, iconUrl: text })}
-                placeholder="URL del icono (opcional)"
-              />
-
-              <Text style={styles.label}>Orden de visualización</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.displayOrder.toString()}
-                onChangeText={(text) => setFormData({ ...formData, displayOrder: parseInt(text) || 0 })}
-                placeholder="0"
-                keyboardType="numeric"
-              />
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Activa</Text>
-                <Switch
-                  value={formData.isActive}
-                  onValueChange={(value) => setFormData({ ...formData, isActive: value })}
+            <ScrollView 
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollViewContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.form}>
+                <Text style={styles.label}>Nombre *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.categoryName}
+                  onChangeText={(text) => setFormData({ ...formData, categoryName: text })}
+                  placeholder="Ej: Plomería, Electricidad"
                 />
+
+                <Text style={styles.label}>Descripción</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={formData.categoryDescription}
+                  onChangeText={(text) => setFormData({ ...formData, categoryDescription: text })}
+                  placeholder="Descripción de la categoría"
+                  multiline
+                  numberOfLines={3}
+                />
+
+                <Text style={styles.label}>Icono URL</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.iconUrl}
+                  onChangeText={(text) => setFormData({ ...formData, iconUrl: text })}
+                  placeholder="URL del icono (opcional)"
+                />
+
+                <Text style={styles.label}>Orden de visualización</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.displayOrder.toString()}
+                  onChangeText={(text) => setFormData({ ...formData, displayOrder: parseInt(text) || 0 })}
+                  placeholder="0"
+                  keyboardType="numeric"
+                />
+
+                <View style={styles.switchRow}>
+                  <Text style={styles.label}>Activa</Text>
+                  <Switch
+                    value={formData.isActive}
+                    onValueChange={(value) => setFormData({ ...formData, isActive: value })}
+                  />
+                </View>
               </View>
-            </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -415,7 +444,7 @@ export default function CategoriesManagementScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -555,22 +584,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     width: '90%',
-    maxHeight: '80%',
-    padding: 20,
+    maxHeight: '85%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1F2937',
   },
+  scrollView: {
+    maxHeight: '70%',
+  },
+  scrollViewContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
   form: {
-    marginBottom: 20,
+    paddingBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -599,6 +638,10 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: 12,
+    padding: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   modalButton: {
     flex: 1,

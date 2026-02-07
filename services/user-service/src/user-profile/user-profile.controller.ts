@@ -30,7 +30,6 @@ export class UserProfileController {
   // Public endpoint for auth-service to create profiles during registration
   @Post('user-profile')
   async createUserProfile(@Body() createProfileDto: CreateUserProfileDto & { user_id: number }) {
-    console.log(`📝 Creando perfil para usuario ID: ${createProfileDto.user_id}`);
     return this.userProfileService.createOrUpdate(createProfileDto.user_id, createProfileDto);
   }
 
@@ -42,7 +41,6 @@ export class UserProfileController {
     @Body() createProfileDto: CreateUserProfileDto,
   ) {
     const userId = Number(req.user.userId);
-    console.log(`📝 Creando/Actualizando perfil para usuario ID: ${userId}`);
     return this.userProfileService.createOrUpdate(userId, createProfileDto);
   }
 
@@ -54,10 +52,7 @@ export class UserProfileController {
     @Request() req: RequestWithUser,
     @Body() createProfileDto: CreateUserProfileDto,
   ) {
-    // 3. We convert the ID from String to Number so the database doesn't complain
     const userId = Number(req.user.userId);
-
-    console.log(`Creating profile for user ID: ${userId}`);
 
     return this.userProfileService.createOrUpdate(userId, createProfileDto);
   }
@@ -76,7 +71,6 @@ export class UserProfileController {
     @Body() updateDto: CreateUserProfileDto,
   ) {
     const userId = Number(req.user.userId);
-    console.log(`🔄 Actualizando perfil del usuario ID: ${userId}`);
     return this.userProfileService.update(userId, updateDto);
   }
 
@@ -105,7 +99,6 @@ export class UserProfileController {
     @Body() updateDto: CreateUserProfileDto,
   ) {
     const userId = Number(req.user.userId);
-    console.log(`Updating profile for user ID: ${userId}`);
     return this.userProfileService.update(userId, updateDto);
   }
 
@@ -114,7 +107,6 @@ export class UserProfileController {
   @Delete('profile')
   async deleteProfile(@Request() req: RequestWithUser) {
     const userId = Number(req.user.userId);
-    console.log(`Deleting profile for user ID: ${userId}`);
     return this.userProfileService.remove(userId);
   }
 

@@ -81,7 +81,7 @@ export default function ProviderRequestsScreen() {
     try {
       const token = user.token;
       const response = await fetch(
-        `${Config.PROVIDER_SERVICE_URL}/api/providers/user/${user.userId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/providers/user/${user.userId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -91,9 +91,7 @@ export default function ProviderRequestsScreen() {
 
       if (response.ok) {
         const provider = await response.json();
-        console.log('Provider data:', provider);
         const actualProviderId = provider.id || provider.providerId;
-        console.log('Using provider ID:', actualProviderId);
         setProviderId(actualProviderId);
         loadRequests(actualProviderId);
       } else {
@@ -113,7 +111,7 @@ export default function ProviderRequestsScreen() {
     try {
       const token = user?.token;
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/provider/${provId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/provider/${provId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -155,7 +153,7 @@ export default function ProviderRequestsScreen() {
       }
 
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/${requestId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
         {
           method: 'PATCH',
           headers: {
@@ -508,7 +506,6 @@ export default function ProviderRequestsScreen() {
                   </View>
                 </View>
 
-                {/* Título */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="document-text" size={20} color="#3B82F6" />
@@ -517,7 +514,6 @@ export default function ProviderRequestsScreen() {
                   <Text style={styles.modalText}>{selectedRequest.requestTitle}</Text>
                 </View>
 
-                {/* Servicio */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="construct" size={20} color="#3B82F6" />
@@ -527,7 +523,6 @@ export default function ProviderRequestsScreen() {
                   <Text style={styles.modalSubText}>Categoría: {selectedRequest.service.category.categoryName}</Text>
                 </View>
 
-                {/* Descripción */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="information-circle" size={20} color="#3B82F6" />
@@ -536,7 +531,6 @@ export default function ProviderRequestsScreen() {
                   <Text style={styles.modalText}>{selectedRequest.requestDescription}</Text>
                 </View>
 
-                {/* Ubicación */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="location" size={20} color="#3B82F6" />
@@ -548,7 +542,6 @@ export default function ProviderRequestsScreen() {
                   )}
                 </View>
 
-                {/* Fecha y Hora */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="calendar" size={20} color="#3B82F6" />
@@ -565,7 +558,6 @@ export default function ProviderRequestsScreen() {
                   <Text style={styles.modalSubText}>🕐 {selectedRequest.preferredTime}</Text>
                 </View>
 
-                {/* Costos */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="cash" size={20} color="#3B82F6" />
@@ -586,7 +578,6 @@ export default function ProviderRequestsScreen() {
                   )}
                 </View>
 
-                {/* Contacto */}
                 {selectedRequest.contactPhone && (
                   <View style={styles.detailSection}>
                     <View style={styles.detailSectionHeader}>
@@ -595,9 +586,8 @@ export default function ProviderRequestsScreen() {
                     </View>
                     <Text style={styles.modalText}>{selectedRequest.contactPhone}</Text>
                   </View>
-                )}
+                                )}
 
-                {/* Información de Cliente */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="person" size={20} color="#3B82F6" />
@@ -606,7 +596,6 @@ export default function ProviderRequestsScreen() {
                   <Text style={styles.modalText}>ID de Cliente: {selectedRequest.clientUserId}</Text>
                 </View>
 
-                {/* Fecha de creación */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailSectionHeader}>
                     <Ionicons name="time" size={20} color="#3B82F6" />

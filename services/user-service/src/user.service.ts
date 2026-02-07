@@ -12,8 +12,6 @@ export class UserService {
   ) {}
 
   async createUser(createUserDto: CreateUserProfileDto) {
-    console.log('Guardando en base de datos:', createUserDto);
-
     const newUser = this.userRepository.create(createUserDto);
 
     return await this.userRepository.save(newUser);

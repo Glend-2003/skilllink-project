@@ -38,7 +38,10 @@ interface ServiceRequest {
   provider: {
     providerId: number;
     businessName: string;
-    profileImageUrl: string;
+    user?: {
+      userId: number;
+      profileImageUrl?: string;
+    };
   };
 }
 
@@ -78,7 +81,7 @@ export default function MyRequestsScreen() {
     try {
       const token = user?.token;
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/mine`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/mine`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -118,7 +121,7 @@ export default function MyRequestsScreen() {
             try {
               const token = user?.token;
               const response = await fetch(
-                `${Config.SERVICE_MANAGER_URL}/requests/${requestId}`,
+                `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
                 {
                   method: 'DELETE',
                   headers: {

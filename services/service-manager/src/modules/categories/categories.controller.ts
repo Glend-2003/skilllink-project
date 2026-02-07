@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   ParseIntPipe,
@@ -42,5 +43,40 @@ export class CategoriesController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.categoriesService.remove(id);
+  }
+}
+
+// Admin endpoints
+@Controller('admin/categories')
+export class AdminCategoriesController {
+  constructor(private readonly categoriesService: CategoriesService) {}
+
+  @Get()
+  async findAllWithCount() {
+    const categories = await this.categoriesService.findAllWithCount();
+    return categories;
+  }
+
+  @Post()
+  create(@Body() createCategoryDto: CreateCategoryDto) {
+    return this.categoriesService.create(createCategoryDto);
+  }
+
+  @Put(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateCategoryDto: UpdateCategoryDto,
+  ) {
+    return this.categoriesService.update(id, updateCategoryDto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.categoriesService.remove(id);
+  }
+
+  @Put(':id/toggle')
+  async toggleStatus(@Param('id', ParseIntPipe) id: number) {
+    return this.categoriesService.toggleStatus(id);
   }
 }

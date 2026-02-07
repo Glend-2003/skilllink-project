@@ -48,7 +48,7 @@ export default function AddServiceScreen() {
 
   const loadProviderInfo = async () => {
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/profile`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -65,7 +65,7 @@ export default function AddServiceScreen() {
 
   const loadCategories = async () => {
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/categories`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/categories`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -104,7 +104,7 @@ export default function AddServiceScreen() {
     setSaving(true);
 
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${user?.token}`,
@@ -267,7 +267,6 @@ export default function AddServiceScreen() {
               serviceId={createdServiceId}
               providerId={providerId}
               onUploadComplete={(images) => {
-                console.log('Images uploaded:', images);
                 Alert.alert(
                   'Fotos subidas',
                   'Las fotos se han agregado al servicio exitosamente',

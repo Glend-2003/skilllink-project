@@ -11,6 +11,11 @@ services:
     volumes:
       - ./SkillLink.sql:/docker-entrypoint-initdb.d/init.sql
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Servicio de Autenticación
   auth-service:
@@ -32,15 +37,26 @@ services:
     ports:
       - "3001:3001"
     depends_on:
-      - mysql_db
+      mysql_db:
+        condition: service_healthy
 
   # Gestor de Servicios
   service-manager:
     build: ./services/service-manager
     ports:
       - "3002:3000"
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      - DB_DATABASE=skilllink_db
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     depends_on:
-      - mysql_db
+      mysql_db:
+        condition: service_healthy
 
   # Servicio de Proveedores
   provider-service:
@@ -49,9 +65,13 @@ services:
       - "3003:3000"
     environment:
       - DB_HOST=mysql_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
       - PORT=3000
     depends_on:
-      - mysql_db
+      mysql_db:
+        condition: service_healthy
 
   # Servicio de Chat
   chat-service:
@@ -60,6 +80,14 @@ services:
       - "3004:3000"
     environment:
       - PORT=3000
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+    depends_on:
+      mysql_db:
+        condition: service_healthy
 
   # Servicio de Pagos
   payment-service:
@@ -70,8 +98,10 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql_db:3306/skilllink_db
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MySQLDialect
     depends_on:
-      - mysql_db
+      mysql_db:
+        condition: service_healthy
 
   # API Gateway 
   api-gateway:
@@ -87,6 +117,7 @@ services:
       - PROVIDER_SERVICE_URL=http://provider-service:3000
       - CHAT_SERVICE_URL=http://chat-service:3000
       - PAYMENT_SERVICE_URL=http://payment-service:8081
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
     depends_on:
       - auth-service
       - user-service
@@ -101,7 +132,8 @@ services:
     ports:
       - "3006:3006"
     depends_on:
-      - mysql_db
+      mysql_db:
+        condition: service_healthy
     environment:
       DB_HOST: mysql_db
       PORT: 3006

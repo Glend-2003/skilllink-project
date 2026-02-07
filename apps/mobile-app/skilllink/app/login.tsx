@@ -21,23 +21,23 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+    const loginUrl = `${Config.AUTH_SERVICE_URL}/login`;
+    
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/login`, {
+      const response = await fetch(loginUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          Email: email,
-          Password: password,
+          email: email,
+          password: password,
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        console.log("Login exitoso:", data);
-
         const userData = {
           userId: data.userId,
           email: data.email,

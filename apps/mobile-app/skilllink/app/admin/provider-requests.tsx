@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import {
   ArrowLeft,
   CheckCircle,
@@ -58,8 +58,8 @@ export default function ProviderRequestsScreen() {
     try {
       setIsLoading(true);
       const url = filter === 'all' 
-        ? `${Config.AUTH_SERVICE_URL}/provider-requests`
-        : `${Config.AUTH_SERVICE_URL}/provider-requests?status=${filter}`;
+        ? `${Config.API_GATEWAY_URL}/api/v1/provider-requests`
+        : `${Config.API_GATEWAY_URL}/api/v1/provider-requests?status=${filter}`;
 
       const response = await fetch(url, {
         headers: {
@@ -109,7 +109,7 @@ export default function ProviderRequestsScreen() {
     try {
       setProcessingId(requestId);
 
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/provider-requests/review`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider-requests/review`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -265,9 +265,11 @@ export default function ProviderRequestsScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft color="white" size={24} />
         </TouchableOpacity>
@@ -345,7 +347,8 @@ export default function ProviderRequestsScreen() {
           </View>
         </ScrollView>
       )}
-    </View>
+      </View>
+    </>
   );
 }
 

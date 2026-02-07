@@ -37,19 +37,14 @@ export default function ChatScreen() {
 
   const fetchConversations = useCallback(async () => {
     if (!user || !user.userId) {
-      console.log('No user or userId:', user);
       return;
     }
     setLoading(true);
     try {
-      console.log('Fetching conversations for userId:', user.userId);
-      const res = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${user.userId}`);
-      console.log('Response status:', res.status);
+      const res = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${user.userId}`);
       const data = await res.json();
-      console.log('Conversations data:', data);
       
       if (!Array.isArray(data)) {
-        console.error('API returned error:', data);
         setItems([]);
         return;
       }
@@ -111,7 +106,7 @@ export default function ChatScreen() {
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      const response = await fetch(`${Config.CHAT_SERVICE_URL}/api/conversations/${conversationId}`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${conversationId}`, {
         method: 'DELETE',
       });
 

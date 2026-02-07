@@ -5,8 +5,6 @@ import { useRole } from '../app/context/RoleContext';
 export default function RoleSwitcher() {
   const { activeRole, setActiveRole, isProvider } = useRole();
 
-  console.log('🎯 RoleSwitcher: isProvider =', isProvider, 'activeRole =', activeRole);
-
   if (!isProvider) {
     return null;
   }

@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { ArrowLeft, Briefcase, FileText, MapPin } from 'lucide-react-native';
 import { Config } from '../../constants/Config';
 
@@ -47,7 +47,7 @@ export default function BecomeProviderScreen() {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/provider-request`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,9 +85,11 @@ export default function BecomeProviderScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft color="white" size={24} />
         </TouchableOpacity>
@@ -173,7 +175,8 @@ export default function BecomeProviderScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </View>
+      </View>
+    </>
   );
 }
 

@@ -59,7 +59,7 @@ export default function EditServiceScreen() {
 
   const loadProviderInfo = async () => {
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/profile`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -76,7 +76,7 @@ export default function EditServiceScreen() {
 
   const loadData = async () => {
     try {
-      const catResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/categories`, {
+      const catResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/categories`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -87,7 +87,7 @@ export default function EditServiceScreen() {
         setCategories(catData);
       }
 
-      const servicesResponse = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services`, {
+      const servicesResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services/provider/me`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -131,7 +131,7 @@ export default function EditServiceScreen() {
     setSaving(true);
 
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/services/${id}`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${user?.token}`,
@@ -276,9 +276,6 @@ export default function EditServiceScreen() {
             <ServiceGalleryView
               serviceId={parseInt(id as string)}
               editable={true}
-              onImagesChange={() => {
-                console.log('Images updated');
-              }}
             />
           </View>
         )}

@@ -43,7 +43,7 @@ export default function ReviewScreen() {
     try {
       const token = user?.token;
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/requests/${requestId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -86,7 +86,7 @@ export default function ReviewScreen() {
     try {
       const token = user?.token;
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/reviews`,
+        `${Config.API_GATEWAY_URL}/api/v1/reviews`,
         {
           method: 'POST',
           headers: {

@@ -124,7 +124,7 @@ export default function EditProviderProfileScreen() {
 
   const loadProviderProfile = async () => {
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/profile`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -161,7 +161,7 @@ export default function EditProviderProfileScreen() {
     setSaving(true);
 
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL.replace('/api/auth', '')}/api/provider/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${user?.token}`,
