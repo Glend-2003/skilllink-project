@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, MessageCircle, User, Search } from "lucide-react-native";
+import { Home, MessageCircle, User, Search, ClipboardList } from "lucide-react-native";
 import { Platform } from "react-native";
 
 export default function TabsLayout() {
@@ -49,6 +49,16 @@ export default function TabsLayout() {
             <MessageCircle color={color} size={22} />
           ),
           tabBarLabel: 'Chats',
+        }}
+      />
+
+      <Tabs.Screen
+        name="my-requests"
+        options={{
+          tabBarIcon: ({ color }) => (
+            <ClipboardList color={color} size={22} />
+          ),
+          tabBarLabel: 'Solicitudes',
         }}
       />
 

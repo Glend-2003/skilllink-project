@@ -11,7 +11,7 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { Trash2, RefreshCw, X } from 'lucide-react-native';
+import { Trash2, X } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -120,8 +120,7 @@ export const ServiceGalleryView: React.FC<ServiceGalleryViewProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Cargando galería...</Text>
+        <ActivityIndicator size="small" color="#007AFF" />
       </View>
     );
   }
@@ -129,37 +128,19 @@ export const ServiceGalleryView: React.FC<ServiceGalleryViewProps> = ({
   if (images.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>📷</Text>
         <Text style={styles.emptyTitle}>Sin imágenes</Text>
-        <Text style={styles.emptySubtitle}>
-          {editable
-            ? 'Agrega fotos de tus trabajos realizados'
-            : 'Este servicio no tiene imágenes todavía'}
-        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Galería ({images.length})</Text>
-        <TouchableOpacity onPress={loadImages} style={styles.refreshButton}>
-          <RefreshCw size={20} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {(maxImagesToShow ? images.slice(0, maxImagesToShow) : images).map((image) => (
           <View key={image.galleryId} style={styles.imageCard}>
             <TouchableOpacity onPress={() => openImageModal(image)} activeOpacity={0.8}>
               <Image source={{ uri: image.imageUrl }} style={styles.image} />
             </TouchableOpacity>
-            {image.imageTitle && (
-              <Text style={styles.imageTitle} numberOfLines={1}>
-                {image.imageTitle}
-              </Text>
-            )}
             {editable && (
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -196,23 +177,11 @@ export const ServiceGalleryView: React.FC<ServiceGalleryViewProps> = ({
           >
             <View style={styles.modalContent}>
               {selectedImage && (
-                <>
-                  <Image
-                    source={{ uri: selectedImage.imageUrl }}
-                    style={styles.fullImage}
-                    resizeMode="contain"
-                  />
-                  {selectedImage.imageTitle && (
-                    <View style={styles.imageInfoContainer}>
-                      <Text style={styles.modalImageTitle}>{selectedImage.imageTitle}</Text>
-                      {selectedImage.imageDescription && (
-                        <Text style={styles.modalImageDescription}>
-                          {selectedImage.imageDescription}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </>
+                <Image
+                  source={{ uri: selectedImage.imageUrl }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
               )}
             </View>
           </TouchableOpacity>

@@ -98,6 +98,29 @@ export class ServicesService {
     return service;
   }
 
+  async findByProvider(providerId: number) {
+    // Validate if ProviderProfile exists
+    const provider = await this.providerProfile.findOne({
+      where: { providerId },
+    });
+    if (!provider) {
+      throw new NotFoundException(
+        `Proveedor con el ID ${providerId} no encontrado`,
+      );
+    }
+
+    return this.serviceRepository.find({
+      where: { providerId },
+      relations: {
+        category: true,
+        provider: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
   async remove(id: number) {
     const service = await this.findOne(id);
     await this.serviceRepository.remove(service);

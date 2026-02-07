@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, ImageIcon } from 'lucide-react-native';
+import { Camera, ImageIcon, User } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
 interface ProfileImageUploaderProps {
@@ -185,7 +185,7 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
           <Image source={{ uri: imageUrl }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarPlaceholderText}>📷</Text>
+            <User size={40} color="#fff" />
           </View>
         )}
         
@@ -199,8 +199,6 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
           <Camera size={16} color="#fff" />
         </View>
       </TouchableOpacity>
-
-      <Text style={styles.helpText}>Toca para cambiar foto</Text>
     </View>
   );
 };

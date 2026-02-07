@@ -120,8 +120,62 @@ app.get('/api/providers/:providerId', async (req, res) => {
 
     res.json(provider);
   } catch (error) {
-    console.error('Error getting provider:', error);
-    res.status(500).json({ error: 'Error getting provider' });
+    console.error('Error obteniendo proveedor:', error);
+    res.status(500).json({ error: 'Error obteniendo proveedor' });
+  }
+});
+
+
+// Get provider profile by user_id
+app.get('/api/providers/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const query = `
+      SELECT 
+        pp.provider_id as id,
+        pp.provider_id,
+        pp.business_name,
+        pp.business_description,
+        pp.years_experience,
+        pp.service_radius_km,
+        pp.is_verified as verified,
+        u.user_id,
+        u.email,
+        u.profile_image_url as profileImageUrl,
+        COALESCE(AVG(r.rating), 0) as rating,
+        COUNT(CASE WHEN r.review_id IS NOT NULL THEN 1 END) as reviewCount
+      FROM provider_profiles pp
+      JOIN users u ON pp.user_id = u.user_id
+      LEFT JOIN reviews r ON u.user_id = r.reviewed_user_id
+      WHERE pp.user_id = ?
+      GROUP BY pp.provider_id, u.user_id
+    `;
+
+    const [providers] = await db.execute(query, [userId]);
+
+    if (providers.length === 0) {
+      return res.status(404).json({ error: 'Provider profile not found for this user' });
+    }
+
+    const provider = providers[0];
+    res.json({
+      id: provider.id,
+      providerId: provider.provider_id,
+      businessName: provider.business_name,
+      description: provider.business_description,
+      yearsExperience: provider.years_experience,
+      serviceRadius: provider.service_radius_km,
+      verified: provider.verified === 1,
+      userId: provider.user_id,
+      email: provider.email,
+      profileImageUrl: provider.profileImageUrl,
+      rating: parseFloat(provider.rating) || 0,
+      reviewCount: provider.reviewCount
+    });
+  } catch (error) {
+    console.error('Error getting provider profile by user_id:', error);
+    res.status(500).json({ error: 'Error getting provider profile' });
   }
 });
 
@@ -244,7 +298,7 @@ app.get('/api/services', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3004;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Provider Service running on port ${PORT}`);
 });

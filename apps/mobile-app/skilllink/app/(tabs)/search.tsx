@@ -14,6 +14,21 @@ import { router } from 'expo-router';
 import { Search as SearchIcon, X, DollarSign, Clock } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
 
+const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
+  'Plomería': { bg: '#EFF6FF', text: '#3B82F6', border: '#3B82F6' },
+  'Electricidad': { bg: '#FEF3C7', text: '#F59E0B', border: '#F59E0B' },
+  'Carpintería': { bg: '#F3E8FF', text: '#8B5CF6', border: '#8B5CF6' },
+  'Limpieza': { bg: '#CFFAFE', text: '#06B6D4', border: '#06B6D4' },
+  'Jardinería': { bg: '#ECFCCB', text: '#84CC16', border: '#84CC16' },
+  'Pintura': { bg: '#FCE7F3', text: '#EC4899', border: '#EC4899' },
+  'Mecánica': { bg: '#FEE2E2', text: '#EF4444', border: '#EF4444' },
+  'Tecnología': { bg: '#D1FAE5', text: '#10B981', border: '#10B981' },
+};
+
+const getCategoryColors = (categoryName: string) => {
+  return CATEGORY_COLORS[categoryName] || { bg: '#F3F4F6', text: '#6B7280', border: '#9CA3AF' };
+};
+
 interface Category {
   categoryId: number;
   categoryName: string;
@@ -137,35 +152,35 @@ export default function SearchScreen() {
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
   };
 
-  const renderCategory = ({ item }: { item: Category }) => (
-    <TouchableOpacity
-      key={item.categoryId}
-      style={[
-        styles.categoryCard,
-        selectedCategory === item.categoryId && styles.categoryCardSelected,
-      ]}
-      onPress={() => handleCategoryPress(item.categoryId)}
-    >
-      <View style={styles.categoryContent}>
-        <Text
-          style={[
-            styles.categoryName,
-            selectedCategory === item.categoryId && styles.categoryNameSelected,
-          ]}
-        >
-          {item.categoryName}
-        </Text>
-        <Text
-          style={[
-            styles.categoryCount,
-            selectedCategory === item.categoryId && styles.categoryCountSelected,
-          ]}
-        >
-          {item.serviceCount} servicio{item.serviceCount !== 1 ? 's' : ''}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderCategory = ({ item }: { item: Category }) => {
+    const colors = getCategoryColors(item.categoryName);
+    const isSelected = selectedCategory === item.categoryId;
+    
+    return (
+      <TouchableOpacity
+        key={item.categoryId}
+        style={[
+          styles.categoryCard,
+          { 
+            backgroundColor: isSelected ? colors.bg : '#fff',
+            borderColor: isSelected ? colors.border : '#E5E7EB',
+          }
+        ]}
+        onPress={() => handleCategoryPress(item.categoryId)}
+      >
+        <View style={styles.categoryContent}>
+          <Text
+            style={[
+              styles.categoryName,
+              { color: isSelected ? colors.text : '#374151' }
+            ]}
+          >
+            {item.categoryName}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderService = ({ item }: { item: Service }) => (
     <TouchableOpacity style={styles.serviceCard} onPress={() => handleServicePress(item)}>
@@ -192,23 +207,19 @@ export default function SearchScreen() {
 
       <View style={styles.serviceFooter}>
         <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <DollarSign size={16} color="#059669" />
-            <Text style={styles.priceText}>{getPriceDisplay(item)}</Text>
-          </View>
+          <Text style={styles.priceText}>{getPriceDisplay(item)}</Text>
           
           {item.estimatedDuration && (
-            <View style={styles.infoItem}>
-              <Clock size={16} color="#666" />
-              <Text style={styles.infoText}>{getDurationDisplay(item.estimatedDuration)}</Text>
-            </View>
+            <Text style={styles.infoText}> • {getDurationDisplay(item.estimatedDuration)}</Text>
           )}
         </View>
 
         <View style={styles.ratingContainer}>
-          <Text style={styles.rating}>⭐ {item.rating.toFixed(1)}</Text>
+          <Text style={styles.rating}>{item.rating.toFixed(1)}</Text>
           {item.verified && (
-            <Text style={styles.verified}>✓</Text>
+            <View style={styles.verifiedBadge}>
+              <Text style={styles.verifiedText}>Verificado</Text>
+            </View>
           )}
         </View>
       </View>
@@ -403,35 +414,24 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  categoryCardSelected: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#3B82F6',
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   categoryContent: {
     alignItems: 'center',
   },
   categoryName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
     textAlign: 'center',
-  },
-  categoryNameSelected: {
-    color: '#3B82F6',
-  },
-  categoryCount: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  categoryCountSelected: {
-    color: '#3B82F6',
   },
   resultsSection: {
     backgroundColor: '#F8FAFC',
@@ -551,15 +551,22 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   rating: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-  },
-  verified: {
     fontSize: 16,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  verifiedBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  verifiedText: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#10B981',
   },
   emptyState: {

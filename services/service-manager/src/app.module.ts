@@ -6,6 +6,7 @@ import { ServicesModule } from './modules/services/services.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { RequestsModule } from './modules/requests/requests.module';
+import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { AuthModule } from './config/auth.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
@@ -39,6 +40,7 @@ import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
     ProvidersModule,
     CategoriesModule,
     RequestsModule,
+    ReviewsModule,
   ],
 })
 export class AppModule {}

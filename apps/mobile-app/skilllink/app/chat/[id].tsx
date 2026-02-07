@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import ServiceRequestModal from '@/components/ServiceRequestModal';
 
 type Message = {
   id: string;
@@ -17,6 +18,7 @@ type ConversationStatus = 'active' | 'pending' | 'completed' | 'cancelled';
 
 interface Provider {
   id: string;
+  providerId?: number;
   name: string;
   category: string;
   rating: number;
@@ -67,6 +69,7 @@ export default function ChatDetail() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('active');
   const [provider, setProvider] = useState<Provider | null>(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
 
   const flatListRef = useRef<FlatList<Message>>(null);
 
@@ -115,20 +118,35 @@ export default function ChatDetail() {
         console.log('Conversation loaded:', conversation);
         
         if (conversation && conversation.other_user_id) {
-          // Fetch provider details
-          const providerRes = await fetch(`${Config.PROVIDER_SERVICE_URL}/api/providers/${conversation.other_user_id}`);
-          if (providerRes.ok) {
-            const providerData = await providerRes.json();
+          // Fetch provider profile by user_id to get providerId
+          const providerProfileRes = await fetch(
+            `${Config.PROVIDER_SERVICE_URL}/api/providers/user/${conversation.other_user_id}`
+          );
+          
+          if (providerProfileRes.ok) {
+            const providerProfile = await providerProfileRes.json();
+            console.log('Provider profile loaded:', providerProfile);
+            console.log('Provider profile keys:', Object.keys(providerProfile));
+            console.log('Provider ID from profile:', providerProfile.id);
+            console.log('Provider providerId from profile:', providerProfile.providerId);
+            
+            // Try both possible field names
+            const actualProviderId = providerProfile.id || providerProfile.providerId;
+            console.log('Using providerId:', actualProviderId);
+            
             setProvider({
-              id: providerData.id,
-              name: providerData.name,
-              category: 'Servicios',
-              rating: providerData.rating,
-              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${providerData.id}`,
-              verified: providerData.verified,
-              profileImageUrl: providerData.profileImageUrl,
+              id: conversation.other_user_id.toString(),
+              providerId: actualProviderId,
+              name: providerProfile.businessName || conversation.other_user_email || 'Proveedor',
+              category: providerProfile.category || 'Servicios',
+              rating: providerProfile.rating || 0,
+              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.other_user_id}`,
+              verified: providerProfile.verified || false,
+              profileImageUrl: providerProfile.profileImageUrl,
             });
           } else {
+            const errorText = await providerProfileRes.text();
+            console.log('Not a provider - status:', providerProfileRes.status, 'error:', errorText);
             setProvider({
               id: conversation.other_user_id.toString(),
               name: conversation.other_user_email || 'Usuario',
@@ -293,6 +311,27 @@ export default function ChatDetail() {
 
       {/* Input de mensaje */}
       <View style={styles.inputContainer}>
+        <TouchableOpacity
+          style={styles.attachButton}
+          onPress={() => {
+            console.log('+ button pressed');
+            console.log('Provider:', provider);
+            console.log('ProviderId:', provider?.providerId);
+            
+            if (!provider?.providerId) {
+              Alert.alert(
+                'No es un proveedor',
+                'Este usuario no está registrado como proveedor. Solo puedes enviar solicitudes de servicio a proveedores.'
+              );
+              return;
+            }
+            
+            setShowRequestModal(true);
+          }}
+        >
+          <Ionicons name="add-circle" size={28} color="#3B82F6" />
+        </TouchableOpacity>
+
         <TextInput
           style={styles.textInput}
           placeholder="Escribe un mensaje..."
@@ -309,6 +348,20 @@ export default function ChatDetail() {
           <Ionicons name="send" size={20} color="white" />
         </TouchableOpacity>
       </View>
+
+      {/* Service Request Modal */}
+      {provider && provider.providerId && (
+        <ServiceRequestModal
+          visible={showRequestModal}
+          onClose={() => setShowRequestModal(false)}
+          providerId={provider.providerId}
+          providerName={provider.name}
+          onSuccess={() => {
+            setShowRequestModal(false);
+            Alert.alert('Éxito', 'Tu solicitud ha sido enviada al proveedor');
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -466,6 +519,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+  },
+  attachButton: {
+    padding: 4,
   },
   textInput: {
     flex: 1,

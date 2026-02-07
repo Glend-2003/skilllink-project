@@ -62,6 +62,10 @@ function RootLayoutNav() {
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="provider/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="provider/provider-requests" options={{ headerShown: false }} />
+              <Stack.Screen name="provider/edit-profile" options={{ headerShown: false }} />
+              <Stack.Screen name="provider/services" options={{ headerShown: false }} />
+              <Stack.Screen name="review/[requestId]" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
             </Stack>
           </RoleProvider>

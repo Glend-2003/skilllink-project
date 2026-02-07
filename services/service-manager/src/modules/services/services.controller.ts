@@ -27,6 +27,11 @@ export class ServicesController {
     return this.servicesService.findAll();
   }
 
+  @Get('provider/:providerId')
+  findByProvider(@Param('providerId', ParseIntPipe) providerId: number) {
+    return this.servicesService.findByProvider(providerId);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.servicesService.findOne(id);

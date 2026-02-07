@@ -66,6 +66,41 @@ namespace AuthController.Controllers
                 _context.UserRoles.Add(userRole);
                 await _context.SaveChangesAsync();
 
+                // Create user profile in user-service
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    var userProfileData = new
+                    {
+                        user_id = user.Id,
+                        first_name = "",
+                        last_name = "",
+                        bio = ""
+                    };
+                    
+                    var jsonContent = new StringContent(
+                        System.Text.Json.JsonSerializer.Serialize(userProfileData),
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+
+                    var userServiceUrl = _configuration["Services:UserService"] ?? "http://localhost:3004";
+                    var response = await httpClient.PostAsync(
+                        $"{userServiceUrl}/user-profile",
+                        jsonContent
+                    );
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}");
+                    }
+                }
+                catch (Exception profileEx)
+                {
+                    Console.WriteLine($"Warning: Error creating user profile: {profileEx.Message}");
+                    // Continue anyway - profile can be created later
+                }
+
                 var authClaims = new List<Claim>
                 {
                     new Claim(ClaimTypes.Name, user.Email),

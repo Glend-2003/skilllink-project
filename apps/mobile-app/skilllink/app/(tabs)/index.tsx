@@ -172,15 +172,14 @@ export default function HomeScreen() {
       style={styles.featuredCard} 
       onPress={() => handleViewProfile(item)}
     >
-      <View style={styles.featuredBadge}>
-        <Ionicons name="star" size={12} color="#FFF" />
-        <Text style={styles.featuredBadgeText}>Destacado</Text>
-      </View>
-      
       <View style={styles.featuredHeader}>
-        <View style={styles.featuredAvatar}>
-          <Text style={styles.featuredAvatarText}>{item.name.charAt(0)}</Text>
-        </View>
+        {item.profileImageUrl ? (
+          <Image source={{ uri: item.profileImageUrl }} style={styles.featuredAvatarImage} />
+        ) : (
+          <View style={styles.featuredAvatar}>
+            <Ionicons name="person" size={28} color="#FFF" />
+          </View>
+        )}
         <View style={styles.featuredRating}>
           <Ionicons name="star" size={16} color="#F59E0B" />
           <Text style={styles.featuredRatingText}>{item.rating.toFixed(1)}</Text>
@@ -196,10 +195,7 @@ export default function HomeScreen() {
       <View style={styles.featuredFooter}>
         <Text style={styles.featuredPrice}>${item.hourlyRate || '---'}/hr</Text>
         {item.verified && (
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-            <Text style={styles.verifiedText}>Verificado</Text>
-          </View>
+          <Text style={styles.verifiedText}>Verificado</Text>
         )}
       </View>
     </TouchableOpacity>
@@ -211,9 +207,6 @@ export default function HomeScreen() {
         <View style={styles.providerInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.providerName}>{item.name}</Text>
-            {item.verified && (
-              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            )}
           </View>
           <Text style={styles.providerCategory}>{item.category}</Text>
           <View style={styles.ratingRow}>
@@ -226,7 +219,7 @@ export default function HomeScreen() {
           <Image source={{ uri: item.profileImageUrl }} style={styles.avatarImage} />
         ) : (
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
+            <Ionicons name="person" size={28} color="#FFF" />
           </View>
         )}
       </View>
@@ -236,9 +229,7 @@ export default function HomeScreen() {
       </Text>
 
       <View style={styles.providerFooter}>
-        <View style={styles.rateContainer}>
-          <Text style={styles.rate}>${item.hourlyRate}/hora</Text>
-        </View>
+        <Text style={styles.rate}>${item.hourlyRate}/hora</Text>
         <TouchableOpacity
           style={styles.contactButton}
           onPress={() => {
@@ -246,7 +237,6 @@ export default function HomeScreen() {
           }}
         >
           <Text style={styles.contactButtonText}>Contactar</Text>
-          <Ionicons name="chatbubble-outline" size={16} color="white" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -257,7 +247,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>👋 Hola</Text>
+            <Text style={styles.greeting}>Bienvenido</Text>
             <Text style={styles.title}>Descubre servicios</Text>
             <Text style={styles.subtitle}>Encuentra profesionales verificados</Text>
           </View>
@@ -273,36 +263,11 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#EEF2FF' }]}>
-            <Ionicons name="briefcase" size={24} color="#4F46E5" />
-          </View>
-          <Text style={styles.statNumber}>{allProviders.length}</Text>
-          <Text style={styles.statLabel}>Servicios</Text>
-        </View>
-        <View style={styles.statCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="people" size={24} color="#F59E0B" />
-          </View>
-          <Text style={styles.statNumber}>{categories.length}</Text>
-          <Text style={styles.statLabel}>Categorías</Text>
-        </View>
-        <View style={styles.statCard}>
-          <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
-            <Ionicons name="star" size={24} color="#10B981" />
-          </View>
-          <Text style={styles.statNumber}>{featuredServices.length}</Text>
-          <Text style={styles.statLabel}>Destacados</Text>
-        </View>
-      </View>
-
       {/* Featured Services */}
       {!selectedCategory && featuredServices.length > 0 && (
         <>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>⭐ Servicios Destacados</Text>
+            <Text style={styles.sectionTitle}>Servicios Destacados</Text>
             <TouchableOpacity onPress={() => router.push('/search')}>
               <Text style={styles.seeAll}>Ver todos →</Text>
             </TouchableOpacity>
@@ -320,7 +285,7 @@ export default function HomeScreen() {
 
       {/* Categories */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>🏷️ Categorías</Text>
+        <Text style={styles.sectionTitle}>Categorías</Text>
         {selectedCategory && (
           <TouchableOpacity onPress={() => setSelectedCategory(null)}>
             <Text style={styles.clearFilter}>Limpiar</Text>
@@ -339,7 +304,7 @@ export default function HomeScreen() {
       {/* Services List */}
       <View style={styles.providersHeader}>
         <Text style={styles.sectionTitle}>
-          {selectedCategory ? `📋 ${selectedCategory}` : '🔍 Todos los Servicios'}
+          {selectedCategory || 'Todos los Servicios'}
         </Text>
         <Text style={styles.resultsCount}>
           {filteredProviders.length} servicio{filteredProviders.length !== 1 ? 's' : ''}
@@ -539,14 +504,15 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#9CA3AF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  featuredAvatarText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFF',
+  featuredAvatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#e0e0e0',
   },
   featuredRating: {
     flexDirection: 'row',
@@ -709,7 +675,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#9CA3AF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -718,11 +684,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: '#e0e0e0',
-  },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'white',
   },
   description: {
     fontSize: 14,

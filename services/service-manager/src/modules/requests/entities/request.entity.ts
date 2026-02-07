@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
 } from 'typeorm';
 import { Service } from '../../services/entities/service.entity';
 import { ProviderProfile } from '../../providers/entities/provider.entity';
+import { Review } from '../../reviews/entities/review.entity';
 
 @Entity('service_requests')
 export class ServiceRequest {
@@ -110,4 +112,7 @@ export class ServiceRequest {
   @ManyToOne(() => ProviderProfile)
   @JoinColumn({ name: 'provider_id' })
   provider: ProviderProfile;
+
+  @OneToOne(() => Review, review => review.request)
+  review: Review;
 }

@@ -11,7 +11,7 @@ import { SavedSearch } from './user-profile/entities/saved-search.entity';
       host:'mysql_db',
       port: 3306,
       username: 'root',
-      password: 'root',
+      password: '',
       database: 'skilllink_db',
       entities: [UserProfile, SavedSearch],
       synchronize: true,

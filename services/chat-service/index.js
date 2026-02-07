@@ -142,7 +142,7 @@ let io;
     });
     
     // Start server after DB is ready
-    const PORT = process.env.PORT || 3003;
+    const PORT = process.env.PORT || 3000;
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`Chat Service running at http://localhost:${PORT}`);
     });
@@ -285,5 +285,32 @@ app.get("/api/conversations/details/:conversationId", async (req, res) => {
   } catch (error) {
     console.error(" Error fetching conversation details:", error);
     res.status(500).json({ error: "Error al obtener detalles de la conversación" });
+  }
+});
+
+app.delete("/api/conversations/:conversationId", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    // Verificar que la conversación existe
+    const [conversation] = await db.execute(
+      `SELECT conversation_id FROM conversations WHERE conversation_id = ?`,
+      [conversationId]
+    );
+
+    if (conversation.length === 0) {
+      return res.status(404).json({ error: "Conversación no encontrada" });
+    }
+
+    // Eliminar la conversación (los mensajes se eliminan en cascada)
+    await db.execute(
+      `DELETE FROM conversations WHERE conversation_id = ?`,
+      [conversationId]
+    );
+
+    res.json({ message: "Conversación eliminada correctamente" });
+  } catch (error) {
+    console.error("Error deleting conversation:", error);
+    res.status(500).json({ error: "Error al eliminar la conversación" });
   }
 });

@@ -10,15 +10,15 @@ import {
 } from 'class-validator';
 
 export class CreateUserProfileDto {
+  @IsOptional()
   @IsString({ message: 'El nombre debe ser texto' })
-  @IsNotEmpty({ message: 'El nombre no puede estar vacío' })
   @MaxLength(100, { message: 'El nombre es muy largo' })
-  first_name: string;
+  first_name?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(100)
-  last_name: string;
+  last_name?: string;
 
   @IsOptional() // Puede ser nulo o indefinido
   @IsString()
@@ -31,7 +31,7 @@ export class CreateUserProfileDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['Masculino', 'Femenino', 'No Binario', 'Otro', 'Prefiero no decir'])
+  @IsIn(['Masculino', 'Femenino', 'Otro'])
   gender?: string;
 
   @IsOptional()
@@ -59,10 +59,10 @@ export class CreateUserProfileDto {
   country?: string;
 
   @IsOptional()
-  @IsLatitude({ message: 'La latitud no es válida' }) // Valida que sea una coordenada real
+  @IsString()
   latitude?: string;
 
   @IsOptional()
-  @IsLongitude({ message: 'La longitud no es válida' })
+  @IsString()
   longitude?: string;
 }
