@@ -1,80 +1,293 @@
-import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
+import { useAuth } from '../../context/AuthContext';
+import { Config, API_BASE_URL } from '../../constants/Config';
+import '../chat.css';
 
 interface Message {
-  id: string;
-  text: string;
-  sender: 'me' | 'other';
-  timestamp: string;
+  message_id: number;
+  conversation_id: number;
+  sender_id: number;
+  message_text: string;
+  sent_at: string;
+  is_read: number;
 }
 
-const mockProviders: Record<string, { id: string; name: string; category: string; rating: number; avatar: string; verified: boolean }> = {
-  '1': {
-    id: '1',
-    name: 'Carlos Méndez',
-    category: 'Plomería',
-    rating: 4.8,
-    avatar: 'https://i.pravatar.cc/150?img=3',
-    verified: true,
-  },
-  '2': {
-    id: '2',
-    name: 'Ana López',
-    category: 'Electricista',
-    rating: 4.9,
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    verified: true,
-  },
-};
-
-const initialMessages: Record<string, Message[]> = {
-  '1': [
-    { id: '1', text: 'Hola, vi tu perfil de plomería', sender: 'other', timestamp: '10:30' },
-    { id: '2', text: '¡Hola! Claro, ¿en qué puedo ayudarte?', sender: 'me', timestamp: '10:31' },
-    { id: '3', text: '¿Cuánto cobrás por hora?', sender: 'other', timestamp: '10:32' },
-    { id: '4', text: 'Cobro $25 por hora. ¿Qué tipo de trabajo necesitas?', sender: 'me', timestamp: '10:33' },
-  ],
-  '2': [
-    { id: '1', text: 'Hola, necesito instalar tomacorrientes', sender: 'other', timestamp: '15:20' },
-    { id: '2', text: '¡Hola! Claro, puedo ayudarte con eso', sender: 'me', timestamp: '15:21' },
-  ],
-};
+interface ConversationInfo {
+  conversation_id: number;
+  provider_user_id: number;
+  client_user_id: number;
+  service_id?: number;
+  created_at: string;
+  other_user_name?: string;
+  other_user_email?: string;
+  other_user_profile_image?: string;
+}
 
 export default function ChatDetail() {
-  const { id } = useParams();
-  const provider = id ? mockProviders[id] : undefined;
-  const [messages, setMessages] = useState<Message[]>(id && initialMessages[id] ? initialMessages[id] : []);
-  const [input, setInput] = useState('');
+  const { id: conversationId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages([...messages, { id: String(messages.length + 1), text: input, sender: 'me', timestamp: new Date().toLocaleTimeString().slice(0,5) }]);
-    setInput('');
+  // Scroll to bottom when messages change
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  if (!provider) return <div>Proveedor no encontrado</div>;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Load conversation info and messages
+  useEffect(() => {
+    if (!conversationId || !user) return;
+
+    const loadChat = async () => {
+      setLoading(true);
+      try {
+        // Get conversation details
+        const convRes = await fetch(`${API_BASE_URL}/api/v1/chat/conversations/${user.userId}`);
+        const convData = await convRes.json();
+        const currentConv = convData.find((c: any) => String(c.conversation_id) === conversationId);
+        
+        if (currentConv) {
+          setConversationInfo({
+            conversation_id: currentConv.conversation_id,
+            provider_user_id: currentConv.provider_user_id,
+            client_user_id: currentConv.client_user_id,
+            service_id: currentConv.service_id,
+            created_at: currentConv.created_at,
+            other_user_name: currentConv.other_user_name,
+            other_user_email: currentConv.other_user_email,
+            other_user_profile_image: currentConv.other_user_profile_image,
+          });
+        }
+
+        // Get messages
+        const messagesRes = await fetch(`${API_BASE_URL}/api/v1/chat/conversations/${conversationId}/messages`);
+        const messagesData = await messagesRes.json();
+        
+        if (Array.isArray(messagesData)) {
+          // Map the messages to use consistent field names
+          const mappedMessages = messagesData.map((msg: any) => ({
+            message_id: msg.message_id,
+            conversation_id: Number(conversationId),
+            sender_id: msg.sender_user_id || msg.sender_id,
+            message_text: msg.message_text,
+            sent_at: msg.created_at || msg.sent_at,
+            is_read: msg.is_read || 0,
+          }));
+          setMessages(mappedMessages);
+        }
+      } catch (error) {
+        console.error('Error loading chat:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChat();
+  }, [conversationId, user]);
+
+  // Socket.io connection
+  useEffect(() => {
+    if (!conversationId || !user) return;
+
+    const socket = io(Config.CHAT_SERVICE_URL, {
+      transports: ['websocket', 'polling'],
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('Connected to chat service, socket ID:', socket.id);
+      console.log('Joining conversation:', conversationId);
+      socket.emit('join_chat', { conversationId: String(conversationId) });
+    });
+
+    socket.on('receive_message', (newMessage: any) => {
+      console.log('New message received via socket:', newMessage);
+      console.log('Current conversation ID:', conversationId);
+      console.log('Message conversation ID:', newMessage.conversation_id);
+      
+      // Add message to state with proper field mapping
+      const mappedMessage: Message = {
+        message_id: newMessage.message_id,
+        conversation_id: newMessage.conversation_id,
+        sender_id: newMessage.sender_user_id || newMessage.sender_id,
+        message_text: newMessage.message_text,
+        sent_at: newMessage.created_at || new Date().toISOString(),
+        is_read: 0,
+      };
+      setMessages((prevMessages) => {
+        // Avoid duplicates
+        const exists = prevMessages.some(m => m.message_id === mappedMessage.message_id);
+        if (exists) {
+          console.log('Message already exists, skipping');
+          return prevMessages;
+        }
+        console.log('Adding new message to state');
+        return [...prevMessages, mappedMessage];
+      });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from chat service');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [conversationId, user]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !conversationId || !user) {
+      console.log('handleSend: validation failed', { 
+        hasInput: !!input.trim(), 
+        conversationId, 
+        userId: user?.userId 
+      });
+      return;
+    }
+
+    if (!socketRef.current || !socketRef.current.connected) {
+      console.error('Socket not connected');
+      alert('No hay conexión con el servidor de chat. Por favor recarga la página.');
+      return;
+    }
+
+    const messageText = input.trim();
+    console.log('Sending message via socket:', messageText);
+
+    // Clear input immediately for better UX
+    setInput('');
+
+    try {
+      // Send message via Socket.IO
+      socketRef.current.emit('send_message', {
+        conversationId: String(conversationId),
+        sender_user_id: user.userId,
+        message_text: messageText,
+      });
+
+      console.log('Message emitted to socket for conversation:', conversationId, 'from user:', user.userId);
+      inputRef.current?.focus();
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Restore input if send failed
+      setInput(messageText);
+      alert('Error al enviar el mensaje. Por favor intenta de nuevo.');
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    
+    if (sameDay) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+           date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) {
+    return (
+      <div className="chat-detail-container">
+        <div className="chat-loading">Cargando conversación...</div>
+      </div>
+    );
+  }
+
+  const otherUserName = conversationInfo?.other_user_name || conversationInfo?.other_user_email || 'Usuario';
+  const otherUserId = user?.userId === conversationInfo?.provider_user_id 
+    ? conversationInfo?.client_user_id 
+    : conversationInfo?.provider_user_id;
+  const avatarUrl = conversationInfo?.other_user_profile_image || `https://i.pravatar.cc/150?u=${otherUserId}`;
 
   return (
-    <div style={{ maxWidth: 500, margin: '0 auto', padding: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <img src={provider.avatar} alt="avatar" style={{ width: 50, height: 50, borderRadius: '50%' }} />
-        <div>
-          <div style={{ fontWeight: 'bold' }}>{provider.name}</div>
-          <div style={{ color: '#888' }}>{provider.category}</div>
-          <div>⭐ {provider.rating}</div>
+    <div className="chat-detail-container">
+      <div className="chat-detail-header">
+        <button className="chat-back-button" onClick={() => navigate('/chat')}>
+          ← Volver
+        </button>
+        
+        <div className="chat-provider-info">
+          <div className="chat-provider-avatar">
+            <img src={avatarUrl} alt={otherUserName} />
+          </div>
+          <div className="chat-provider-details">
+            <h2 className="chat-provider-name">{otherUserName}</h2>
+            <p className="chat-provider-status">En línea</p>
+          </div>
         </div>
       </div>
-      <div style={{ minHeight: 200, border: '1px solid #eee', borderRadius: 8, padding: 12, marginBottom: 12, background: '#fafafa' }}>
-        {messages.map(msg => (
-          <div key={msg.id} style={{ textAlign: msg.sender === 'me' ? 'right' : 'left', margin: '8px 0' }}>
-            <span style={{ background: msg.sender === 'me' ? '#2563eb' : '#e5e7eb', color: msg.sender === 'me' ? '#fff' : '#222', borderRadius: 8, padding: '6px 12px', display: 'inline-block' }}>{msg.text}</span>
-            <div style={{ fontSize: 10, color: '#888' }}>{msg.timestamp}</div>
+
+      <div className="chat-messages-container">
+        {messages.length === 0 ? (
+          <div className="chat-empty">
+            <p>No hay mensajes aún. ¡Inicia la conversación!</p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.sender_id === user?.userId;
+            return (
+              <div
+                key={msg.message_id}
+                className={`chat-message ${isMe ? 'chat-message-me' : 'chat-message-other'}`}
+              >
+                <div className="chat-message-bubble">
+                  <p className="chat-message-text">{msg.message_text}</p>
+                  <span className="chat-message-time">
+                    {formatTimestamp(msg.sent_at)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={input} onChange={e => setInput(e.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #ccc' }} placeholder="Escribe un mensaje..." />
-        <button onClick={handleSend} style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px' }}>Enviar</button>
+
+      <div className="chat-input-container">
+        <input
+          ref={inputRef}
+          type="text"
+          className="chat-input"
+          placeholder="Escribe un mensaje..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          autoComplete="off"
+        />
+        <button 
+          className="chat-send-button" 
+          onClick={handleSend}
+          disabled={!input.trim()}
+          title="Enviar mensaje"
+        >
+          ➤
+        </button>
       </div>
     </div>
   );
