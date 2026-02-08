@@ -1,33 +1,83 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import React from 'react'
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import Login from './views/login'
+import Register from './views/register'
+// import Provider from './views/provider/provider'
+import NotFound from './views/not-found'
+import Home from './views/Home';
+import MyRequests from './views/my-requests';
+import Search from './views/search';
+import Profile from './views/profile';
+import Chat from './views/chat';
+import ReviewRequest from './views/review/requestId';
+import CompleteProfile from './views/profile/complete-profile'
+import AddService from './views/provider/add-service'
+import EditProviderProfile from './views/provider/edit-profile'
+import ProviderServices from './views/provider/services'
+import CategoriesManagement from './views/admin/categories-management'
+import ProviderRequests from './views/admin/provider-requests'
+import ServicesApproval from './views/admin/services-approval'
+import BecomeProvider from './views/profile/become-provider';
+import ChatDetail from './views/chat/ChatDetail';
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+  if (isLoading) return <div>Cargando...</div>
+  return user ? <>{children}</> : <Navigate to="/login" />
+}
 
+function Tabs() {
+  return (
+    <nav
+      style={{
+        display: 'flex',
+        gap: 16,
+        background: '#f2f2f2',
+        padding: 12,
+        marginBottom: 24,
+      }}
+    >
+      <Link to="/">Inicio</Link>
+      <Link to="/provider">Proveedor</Link>
+      
+    </nav>
+  )
+}
+
+
+function App() {
+  const location = useLocation();
+  const hideNav = location.pathname === '/login' || location.pathname === '/register';
   return (
     <>
       <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        {!hideNav && <h1>SkillLink Web</h1>}
+        {!hideNav && <Tabs />}
+        <div className="card">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/my-requests" element={<ProtectedRoute><MyRequests /></ProtectedRoute>} />
+            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/review/:requestId" element={<ProtectedRoute><ReviewRequest /></ProtectedRoute>} />
+            <Route path="/provider/add-service" element={<ProtectedRoute><AddService /></ProtectedRoute>} />
+            <Route path="/provider/edit-profile" element={<ProtectedRoute><EditProviderProfile /></ProtectedRoute>} />
+            <Route path="/provider/services" element={<ProtectedRoute><ProviderServices /></ProtectedRoute>} />
+            <Route path="/profile/become-provider" element={<ProtectedRoute><BecomeProvider /></ProtectedRoute>} />
+            <Route path="/profile/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
+            <Route path="/admin/categories-management" element={<ProtectedRoute><CategoriesManagement /></ProtectedRoute>} />
+            <Route path="/admin/provider-requests" element={<ProtectedRoute><ProviderRequests /></ProtectedRoute>} />
+            <Route path="/admin/services-approval" element={<ProtectedRoute><ServicesApproval /></ProtectedRoute>} />
+            <Route path="/chat/:id" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }
