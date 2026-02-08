@@ -198,8 +198,8 @@ app.get("/api/conversations/:userId", async (req, res) => {
         END AS other_user_id,
         u_other.email AS other_user_email,
         u_other.profile_image_url AS other_user_profile_image,
-        NULL AS other_user_name,
-        1 AS is_provider,
+        COALESCE(pp.business_name, u_other.email) AS other_user_name,
+        CASE WHEN pp.provider_id IS NOT NULL THEN 1 ELSE 0 END AS is_provider,
         (SELECT m.message_text FROM messages m 
          WHERE m.conversation_id = c.conversation_id 
          ORDER BY m.created_at DESC LIMIT 1) AS last_message_text,
@@ -212,6 +212,7 @@ app.get("/api/conversations/:userId", async (req, res) => {
           ELSE c.participant1_user_id
         END
       )
+      LEFT JOIN provider_profiles pp ON pp.user_id = u_other.user_id
       WHERE c.participant1_user_id = ? OR c.participant2_user_id = ?
       ORDER BY last_activity_at DESC`,
       [userId, userId, userId, userId]
