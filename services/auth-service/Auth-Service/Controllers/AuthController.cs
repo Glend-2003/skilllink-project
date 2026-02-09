@@ -56,6 +56,12 @@ namespace AuthController.Controllers
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
+
+                await SendNotificationAsync(user.Id, user.Email, "WELCOME",
+    "¡Bienvenido a SkillLink!",
+    "Gracias por registrarte. Estamos felices de tenerte con nosotros.",
+    "User", user.Id);
+
                 int roleId = (model.userType == "Provider") ? 2 : 1;
 
                 var userRole = new UserRole
@@ -71,7 +77,7 @@ namespace AuthController.Controllers
                 try
                 {
                     using var httpClient = new HttpClient();
-                    
+
                     // Split full name into first and last name
                     string firstName = "";
                     string lastName = "";
@@ -81,7 +87,7 @@ namespace AuthController.Controllers
                         firstName = nameParts[0];
                         lastName = nameParts.Length > 1 ? nameParts[1] : "";
                     }
-                    
+
                     var userProfileData = new
                     {
                         user_id = user.Id,
@@ -99,7 +105,7 @@ namespace AuthController.Controllers
                     var userServiceUrl = _configuration["Services:UserService"] ?? "http://localhost:3004";
                     Console.WriteLine($"Creating user profile for userId: {user.Id}, firstName: {firstName}, lastName: {lastName}");
                     Console.WriteLine($"User service URL: {userServiceUrl}/user-profile");
-                    
+
                     var response = await httpClient.PostAsync(
                         $"{userServiceUrl}/user-profile",
                         jsonContent
@@ -188,6 +194,11 @@ namespace AuthController.Controllers
                     claims: authClaims,
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
+
+                await SendNotificationAsync(user.Id, user.Email, "LOGIN_SECURITY",
+    "Nuevo inicio de sesión detectado",
+    $"Hola, se ha detectado un inicio de sesión en tu cuenta el {DateTime.Now:dd/MM/yyyy HH:mm}. Si no fuiste tú, contacta a soporte.",
+    "User", user.Id);
 
                 return Ok(new
                 {
@@ -406,10 +417,15 @@ namespace AuthController.Controllers
                     // Send push notification to user
                     try
                     {
-                        await SendNotificationAsync(request.UserId, request.User.Email,
-            "¡Solicitud Aprobada!",
-            "Tu solicitud para ser proveedor en SkillLink ha sido aprobada. ¡Bienvenido a bordo!",
-            "ProviderRequest", request.RequestId);
+                        await SendNotificationAsync(
+    request.UserId,
+    request.User.Email,
+    "PROVIDER_APPROVAL",
+    "¡Solicitud Aprobada!",
+    "Tu solicitud para ser proveedor en SkillLink ha sido aprobada. ¡Bienvenido a bordo!",
+    "ProviderRequest",
+    request.RequestId
+);
                     }
                     catch (Exception notifEx)
                     {
@@ -422,10 +438,15 @@ namespace AuthController.Controllers
                     // Send rejection notification
                     try
                     {
-                        await SendNotificationAsync(request.UserId, request.User.Email,
-            "Solicitud de Proveedor",
-            "Tu solicitud ha sido rechazada. Notas: " + model.ReviewNotes,
-            "ProviderRequest", request.RequestId);
+                        await SendNotificationAsync(
+    request.UserId,
+    request.User.Email,
+    "PROVIDER_REJECTION",
+    "Solicitud de Proveedor",
+    "Tu solicitud ha sido rechazada. Notas: " + model.ReviewNotes,
+    "ProviderRequest",
+    request.RequestId
+);
                     }
                     catch (Exception notifEx)
                     {
@@ -448,7 +469,7 @@ namespace AuthController.Controllers
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
-            
+
             if (user == null)
             {
                 // Don't reveal that the user doesn't exist for security reasons
@@ -473,7 +494,7 @@ namespace AuthController.Controllers
                 {
                     using var httpClient = new HttpClient();
                     var notificationServiceUrl = _configuration["Services:NotificationService"] ?? "http://localhost:3006";
-                    
+
                     var emailData = new
                     {
                         to = user.Email,
@@ -481,7 +502,7 @@ namespace AuthController.Controllers
                         code = code,
                         type = "password-reset"
                     };
-                    
+
                     var jsonContent = new StringContent(
                         System.Text.Json.JsonSerializer.Serialize(emailData),
                         Encoding.UTF8,
@@ -523,14 +544,14 @@ namespace AuthController.Controllers
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
-            
+
             if (user == null)
             {
                 return BadRequest(new { Status = "Error", Message = "Código inválido o expirado" });
             }
 
             // Check if code matches and is not expired
-            if (string.IsNullOrEmpty(user.ResetPasswordCode) || 
+            if (string.IsNullOrEmpty(user.ResetPasswordCode) ||
                 user.ResetPasswordCode != model.code ||
                 user.ResetCodeExpiration == null ||
                 user.ResetCodeExpiration < DateTime.UtcNow)
@@ -587,7 +608,7 @@ namespace AuthController.Controllers
             }
         }
 
-        private async Task SendNotificationAsync(int userId, string email, string title, string message, string entityType, int entityId)
+        private async Task SendNotificationAsync(int userId, string email, string type, string title, string message, string entityType, int entityId)
         {
             try
             {
@@ -596,13 +617,13 @@ namespace AuthController.Controllers
                 {
                     userId = userId,
                     userEmail = email,
-                    type = "SYSTEM",
+                    type = type,
                     title = title,
                     message = message,
                     entityType = entityType,
                     entityId = entityId
                 };
-                // Docker resuelve "notification_service" automáticamente
+
                 await client.PostAsJsonAsync("http://notification_service:3006/api/notifications/send", payload);
             }
             catch (Exception ex)
