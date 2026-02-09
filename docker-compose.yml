@@ -124,8 +124,7 @@ services:
       - service-manager
       - provider-service
       - chat-service
-
-# Servicio de notificaciones
+  
   notification-service:
     build: ./services/notification-service
     container_name: notification_service
@@ -135,8 +134,15 @@ services:
       mysql_db:
         condition: service_healthy
     environment:
-      DB_HOST: mysql_db
-      PORT: 3006
+      - PORT=3006
+      - DB_HOST=mysql_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=465
+      - EMAIL_USER=glendrojas1040@gmail.com
+      - EMAIL_PASS=fkhg bnqj svap cebe
 
 
 volumes:
