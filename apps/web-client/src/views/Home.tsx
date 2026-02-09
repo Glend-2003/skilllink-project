@@ -1,9 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Search as SearchIcon, Wrench, Zap, Scissors, Car, Palette, Home as HomeIcon, Paintbrush, Hammer, Star, MapPin, Verified } from 'lucide-react';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../context/RoleContext';
 import RoleSwitcher from '../components/RoleSwitcher';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import './Home.css';
 
 interface Category {
@@ -39,23 +45,23 @@ interface Provider {
   location?: string;
 }
 
-const CATEGORY_ICONS: { [key: string]: { icon: string; color: string } } = {
-  'Plomería': { icon: '🔧', color: '#3B82F6' },
-  'Electricista': { icon: '⚡', color: '#F59E0B' },
-  'Electricidad': { icon: '⚡', color: '#F59E0B' },
-  'Técnico': { icon: '🔌', color: '#8B5CF6' },
-  'Carpintería': { icon: '🔨', color: '#8B5CF6' },
-  'Barbería': { icon: '✂️', color: '#06B6D4' },
-  'Limpieza': { icon: '✨', color: '#06B6D4' },
-  'Mecánica': { icon: '🚗', color: '#EF4444' },
-  'Jardinería': { icon: '🌿', color: '#84CC16' },
-  'Pintura': { icon: '🎨', color: '#EC4899' },
-  'Diseño': { icon: '🎨', color: '#EC4899' },
-  'Tecnología': { icon: '💻', color: '#10B981' },
+const CATEGORY_ICONS: { [key: string]: { icon: React.ComponentType<any>; color: string } } = {
+  'Plomería': { icon: Wrench, color: '#3B82F6' },
+  'Electricista': { icon: Zap, color: '#F59E0B' },
+  'Electricidad': { icon: Zap, color: '#F59E0B' },
+  'Técnico': { icon: Hammer, color: '#8B5CF6' },
+  'Carpintería': { icon: Hammer, color: '#8B5CF6' },
+  'Barbería': { icon: Scissors, color: '#06B6D4' },
+  'Limpieza': { icon: HomeIcon, color: '#06B6D4' },
+  'Mecánica': { icon: Car, color: '#EF4444' },
+  'Jardinería': { icon: Palette, color: '#84CC16' },
+  'Pintura': { icon: Paintbrush, color: '#EC4899' },
+  'Diseño': { icon: Palette, color: '#EC4899' },
+  'Tecnología': { icon: Wrench, color: '#10B981' },
 };
 
 const getIconForCategory = (categoryName: string) => {
-  return CATEGORY_ICONS[categoryName] || { icon: '🧰', color: '#6B7280' };
+  return CATEGORY_ICONS[categoryName] || { icon: Wrench, color: '#6B7280' };
 };
 
 export default function Home() {
@@ -219,292 +225,391 @@ export default function Home() {
   }
 
   return (
-    <div className="home-container">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-20 md:pb-8">
       {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <header className="hero-header">
-            <nav className="hero-nav">
-              <Link to="/" className="logo">
-                <span>🔗</span> SkillLink
-              </Link>
-              <div className="nav-links">
-                <Link to="/" className="nav-link active">
-                  <span>🏠</span> Inicio
-                </Link>
-                <Link to="/search" className="nav-link">
-                  <span>🔍</span> Buscar
-                </Link>
-                <Link to="/chat" className="nav-link">
-                  <span>💬</span> Mensajes
-                </Link>
-                <Link to="/my-requests" className="nav-link">
-                  <span>📋</span> Historial
-                </Link>
-              </div>
-            </nav>
-            <div className="hero-right">
+      <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white px-4 md:px-6 py-8 md:py-12">
+        <div className="max-w-6xl mx-auto">
+          {/* Navigation */}
+          <header className="flex items-center justify-between mb-8">
+            <Link to="/" className="text-2xl font-bold">
+              🔗 SkillLink
+            </Link>
+            <div className="flex items-center gap-4">
               <RoleSwitcher />
-              <div className="user-avatar" onClick={() => navigate('/profile')}>
+              <div 
+                className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors"
+                onClick={() => navigate('/profile')}
+              >
                 {user ? (
-                  <span style={{ fontSize: '18px' }}>👤</span>
+                  <span className="text-lg">👤</span>
                 ) : (
-                  <span>👤</span>
+                  <span className="text-lg">👤</span>
                 )}
               </div>
             </div>
           </header>
 
-          <div className="hero-main">
-            <h1 className="hero-title">
-              {activeRole === 'provider' ? (
-                <>Gestiona tus servicios<br />y solicitudes</>
-              ) : (
-                <>Encuentra el profesional<br />que necesitas</>
-              )}
-            </h1>
-            <p className="hero-subtitle">
-              {activeRole === 'provider' 
-                ? 'Panel de control para proveedores de servicios'
-                : 'Conecta con expertos locales verificados cerca de ti'
-              }
-            </p>
-            
-            <div className="search-bar">
-              <input
-                type="text"
-                className="search-input"
+          <h1 className="text-3xl md:text-5xl font-bold mb-4">
+            {activeRole === 'provider' ? (
+              <>Gestiona tus servicios<br />y solicitudes</>
+            ) : (
+              <>Encuentra el profesional<br />que necesitas</>
+            )}
+          </h1>
+          <p className="text-lg md:text-xl mb-6 text-blue-50">
+            {activeRole === 'provider' 
+              ? 'Panel de control para proveedores de servicios'
+              : 'Conecta con expertos locales verificados cerca de ti'
+            }
+          </p>
+          
+          {/* Search Bar */}
+          {activeRole !== 'provider' && (
+            <div className="bg-white rounded-lg p-2 flex gap-2 shadow-lg max-w-2xl">
+              <Input 
                 placeholder="¿Qué servicio necesitas?"
+                className="border-0 focus-visible:ring-0 text-slate-900"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               />
-              <button className="search-button" onClick={handleSearch}>
-                <span>🔍</span> Buscar
-              </button>
+              <Button 
+                onClick={handleSearch}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <SearchIcon className="w-4 h-4 mr-2" />
+                Buscar
+              </Button>
             </div>
-          </div>
+          )}
         </div>
-      </section>
+      </div>
 
-      {/* Content Section */}
-      <section className="content-section">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
         {activeRole === 'provider' ? (
           /* Provider View */
           <div className="provider-dashboard">
-            <h2 className="section-title">Panel de Proveedor</h2>
-            <div className="dashboard-grid">
-              <div className="dashboard-card" onClick={() => navigate('/provider/services')}>
-                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>📋</div>
-                <h3>Mis Servicios</h3>
-                <p>Gestiona los servicios que ofreces</p>
-              </div>
-              <div className="dashboard-card" onClick={() => navigate('/my-requests')}>
-                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}>📬</div>
-                <h3>Solicitudes</h3>
-                <p>Revisa solicitudes de clientes</p>
-              </div>
-              <div className="dashboard-card" onClick={() => navigate('/provider/edit-profile')}>
-                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' }}>✏️</div>
-                <h3>Editar Perfil</h3>
-                <p>Actualiza tu información</p>
-              </div>
-              <div className="dashboard-card" onClick={() => navigate('/chat')}>
-                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' }}>💬</div>
-                <h3>Mensajes</h3>
-                <p>Chat con tus clientes</p>
-              </div>
+            <h2 className="text-2xl font-bold mb-6">Panel de Proveedor</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/provider/services')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">📋</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Mis Servicios</h3>
+                  <p className="text-sm text-slate-600">Gestiona los servicios que ofreces</p>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/my-requests')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">📬</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Solicitudes</h3>
+                  <p className="text-sm text-slate-600">Revisa solicitudes de clientes</p>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/provider/edit-profile')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">✏️</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Editar Perfil</h3>
+                  <p className="text-sm text-slate-600">Actualiza tu información</p>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/chat')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">💬</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Mensajes</h3>
+                  <p className="text-sm text-slate-600">Chat con tus clientes</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         ) : (
           /* Client View */
           <>
-        {/* Categories */}
-        <div className="categories-section">
-          <h2 className="section-title">Categorías populares</h2>
-          <div className="categories-grid">
-            {categories.slice(0, 6).map(category => {
-              const iconConfig = getIconForCategory(category.categoryName);
-              return (
-                <div
-                  key={category.categoryId}
-                  className={`category-card ${selectedCategory === category.categoryName ? 'selected' : ''}`}
-                  onClick={() => handleCategoryClick(category.categoryName)}
-                >
-                  <div className="category-icon" style={{ backgroundColor: iconConfig.color + '20' }}>
-                    <span style={{ color: iconConfig.color }}>{iconConfig.icon}</span>
-                  </div>
-                  <p className="category-name">{category.categoryName}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Featured Providers */}
-        {!selectedCategory && featuredServices.length > 0 && (
-          <div className="providers-section">
-            <div className="section-header">
-              <h2 className="section-title">Proveedores destacados</h2>
-              <Link to="/search" className="view-all-link">
-                Ver todos →
-              </Link>
-            </div>
-            <div className="providers-grid">
-              {featuredServices.map(service => {
-                const categoryName = typeof service.category === 'string' 
-                  ? service.category 
-                  : service.category?.categoryName || 'Sin categoría';
-                
-                return (
-                  <div
-                    key={service.serviceId}
-                    className="provider-card"
-                    onClick={() => handleViewProvider(service)}
-                  >
-                    <div className="provider-image">
-                      {service.provider?.user?.profileImageUrl ? (
-                        <img src={service.provider.user.profileImageUrl} alt={service.serviceTitle} />
-                      ) : (
-                        <div style={{ 
-                          width: '100%', 
-                          height: '100%', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          fontSize: '48px'
-                        }}>
-                          👤
-                        </div>
-                      )}
-                      {service.isVerified && (
-                        <div className="verified-badge">
-                          <span>✓</span> Verificado
-                        </div>
-                      )}
-                    </div>
-                    <div className="provider-content">
-                      <div className="provider-header">
-                        <div className="provider-info">
-                          <h3>{service.serviceTitle}</h3>
-                          <p className="provider-category">{categoryName}</p>
-                          <div className="provider-rating">
-                            <span className="rating-star">⭐</span>
-                            <strong>{(service.rating || 4.5).toFixed(1)}</strong>
-                            <span className="provider-distance">
-                              <span>📍</span>
-                              {service.location || '1.5 km'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="provider-description">{service.serviceDescription}</p>
-                      <div className="provider-footer">
-                        <div className="provider-price">${service.basePrice}</div>
-                        <button 
-                          className="contact-button"
-                          onClick={(e) => handleContactProvider(e, service)}
-                        >
-                          💬 Contactar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* All Services */}
-        {selectedCategory && (
-          <div className="providers-section">
-            <div className="section-header">
-              <h2 className="section-title">{selectedCategory}</h2>
-              <button 
-                className="view-all-link" 
-                onClick={() => setSelectedCategory(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                Ver todas las categorías
-              </button>
-            </div>
-            {filteredProviders.length > 0 ? (
-              <div className="providers-grid">
-                {filteredProviders.map(service => {
-                  const categoryName = typeof service.category === 'string' 
-                    ? service.category 
-                    : service.category?.categoryName || 'Sin categoría';
+            {/* Categories */}
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold mb-6">Categorías populares</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {categories.slice(0, 6).map(category => {
+                  const iconConfig = getIconForCategory(category.categoryName);
+                  const IconComponent = iconConfig.icon;
+                  const isSelected = selectedCategory === category.categoryName;
                   
                   return (
-                    <div
-                      key={service.serviceId}
-                      className="provider-card"
-                      onClick={() => handleViewProvider(service)}
+                    <Card 
+                      key={category.categoryId}
+                      className={`cursor-pointer hover:shadow-lg transition-all hover:scale-105 ${
+                        isSelected ? 'ring-2 ring-blue-500' : ''
+                      }`}
+                      onClick={() => handleCategoryClick(category.categoryName)}
                     >
-                      <div className="provider-image">
-                        {service.provider?.user?.profileImageUrl ? (
-                          <img src={service.provider.user.profileImageUrl} alt={service.serviceTitle} />
-                        ) : (
-                          <div style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            fontSize: '48px'
-                          }}>
-                            👤
-                          </div>
-                        )}
-                        {service.isVerified && (
-                          <div className="verified-badge">
-                            <span>✓</span> Verificado
-                          </div>
-                        )}
-                      </div>
-                      <div className="provider-content">
-                        <div className="provider-header">
-                          <div className="provider-info">
-                            <h3>{service.serviceTitle}</h3>
-                            <p className="provider-category">{categoryName}</p>
-                            <div className="provider-rating">
-                              <span className="rating-star">⭐</span>
-                              <strong>{(service.rating || 4.5).toFixed(1)}</strong>
-                              <span className="provider-distance">
-                                <span>📍</span>
-                                {service.location || '1.5 km'}
-                              </span>
-                            </div>
-                          </div>
+                      <CardContent className="p-6 text-center">
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+                          style={{ backgroundColor: iconConfig.color + '20' }}
+                        >
+                          <IconComponent 
+                            className="w-6 h-6" 
+                            style={{ color: iconConfig.color }}
+                          />
                         </div>
-                        <p className="provider-description">{service.serviceDescription}</p>
-                        <div className="provider-footer">
-                          <div className="provider-price">${service.basePrice}</div>
-                          <button 
-                            className="contact-button"
-                            onClick={(e) => handleContactProvider(e, service)}
-                          >
-                            💬 Contactar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                        <p className="font-medium text-sm">{category.categoryName}</p>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
-            ) : (
-              <div className="empty-state">
-                <div className="empty-state-icon">🔍</div>
-                <h3 className="empty-state-title">No se encontraron servicios</h3>
-                <p className="empty-state-text">Intenta con otra categoría</p>
-              </div>
+            </section>
+
+            {/* Featured Providers */}
+            {!selectedCategory && featuredServices.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold">Proveedores destacados</h2>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => navigate('/search')}
+                    className="text-blue-600"
+                  >
+                    Ver todos →
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {featuredServices.map((service) => {
+                    const categoryName = typeof service.category === 'string' 
+                      ? service.category 
+                      : service.category?.categoryName || 'Sin categoría';
+                    
+                    return (
+                      <Card 
+                        key={service.serviceId}
+                        className="cursor-pointer hover:shadow-xl transition-all"
+                        onClick={() => handleViewProvider(service)}
+                      >
+                        <CardContent className="p-0">
+                          <div className="relative h-48">
+                            {service.provider?.user?.profileImageUrl ? (
+                              <img 
+                                src={service.provider.user.profileImageUrl}
+                                alt={service.serviceTitle}
+                                className="w-full h-full object-cover rounded-t-lg"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center rounded-t-lg">
+                                <span className="text-6xl">👤</span>
+                              </div>
+                            )}
+                            {service.isVerified && (
+                              <Badge className="absolute top-3 right-3 bg-blue-600">
+                                <Verified className="w-3 h-3 mr-1" />
+                                Verificado
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="p-4">
+                            <div className="flex items-start gap-3 mb-3">
+                              <Avatar>
+                                <AvatarImage src={service.provider?.user?.profileImageUrl} alt={service.serviceTitle} />
+                                <AvatarFallback>{service.serviceTitle.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold truncate">{service.serviceTitle}</h3>
+                                <p className="text-sm text-slate-600">{categoryName}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-sm mb-3">
+                              <div className="flex items-center gap-1 text-amber-600">
+                                <Star className="w-4 h-4 fill-current" />
+                                <span className="font-medium">{(service.rating || 4.5).toFixed(1)}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-slate-600">
+                                <MapPin className="w-4 h-4" />
+                                <span>{service.location || '1.5 km'}</span>
+                              </div>
+                            </div>
+                            
+                            <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                              {service.serviceDescription}
+                            </p>
+                            
+                            <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                              <div>
+                                <span className="text-sm text-slate-600">Desde </span>
+                                <span className="text-lg font-bold text-slate-900">${service.basePrice}</span>
+                              </div>
+                              <Button 
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => handleContactProvider(e, service)}
+                              >
+                                💬 Contactar
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </section>
             )}
-          </div>
-        )}
+
+            {/* All Services (when category is selected) */}
+            {selectedCategory && (
+              <section>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold">{selectedCategory}</h2>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-blue-600"
+                  >
+                    Ver todas las categorías
+                  </Button>
+                </div>
+                {filteredProviders.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {filteredProviders.map(service => {
+                      const categoryName = typeof service.category === 'string' 
+                        ? service.category 
+                        : service.category?.categoryName || 'Sin categoría';
+                      
+                      return (
+                        <Card 
+                          key={service.serviceId}
+                          className="cursor-pointer hover:shadow-xl transition-all"
+                          onClick={() => handleViewProvider(service)}
+                        >
+                          <CardContent className="p-0">
+                            <div className="relative h-48">
+                              {service.provider?.user?.profileImageUrl ? (
+                                <img 
+                                  src={service.provider.user.profileImageUrl}
+                                  alt={service.serviceTitle}
+                                  className="w-full h-full object-cover rounded-t-lg"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center rounded-t-lg">
+                                  <span className="text-6xl">👤</span>
+                                </div>
+                              )}
+                              {service.isVerified && (
+                                <Badge className="absolute top-3 right-3 bg-blue-600">
+                                  <Verified className="w-3 h-3 mr-1" />
+                                  Verificado
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="p-4">
+                              <div className="flex items-start gap-3 mb-3">
+                                <Avatar>
+                                  <AvatarImage src={service.provider?.user?.profileImageUrl} alt={service.serviceTitle} />
+                                  <AvatarFallback>{service.serviceTitle.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold truncate">{service.serviceTitle}</h3>
+                                  <p className="text-sm text-slate-600">{categoryName}</p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-between text-sm mb-3">
+                                <div className="flex items-center gap-1 text-amber-600">
+                                  <Star className="w-4 h-4 fill-current" />
+                                  <span className="font-medium">{(service.rating || 4.5).toFixed(1)}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-slate-600">
+                                  <MapPin className="w-4 h-4" />
+                                  <span>{service.location || '1.5 km'}</span>
+                                </div>
+                              </div>
+                              
+                              <p className="text-sm text-slate-600 mb-3 line-clamp-2">
+                                {service.serviceDescription}
+                              </p>
+                              
+                              <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                                <div>
+                                  <span className="text-sm text-slate-600">Desde </span>
+                                  <span className="text-lg font-bold text-slate-900">${service.basePrice}</span>
+                                </div>
+                                <Button 
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => handleContactProvider(e, service)}
+                                >
+                                  💬 Contactar
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Card className="p-12 text-center">
+                    <div className="text-slate-400 mb-4">
+                      <SearchIcon className="w-16 h-16 mx-auto" />
+                    </div>
+                    <h3 className="font-bold text-lg mb-2">No se encontraron servicios</h3>
+                    <p className="text-slate-600">Intenta con otra categoría</p>
+                  </Card>
+                )}
+              </section>
+            )}
+
+            {/* Benefits Section */}
+            <section className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center p-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Verified className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="font-bold mb-2">Profesionales verificados</h3>
+                <p className="text-slate-600">Todos los proveedores son verificados y evaluados</p>
+              </div>
+              <div className="text-center p-6">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="font-bold mb-2">Encuentra cerca de ti</h3>
+                <p className="text-slate-600">Proveedores locales disponibles en tu zona</p>
+              </div>
+              <div className="text-center p-6">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Star className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="font-bold mb-2">Reseñas reales</h3>
+                <p className="text-slate-600">Lee opiniones de clientes verificados</p>
+              </div>
+            </section>
           </>
         )}
-      </section>
+      </div>
     </div>
   );
 }

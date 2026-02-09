@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Star, MapPin, Clock, CheckCircle, MessageCircle, Verified, Calendar, Image as ImageIcon } from 'lucide-react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import ServiceGalleryView from '../../components/ServiceGalleryView';
+import { Button } from '../../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
+import { Separator } from '../../ui/separator';
+import { toast } from 'sonner';
 import './ProviderDetail.css';
 
 interface Provider {
@@ -64,7 +72,7 @@ export default function ProviderDetail() {
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'services' | 'reviews'>('services');
+  const [activeTab, setActiveTab] = useState<'services' | 'reviews' | 'gallery' | 'about'>('services');
 
   useEffect(() => {
     if (id) {
@@ -140,13 +148,13 @@ export default function ProviderDetail() {
 
   const handleContactProvider = async () => {
     if (!user) {
-      alert('Debes iniciar sesión para contactar proveedores');
+      toast.error('Debes iniciar sesión para contactar proveedores');
       navigate('/login');
       return;
     }
 
     if (!user.userId) {
-      alert('Sesión inválida. Por favor, cierra sesión e inicia sesión nuevamente.');
+      toast.error('Sesión inválida. Por favor, cierra sesión e inicia sesión nuevamente.');
       return;
     }
 
@@ -164,31 +172,45 @@ export default function ProviderDetail() {
 
       if (response.ok) {
         const conversationId = data.conversation_id;
-        navigate(`/chat/${conversationId}`);
+        toast.success('Redirigiendo al chat...');
+        setTimeout(() => navigate(`/chat/${conversationId}`), 1000);
       } else {
-        alert('No se pudo crear la conversación');
+        toast.error('No se pudo crear la conversación');
       }
     } catch (error) {
       console.error('Error creating conversation:', error);
-      alert('Error al intentar contactar al proveedor');
+      toast.error('Error al intentar contactar al proveedor');
     }
   };
 
+  const handleRequestService = (serviceName: string) => {
+    toast.success(`Solicitud enviada para: ${serviceName}`);
+  };
+
+  const handleScheduleAppointment = () => {
+    toast.info('Función de agendar cita próximamente disponible');
+  };
+
   const calculateAverageRating = () => {
-    if (reviews.length === 0) return 0;
+    if (reviews.length === 0) return provider?.rating || 0;
     const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
     return (sum / reviews.length).toFixed(1);
   };
 
   const renderStars = (rating: number) => {
     return (
-      <div className="stars">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <span key={star} className={star <= rating ? 'star filled' : 'star'}>
-            ★
-          </span>
+      <>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star
+            key={i}
+            className={`w-4 h-4 ${
+              i < rating
+                ? 'text-amber-500 fill-current'
+                : 'text-slate-300'
+            }`}
+          />
         ))}
-      </div>
+      </>
     );
   };
 
@@ -203,21 +225,24 @@ export default function ProviderDetail() {
 
   if (loading) {
     return (
-      <div className="provider-detail-container">
-        <div className="provider-loading">Cargando perfil del proveedor...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando perfil del proveedor...</p>
+        </div>
       </div>
     );
   }
 
   if (!provider) {
     return (
-      <div className="provider-detail-container">
-        <div className="provider-error">
-          <h2>Proveedor no encontrado</h2>
-          <button onClick={() => navigate('/search')} className="back-button">
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="p-12 text-center">
+          <h2 className="text-xl font-bold mb-4">Proveedor no encontrado</h2>
+          <Button onClick={() => navigate('/search')}>
             Volver a búsqueda
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
     );
   }
@@ -225,147 +250,263 @@ export default function ProviderDetail() {
   const averageRating = calculateAverageRating();
 
   return (
-    <div className="provider-detail-container">
-      <nav className="breadcrumb">
-        <Link to="/">Inicio</Link>
-        <span>→</span>
-        <Link to="/search">Búsqueda</Link>
-        <span>→</span>
-        <span>{provider.name || provider.businessName || 'Proveedor'}</span>
-      </nav>
-
-      {/* Provider Header */}
-      <div className="provider-header">
-        <div className="provider-avatar">
-          {(provider.profileImageUrl || provider.user?.profileImageUrl) ? (
-            <img src={provider.profileImageUrl || provider.user?.profileImageUrl} alt={provider.name || provider.businessName || 'Proveedor'} />
-          ) : (
-            <div className="avatar-placeholder">
-              {((provider.name || provider.businessName || 'P').charAt(0).toUpperCase())}
-            </div>
-          )}
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-4">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/search')}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </Button>
         </div>
-        
-        <div className="provider-info">
-          <div className="provider-title">
-            <h1 className="provider-name">
-              {provider.name || provider.businessName || 'Proveedor'}
-              {(provider.verified || provider.isVerified) && (
-                <span className="verified-badge" title="Proveedor verificado">
-                  ✓
-                </span>
-              )}
-            </h1>
-          </div>
-          
-          {provider.category && (
-            <div className="provider-category">{provider.category.categoryName}</div>
-          )}
-          
-          <div className="provider-stats">
-            <div className="stat">
-              {renderStars(Number(averageRating))}
-              <span className="stat-value">{averageRating}</span>
-              <span className="stat-label">({reviews.length} reseñas)</span>
-            </div>
-            {provider.yearsExperience && (
-              <>
-                <div className="stat-separator">•</div>
-                <div className="stat">
-                  <span className="stat-value">{provider.yearsExperience}</span>
-                  <span className="stat-label">años de experiencia</span>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+        {/* Provider Header */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-6">
+              <Avatar className="w-24 h-24">
+                <AvatarImage 
+                  src={provider.profileImageUrl || provider.user?.profileImageUrl} 
+                  alt={provider.name || provider.businessName || 'Proveedor'} 
+                />
+                <AvatarFallback>
+                  {((provider.name || provider.businessName || 'P').charAt(0).toUpperCase())}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="flex-1">
+                <div className="flex flex-wrap items-start gap-3 mb-3">
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold mb-1">
+                      {provider.name || provider.businessName || 'Proveedor'}
+                    </h1>
+                    {provider.category && (
+                      <p className="text-slate-600">{provider.category.categoryName}</p>
+                    )}
+                  </div>
+                  {(provider.verified || provider.isVerified) && (
+                    <Badge className="bg-blue-600">
+                      <Verified className="w-3 h-3 mr-1" />
+                      Verificado
+                    </Badge>
+                  )}
                 </div>
-              </>
-            )}
-          </div>
-          
-          <p className="provider-description">
-            {provider.description || provider.businessDescription || 'Sin descripción disponible'}
-          </p>
-          
-          <button className="contact-button" onClick={handleContactProvider}>
-            💬 Contactar proveedor
-          </button>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'services' ? 'active' : ''}`}
-          onClick={() => setActiveTab('services')}
-        >
-          Servicios ({services.length})
-        </button>
-        <button
-          className={`tab ${activeTab === 'reviews' ? 'active' : ''}`}
-          onClick={() => setActiveTab('reviews')}
-        >
-          Reseñas ({reviews.length})
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      <div className="tab-content">
-        {activeTab === 'services' && (
-          <div className="services-grid">
-            {services.length === 0 ? (
-              <div className="empty-state">
-                <p>No hay servicios disponibles</p>
-              </div>
-            ) : (
-              services.map((service) => (
-                <div key={service.serviceId} className="service-card">
-                  <h3 className="service-title">{service.serviceTitle}</h3>
-                  <p className="service-description">{service.serviceDescription}</p>
-                  
-                  {service.serviceId && (
-                    <div className="service-gallery">
-                      <ServiceGalleryView
-                        serviceId={service.serviceId}
-                        editable={false}
-                        maxImagesToShow={5}
-                      />
+                <div className="flex flex-wrap gap-4 mb-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-500 fill-current" />
+                    <span className="font-bold text-lg">{averageRating}</span>
+                    <span className="text-slate-600">({reviews.length} reseñas)</span>
+                  </div>
+                  {provider.serviceRadius && (
+                    <div className="flex items-center gap-2 text-slate-600">
+                      <MapPin className="w-5 h-5" />
+                      <span>{provider.serviceRadius} km de alcance</span>
                     </div>
                   )}
-                  
-                  <div className="service-footer">
-                    <div className="service-price">
-                      ₡{service.basePrice.toLocaleString()}
-                      <span className="price-unit"> / {service.priceUnit}</span>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <span className="text-green-600 font-medium">Disponible ahora</span>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-        )}
 
-        {activeTab === 'reviews' && (
-          <div className="reviews-list">
-            {reviews.length === 0 ? (
-              <div className="empty-state">
-                <p>No hay reseñas aún</p>
+                <p className="text-slate-700 mb-4">
+                  {provider.description || provider.businessDescription || 'Sin descripción disponible'}
+                </p>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button 
+                    onClick={handleContactProvider}
+                    className="gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Contactar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={handleScheduleAppointment}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Agendar cita
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs defaultValue="services" value={activeTab} onValueChange={(val) => setActiveTab(val as any)} className="space-y-6">
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="services">Servicios</TabsTrigger>
+            <TabsTrigger value="reviews">Reseñas</TabsTrigger>
+            <TabsTrigger value="gallery">Galería</TabsTrigger>
+            <TabsTrigger value="about">Acerca de</TabsTrigger>
+          </TabsList>
+
+          {/* Services Tab */}
+          <TabsContent value="services">
+            {services.length === 0 ? (
+              <Card className="p-12 text-center">
+                <p className="text-slate-500">No hay servicios disponibles</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {services.map((service) => (
+                  <Card key={service.serviceId} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-start justify-between">
+                        <span>{service.serviceTitle}</span>
+                        <span className="text-blue-600 font-bold">₡{service.basePrice.toLocaleString()}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-slate-600 mb-3">{service.serviceDescription}</p>
+                      
+                      {service.serviceId && (
+                        <div className="mb-3">
+                          <ServiceGalleryView
+                            serviceId={service.serviceId}
+                            editable={false}
+                            maxImagesToShow={5}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Clock className="w-4 h-4" />
+                          <span>{service.priceUnit}</span>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleRequestService(service.serviceTitle)}
+                        >
+                          Solicitar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Reviews Tab */}
+          <TabsContent value="reviews">
+            <Card>
+              <CardHeader>
+                <CardTitle>Reseñas de clientes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {reviews.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-slate-500">No hay reseñas aún</p>
+                  </div>
+                ) : (
+                  reviews.map((review, index) => (
+                    <div key={review.reviewId}>
+                      {index > 0 && <Separator className="my-6" />}
+                      <div className="flex gap-4">
+                        <Avatar>
+                          <AvatarFallback>{review.client?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{review.client?.email || 'Usuario'}</h4>
+                            <span className="text-sm text-slate-600">{formatDate(review.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-1 mb-2">
+                            {renderStars(review.rating)}
+                          </div>
+                          <p className="text-slate-700">{review.comment}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Gallery Tab */}
+          <TabsContent value="gallery">
+            {services.length > 0 && services.some(s => s.serviceId) ? (
+              <div className="space-y-6">
+                {services.map((service) => (
+                  service.serviceId && (
+                    <Card key={service.serviceId}>
+                      <CardHeader>
+                        <CardTitle>{service.serviceTitle}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ServiceGalleryView
+                          serviceId={service.serviceId}
+                          editable={false}
+                          maxImagesToShow={10}
+                        />
+                      </CardContent>
+                    </Card>
+                  )
+                ))}
               </div>
             ) : (
-              reviews.map((review) => (
-                <div key={review.reviewId} className="review-card">
-                  <div className="review-header">
-                    <div className="review-avatar">
-                      {review.client?.email?.charAt(0).toUpperCase() || 'U'}
-                    </div>
-                    <div className="review-info">
-                      <div className="review-author">{review.client?.email || 'Usuario'}</div>
-                      <div className="review-date">{formatDate(review.createdAt)}</div>
-                    </div>
-                    {renderStars(review.rating)}
-                  </div>
-                  <p className="review-comment">{review.comment}</p>
-                </div>
-              ))
+              <Card className="p-12 text-center">
+                <ImageIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500">No hay imágenes en la galería</p>
+              </Card>
             )}
-          </div>
-        )}
+          </TabsContent>
+
+          {/* About Tab */}
+          <TabsContent value="about">
+            <Card>
+              <CardHeader>
+                <CardTitle>Información del proveedor</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {provider.yearsExperience && (
+                  <>
+                    <div>
+                      <h4 className="font-semibold mb-2">Experiencia</h4>
+                      <p className="text-slate-700">{provider.yearsExperience} años de experiencia</p>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+                <div>
+                  <h4 className="font-semibold mb-2">Descripción</h4>
+                  <p className="text-slate-700">
+                    {provider.description || provider.businessDescription || 'Sin descripción disponible'}
+                  </p>
+                </div>
+                {provider.serviceRadius && (
+                  <>
+                    <Separator />
+                    <div>
+                      <h4 className="font-semibold mb-2">Área de servicio</h4>
+                      <p className="text-slate-700">{provider.serviceRadius} km de alcance</p>
+                    </div>
+                  </>
+                )}
+                <Separator />
+                <div>
+                  <h4 className="font-semibold mb-2">Estado</h4>
+                  <Badge variant={(provider.verified || provider.isVerified) ? 'default' : 'secondary'}>
+                    {(provider.verified || provider.isVerified) ? 'Verificado' : 'No verificado'}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

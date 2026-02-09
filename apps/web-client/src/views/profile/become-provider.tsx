@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './become-provider.css';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
+import { ArrowLeft, Briefcase, FileText, Wrench, MapPin, AlertCircle, Rocket } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function BecomeProvider() {
   const { user } = useAuth();
@@ -24,15 +30,15 @@ export default function BecomeProvider() {
     
     // Validaciones
     if (!formData.businessName.trim()) {
-      alert('Por favor ingresa el nombre de tu negocio o servicio');
+      toast.error('Por favor ingresa el nombre de tu negocio o servicio');
       return;
     }
     if (!formData.description.trim()) {
-      alert('Por favor describe tus servicios');
+      toast.error('Por favor describe tus servicios');
       return;
     }
     if (!formData.location.trim()) {
-      alert('Por favor indica tu ubicación');
+      toast.error('Por favor indica tu ubicación');
       return;
     }
 
@@ -53,115 +59,145 @@ export default function BecomeProvider() {
       });
 
       if (response.ok) {
-        alert('Tu solicitud para convertirte en proveedor ha sido enviada. Nuestro equipo la revisará y te notificaremos pronto.');
-        navigate('/profile');
+        toast.success('Tu solicitud ha sido enviada exitosamente');
+        setTimeout(() => navigate('/profile'), 1500);
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'No se pudo enviar la solicitud');
+        toast.error(errorData.message || 'No se pudo enviar la solicitud');
       }
     } catch (error) {
       console.error('Error submitting provider request:', error);
-      alert('No se pudo enviar la solicitud. Por favor intenta de nuevo.');
+      toast.error('No se pudo enviar la solicitud. Por favor intenta de nuevo.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="become-provider-container">
-      <div className="become-provider-header">
-        <button onClick={() => navigate('/profile')} className="back-button">
-          ← Volver
-        </button>
-        <h1>Convertirme en Proveedor</h1>
-      </div>
+    <div className="min-h-screen bg-slate-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate('/profile')}
+          className="mb-6 gap-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Volver
+        </Button>
 
-      <div className="become-provider-content">
-        <div className="info-card">
-          <h2>¿Por qué ser proveedor?</h2>
-          <p>
-            Como proveedor podrás ofrecer tus servicios profesionales, recibir solicitudes de clientes y 
-            gestionar tu propio negocio a través de nuestra plataforma.
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+            <Rocket className="w-8 h-8 text-blue-600" />
+            Convertirme en Proveedor
+          </h1>
+          <p className="text-slate-600">
+            Únete a nuestra red de proveedores profesionales
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="provider-form">
-          <h3>Información Requerida</h3>
-
-          <div className="form-field">
-            <label>
-              <span className="icon">💼</span>
-              Nombre del Negocio/Servicio *
-            </label>
-            <input
-              type="text"
-              name="businessName"
-              placeholder="Ej: Plomería García"
-              value={formData.businessName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-field">
-            <label>
-              <span className="icon">📝</span>
-              Descripción de Servicios *
-            </label>
-            <textarea
-              name="description"
-              placeholder="Describe detalladamente los servicios que ofreces. Ej: Plomería residencial y comercial, reparación de tuberías, instalación de baños, etc."
-              value={formData.description}
-              onChange={handleChange}
-              rows={6}
-              required
-            />
-          </div>
-
-          <div className="form-field">
-            <label>
-              <span className="icon">🔧</span>
-              Servicios Específicos (Opcional)
-            </label>
-            <input
-              type="text"
-              name="services"
-              placeholder="Ej: Reparación de fugas, Instalación de tuberías, Mantenimiento"
-              value={formData.services}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-field">
-            <label>
-              <span className="icon">📍</span>
-              Ubicación *
-            </label>
-            <input
-              type="text"
-              name="location"
-              placeholder="Ej: Ciudad de Guatemala, Zona 10"
-              value={formData.location}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="note-card">
-            <p>
-              * Campos requeridos. Tu solicitud será revisada por nuestro equipo y te notificaremos cuando 
-              sea aprobada. Una vez aprobado, podrás completar tu perfil con más detalles.
+        <Card className="mb-6 bg-blue-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <AlertCircle className="w-5 h-5" />
+              ¿Por qué ser proveedor?
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-900">
+              Como proveedor podrás ofrecer tus servicios profesionales, recibir solicitudes de clientes y 
+              gestionar tu propio negocio a través de nuestra plataforma.
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          <button 
-            type="submit" 
-            className={`submit-button ${isSubmitting ? 'disabled' : ''}`}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
-          </button>
-        </form>
+        <Card>
+          <CardHeader>
+            <CardTitle>Información Requerida</CardTitle>
+            <CardDescription>
+              Completa el formulario para solicitar convertirte en proveedor
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="businessName" className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-slate-600" />
+                  Nombre del Negocio/Servicio *
+                </Label>
+                <Input
+                  id="businessName"
+                  name="businessName"
+                  placeholder="Ej: Plomería García"
+                  value={formData.businessName}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-slate-600" />
+                  Descripción de Servicios *
+                </Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  placeholder="Describe detalladamente los servicios que ofreces. Ej: Plomería residencial y comercial, reparación de tuberías, instalación de baños, etc."
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={6}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="services" className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-slate-600" />
+                  Servicios Específicos (Opcional)
+                </Label>
+                <Input
+                  id="services"
+                  name="services"
+                  placeholder="Ej: Reparación de fugas, Instalación de tuberías, Mantenimiento"
+                  value={formData.services}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-slate-600" />
+                  Ubicación *
+                </Label>
+                <Input
+                  id="location"
+                  name="location"
+                  placeholder="Ej: Ciudad de Guatemala, Zona 10"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <Card className="bg-amber-50 border-amber-200">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-amber-900">
+                    <strong>*</strong> Campos requeridos. Tu solicitud será revisada por nuestro equipo y te notificaremos cuando 
+                    sea aprobada. Una vez aprobado, podrás completar tu perfil con más detalles.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
