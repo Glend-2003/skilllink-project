@@ -230,7 +230,7 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
         ) as duration
       FROM services s
       JOIN provider_profiles pp ON s.provider_id = pp.provider_id
-      WHERE pp.user_id = ? AND s.is_active = 1
+      WHERE pp.user_id = ? AND s.is_active = 1 AND s.approval_status = 'approved'
       ORDER BY s.service_title
     `;
 

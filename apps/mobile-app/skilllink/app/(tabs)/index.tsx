@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image, Alert, Platform, Animated, RefreshControl } from "react-native";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 
@@ -51,101 +52,93 @@ interface Provider {
       email: string;
     };
   };
+  gallery?: Array<{
+    galleryId: number;
+    imageUrl: string;
+    displayOrder: number;
+  }>;
   rating?: number;
   location?: string;
 }
 
-interface Category {
-  categoryId: number;
-  categoryName: string;
-  categoryDescription?: string;
-  iconUrl?: string;
-  isActive: boolean;
-  displayOrder?: number;
-  serviceCount?: number;
-}
-
-const CATEGORY_ICONS: { [key: string]: { icon: string; color: string } } = {
-  'Plomería': { icon: 'water', color: '#3B82F6' },
-  'Electricidad': { icon: 'flash', color: '#F59E0B' },
-  'Carpintería': { icon: 'hammer', color: '#8B5CF6' },
-  'Limpieza': { icon: 'sparkles', color: '#06B6D4' },
-  'Jardinería': { icon: 'leaf', color: '#84CC16' },
-  'Pintura': { icon: 'color-palette', color: '#EC4899' },
-  'Mecánica': { icon: 'car', color: '#EF4444' },
-  'Tecnología': { icon: 'laptop', color: '#10B981' },
-};
-
-const getIconForCategory = (categoryName: string) => {
-  return CATEGORY_ICONS[categoryName] || { icon: 'briefcase', color: '#6B7280' };
-};
-
 export default function HomeScreen() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
   const [featuredServices, setFeaturedServices] = useState<Provider[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { logout, user } = useAuth();
+  
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        const diff = currentScrollY - lastScrollY.current;
+        
+        if (diff > 0 && currentScrollY > 50) {
+          // Scrolling down
+          Animated.timing(headerTranslateY, {
+            toValue: -200,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        } else if (diff < 0) {
+          // Scrolling up
+          Animated.timing(headerTranslateY, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+        
+        lastScrollY.current = currentScrollY;
+      },
+    }
+  );
+
+  const loadData = async () => {
+    try {
+      const servicesResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`);
+      
+      if (!servicesResponse.ok) {
+        throw new Error(`Error servicios: ${servicesResponse.status} ${servicesResponse.statusText}`);
+      }
+      
+      const servicesText = await servicesResponse.text();
+      
+      const servicesData = servicesText ? JSON.parse(servicesText) : [];
+      setAllProviders(Array.isArray(servicesData) ? servicesData : []);
+      
+      if (Array.isArray(servicesData) && servicesData.length > 0) {
+        const featured = [...servicesData]
+          .filter(service => service.rating && service.rating > 0)
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+          .slice(0, 5);
+        setFeaturedServices(featured);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setAllProviders([]);
+      setFeaturedServices([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const categoriesResponse = await fetch(`${Config.AUTH_SERVICE_URL}/categories`);
-        
-        if (!categoriesResponse.ok) {
-          throw new Error(`Error categorías: ${categoriesResponse.status} ${categoriesResponse.statusText}`);
-        }
-        
-        const categoriesText = await categoriesResponse.text();
-        
-        const categoriesData = categoriesText ? JSON.parse(categoriesText) : [];
-        setCategories(Array.isArray(categoriesData) ? categoriesData.filter((cat: Category) => cat.isActive) : []);
-
-        const servicesResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`);
-        
-        if (!servicesResponse.ok) {
-          throw new Error(`Error servicios: ${servicesResponse.status} ${servicesResponse.statusText}`);
-        }
-        
-        const servicesText = await servicesResponse.text();
-        
-        const servicesData = servicesText ? JSON.parse(servicesText) : [];
-        setAllProviders(Array.isArray(servicesData) ? servicesData : []);
-        setFilteredProviders(Array.isArray(servicesData) ? servicesData : []);
-        
-        if (Array.isArray(servicesData) && servicesData.length > 0) {
-          const featured = [...servicesData].sort((a, b) => b.rating - a.rating).slice(0, 5);
-          setFeaturedServices(featured);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
-        setAllProviders([]);
-        setCategories([]);
-        setFeaturedServices([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
 
-  useEffect(() => {
-    let filtered = allProviders;
-
-    if (selectedCategory) {
-      filtered = filtered.filter(provider => {
-        const categoryName = typeof provider.category === 'string' 
-          ? provider.category 
-          : provider.category?.categoryName;
-        return categoryName === selectedCategory;
-      });
-    }
-
-    setFilteredProviders(filtered);
-  }, [selectedCategory, allProviders]);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
   if (loading) {
     return (
@@ -210,145 +203,244 @@ export default function HomeScreen() {
     }
   };
 
-  const renderCategory = ({ item }: { item: Category }) => {
-    const iconConfig = getIconForCategory(item.categoryName);
-    const isSelected = selectedCategory === item.categoryName;
+  const renderFeaturedService = ({ item }: { item: Provider }) => {
+    const serviceImage = item.gallery && item.gallery.length > 0 
+      ? item.gallery.sort((a, b) => a.displayOrder - b.displayOrder)[0].imageUrl 
+      : null;
     
     return (
-      <TouchableOpacity
-        style={[
-          styles.categoryCard,
-          { backgroundColor: isSelected ? iconConfig.color : '#FFFFFF' }
-        ]}
-        onPress={() => setSelectedCategory(isSelected ? null : item.categoryName)}
-      >
-        <View style={[
-          styles.categoryIconContainer,
-          { backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : iconConfig.color + '15' }
-        ]}>
-          <Ionicons
-            name={iconConfig.icon as any}
-            size={28}
-            color={isSelected ? 'white' : iconConfig.color}
-          />
-        </View>
-        <Text style={[
-          styles.categoryText,
-          { color: isSelected ? 'white' : '#1F2937' }
-        ]}>
-          {item.categoryName}
-        </Text>
-        {item.serviceCount !== undefined && item.serviceCount > 0 && (
-          <Text style={[styles.categoryCount, { color: isSelected ? 'white' : '#6B7280' }]}>
-            {item.serviceCount}
-          </Text>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  const renderFeaturedService = ({ item }: { item: Provider }) => (
     <TouchableOpacity 
       style={styles.featuredCard} 
       onPress={() => handleViewServiceProvider(item)}
     >
-      <View style={styles.featuredHeader}>
-        {item.provider?.user?.profileImageUrl ? (
-          <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.featuredAvatarImage} />
-        ) : (
-          <View style={styles.featuredAvatar}>
-            <Ionicons name="person" size={28} color="#FFF" />
+      <LinearGradient
+        colors={['#ffffff', '#f8fafc']}
+        style={styles.featuredGradient}
+      >
+        {serviceImage && (
+          <View style={styles.serviceImageContainer}>
+            <Image source={{ uri: serviceImage }} style={styles.serviceImage} />
+            <View style={styles.imageOverlay} />
           </View>
         )}
-        <View style={styles.featuredRating}>
-          <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.featuredRatingText}>{(item.rating || 4.5).toFixed(1)}</Text>
+        
+        <View style={styles.featuredBadgeContainer}>
+          <LinearGradient
+            colors={['#fbbf24', '#f59e0b']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.featuredBadge}
+          >
+            <Ionicons name="ribbon" size={11} color="#FFF" />
+            <Text style={styles.featuredBadgeText}>Destacado</Text>
+          </LinearGradient>
         </View>
-      </View>
 
-      <Text style={styles.featuredName} numberOfLines={1}>{item.serviceTitle}</Text>
-      <Text style={styles.featuredCategory}>
-        {typeof item.category === 'string' ? item.category : item.category?.categoryName || 'Sin categoría'}
-      </Text>
-      <Text style={styles.featuredDescription} numberOfLines={2}>
-        {item.serviceDescription}
-      </Text>
-
-      <View style={styles.featuredFooter}>
-        <Text style={styles.featuredPrice}>${item.basePrice}</Text>
-        {item.isVerified && (
-          <Text style={styles.verifiedText}>Verificado</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderProvider = ({ item }: { item: Provider }) => (
-    <TouchableOpacity style={styles.providerCard} onPress={() => handleViewServiceProvider(item)}>
-      <View style={styles.providerHeader}>
-        <View style={styles.providerInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.providerName}>{item.serviceTitle}</Text>
+        <View style={styles.featuredHeader}>
+          <View style={styles.avatarContainer}>
+            {item.provider?.user?.profileImageUrl ? (
+              <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.featuredAvatarImage} />
+            ) : (
+              <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                style={styles.featuredAvatar}
+              >
+                <Ionicons name="person-circle-outline" size={28} color="#FFF" />
+              </LinearGradient>
+            )}
+            <View style={styles.avatarBorder} />
           </View>
-          <Text style={styles.providerCategory}>
+        </View>
+
+        <View style={styles.featuredRatingContainer}>
+          <Ionicons name="star" size={16} color="#fbbf24" />
+          <Text style={styles.featuredRatingText}>
+            {item.rating && item.rating > 0 ? item.rating.toFixed(1) : 'N/A'}
+          </Text>
+          {item.rating && item.rating > 0 ? (
+            <Text style={styles.featuredRatingLabel}>
+              • {item.rating >= 4.5 ? 'Excelente' : item.rating >= 4 ? 'Muy bueno' : item.rating >= 3 ? 'Bueno' : 'Regular'}
+            </Text>
+          ) : (
+            <Text style={styles.featuredRatingLabel}>• Sin calificaciones</Text>
+          )}
+        </View>
+
+        <Text style={styles.featuredName} numberOfLines={1}>{item.serviceTitle}</Text>
+        <View style={styles.featuredCategoryContainer}>
+          <View style={styles.categoryDot} />
+          <Text style={styles.featuredCategory}>
             {typeof item.category === 'string' ? item.category : item.category?.categoryName || 'Sin categoría'}
           </Text>
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color="#F59E0B" />
-            <Text style={styles.rating}>{item.rating || 4.5}</Text>
-            <Text style={styles.location}>• {item.provider?.businessName || 'Proveedor'}</Text>
+        </View>
+        <Text style={styles.featuredDescription} numberOfLines={2}>
+          {item.serviceDescription}
+        </Text>
+
+        <View style={styles.featuredFooter}>
+          <View>
+            <Text style={styles.featuredPriceLabel}>Desde</Text>
+            <Text style={styles.featuredPrice}>${item.basePrice}</Text>
           </View>
         </View>
-        {item.provider?.user?.profileImageUrl ? (
-          <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={28} color="#FFF" />
-          </View>
-        )}
-      </View>
-
-      <Text style={styles.description} numberOfLines={2}>
-        {item.serviceDescription}
-      </Text>
-
-      <View style={styles.providerFooter}>
-        <Text style={styles.rate}>${item.basePrice}</Text>
-        <TouchableOpacity
-          style={styles.contactButton}
-          onPress={() => {
-            handleContactServiceProvider(item);
-          }}
-        >
-          <Text style={styles.contactButtonText}>Contactar</Text>
-        </TouchableOpacity>
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
+  };
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Bienvenido</Text>
-            <Text style={styles.title}>Descubre servicios</Text>
-            <Text style={styles.subtitle}>Encuentra profesionales verificados</Text>
+  const renderProvider = ({ item }: { item: Provider }) => {
+    const serviceImage = item.gallery && item.gallery.length > 0 
+      ? item.gallery.sort((a, b) => a.displayOrder - b.displayOrder)[0].imageUrl 
+      : null;
+    
+    return (
+    <TouchableOpacity style={styles.providerCard} onPress={() => handleViewServiceProvider(item)}>
+      <LinearGradient
+        colors={['#ffffff', '#fafbfc']}
+        style={styles.providerGradient}
+      >
+        {serviceImage && (
+          <View style={styles.providerImageContainer}>
+            <Image source={{ uri: serviceImage }} style={styles.providerImage} />
+          </View>
+        )}
+        
+        <View style={styles.providerHeader}>
+          <View style={styles.providerInfo}>
+            <View style={styles.nameRow}>
+              <Text style={styles.providerName}>{item.serviceTitle}</Text>
+            </View>
+            <View style={styles.providerCategoryRow}>
+              <View style={styles.categoryDotSmall} />
+              <Text style={styles.providerCategory}>
+                {typeof item.category === 'string' ? item.category : item.category?.categoryName || 'Sin categoría'}
+              </Text>
+            </View>
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={14} color="#fbbf24" />
+              <Text style={styles.rating}>
+                {item.rating && item.rating > 0 ? item.rating.toFixed(1) : 'N/A'}
+              </Text>
+              {item.rating && item.rating > 0 ? (
+                <Text style={styles.ratingLabel}>
+                  • {item.rating >= 4.5 ? 'Excelente' : item.rating >= 4 ? 'Muy bueno' : item.rating >= 3 ? 'Bueno' : 'Regular'}
+                </Text>
+              ) : (
+                <Text style={styles.ratingLabel}>• Sin calificaciones</Text>
+              )}
+              <Text style={styles.location}>• {item.provider?.businessName || 'Proveedor'}</Text>
+            </View>
+          </View>
+          <View style={styles.avatarWrapper}>
+            {item.provider?.user?.profileImageUrl ? (
+              <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.avatarImage} />
+            ) : (
+              <LinearGradient
+                colors={['#58b9f1', '#2563eb']}
+                style={styles.avatar}
+              >
+                <Ionicons name="person-circle-outline" size={24} color="#FFF" />
+              </LinearGradient>
+            )}
+            <View style={styles.avatarRing} />
+          </View>
+        </View>
+
+        <Text style={styles.description} numberOfLines={2}>
+          {item.serviceDescription}
+        </Text>
+
+        <View style={styles.providerFooter}>
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceLabel}>Desde</Text>
+            <Text style={styles.rate}>${item.basePrice}</Text>
           </View>
           <TouchableOpacity
-            style={styles.logoutButton}
             onPress={() => {
-              logout();
-              router.replace('/login');
+              handleContactServiceProvider(item);
             }}
           >
-            <Ionicons name="log-out-outline" size={24} color="#6B7280" />
+            <LinearGradient
+              colors={['#3b82f6', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.contactButton}
+            >
+              <Ionicons name="paper-plane" size={14} color="#FFF" />
+              <Text style={styles.contactButtonText}>Contactar</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+  };
+
+  return (
+    <View style={styles.container}>
+      <Animated.View 
+        style={[
+          styles.headerContainer,
+          {
+            transform: [{ translateY: headerTranslateY }]
+          }
+        ]}
+      >
+        <LinearGradient
+          colors={['#1e3a8a', '#3b82f6', '#06b6d4']}
+          style={styles.headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.headerOverlay}>
+            <View style={styles.header}>
+              <View style={styles.headerTop}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.greetingContainer}>
+                    <Text style={styles.greeting}>Bienvenido de nuevo</Text>
+                    <View style={styles.greetingLine} />
+                  </View>
+                  <Text style={styles.title}>Descubre Servicios</Text>
+                  <Text style={styles.subtitle}>Los mejores profesionales verificados a tu alcance</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    logout();
+                    router.replace('/login');
+                  }}
+                >
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.2)', 'rgba(255, 255, 255, 0.1)']}
+                    style={styles.logoutButton}
+                  >
+                    <Ionicons name="exit-outline" size={20} color="#ffffff" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      <Animated.ScrollView
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContentContainer}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3B82F6']}
+            tintColor="#3B82F6"
+            progressViewOffset={200}
+          />
+        }
+      >
 
       {/* Featured Services */}
-      {!selectedCategory && featuredServices.length > 0 && (
+      {featuredServices.length > 0 && (
         <>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Servicios Destacados</Text>
@@ -367,36 +459,16 @@ export default function HomeScreen() {
         </>
       )}
 
-      {/* Categories */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Categorías</Text>
-        {selectedCategory && (
-          <TouchableOpacity onPress={() => setSelectedCategory(null)}>
-            <Text style={styles.clearFilter}>Limpiar</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      <FlatList
-        data={categories}
-        keyExtractor={(item) => item.categoryId.toString()}
-        renderItem={renderCategory}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      />
-
-      {/* Services List */}
+      {/* All Services */}
       <View style={styles.providersHeader}>
-        <Text style={styles.sectionTitle}>
-          {selectedCategory || 'Todos los Servicios'}
-        </Text>
+        <Text style={styles.sectionTitle}>Todos los Servicios</Text>
         <Text style={styles.resultsCount}>
-          {filteredProviders.length} servicio{filteredProviders.length !== 1 ? 's' : ''}
+          {allProviders.length} servicio{allProviders.length !== 1 ? 's' : ''}
         </Text>
       </View>
 
       <FlatList
-        data={filteredProviders}
+        data={allProviders}
         keyExtractor={(item) => item.serviceId?.toString() || item.id?.toString() || Math.random().toString()}
         renderItem={renderProvider}
         scrollEnabled={false}
@@ -404,29 +476,49 @@ export default function HomeScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="search" size={64} color="#E5E7EB" />
             <Text style={styles.emptyTitle}>No hay servicios disponibles</Text>
-            <Text style={styles.emptyText}>
-              {selectedCategory 
-                ? 'No hay servicios en esta categoría aún' 
-                : 'Pronto habrá servicios disponibles'
-              }
-            </Text>
+            <Text style={styles.emptyText}>Pronto habrá servicios disponibles</Text>
           </View>
         }
       />
-    </ScrollView>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f8fafc',
+  },
+  headerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  headerGradient: {
+    paddingTop: 60,
+    paddingBottom: 40,
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  headerOverlay: {
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    overflow: 'hidden',
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    paddingTop: 200,
   },
   headerTop: {
     flexDirection: 'row',
@@ -436,27 +528,43 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
-  greeting: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 4,
+  greetingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  logoutButton: {
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: '#F9FAFB',
+  greeting: {
+    fontSize: 14,
+    color: '#e0f2fe',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  greetingLine: {
+    height: 2,
+    width: 30,
+    backgroundColor: '#60a5fa',
+    marginLeft: 12,
+    borderRadius: 2,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#ffffff',
     letterSpacing: -0.5,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#6B7280',
-    lineHeight: 22,
-    marginTop: 4,
+    fontSize: 14,
+    color: '#dbeafe',
+    lineHeight: 20,
+    fontWeight: '400',
+  },
+  logoutButton: {
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -524,71 +632,102 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    marginTop: 32,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#0f172a',
+    letterSpacing: -0.3,
   },
   seeAll: {
     fontSize: 14,
     color: '#3B82F6',
     fontWeight: '600',
   },
-  clearFilter: {
-    fontSize: 14,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
   featuredList: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    gap: 16,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    gap: 20,
   },
   featuredCard: {
     width: 280,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
     marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    elevation: 8,
+    backgroundColor: '#fff',
   },
-  featuredBadge: {
+  featuredGradient: {
+    padding: 20,
+    borderRadius: 20,
+  },
+  serviceImageContainer: {
+    width: '100%',
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    position: 'relative',
+  },
+  serviceImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  featuredBadgeContainer: {
     position: 'absolute',
     top: 16,
-    right: 16,
+    left: 16,
+    zIndex: 10,
+  },
+  featuredBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F59E0B',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 16,
     gap: 4,
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   featuredBadgeText: {
-    fontSize: 11,
     color: '#FFF',
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   featuredHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  avatarContainer: {
+    position: 'relative',
   },
   featuredAvatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#9CA3AF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -596,96 +735,113 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#e0e0e0',
+  },
+  avatarBorder: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
   },
   featuredRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#fffbeb',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 16,
     gap: 4,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  featuredRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 6,
+  },
+  featuredRatingLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
   },
   featuredRatingText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#92400E',
+    color: '#92400e',
   },
   featuredName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
+    color: '#0f172a',
+    marginBottom: 8,
+    letterSpacing: -0.2,
+  },
+  featuredCategoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3b82f6',
+    marginRight: 6,
   },
   featuredCategory: {
-    fontSize: 14,
-    color: '#3B82F6',
+    fontSize: 12,
+    color: '#3b82f6',
     fontWeight: '600',
-    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   featuredDescription: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#64748b',
     lineHeight: 20,
     marginBottom: 16,
   },
   featuredFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  featuredPriceLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   featuredPrice: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#059669',
+    letterSpacing: -0.5,
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d1fae5',
   },
   verifiedText: {
     fontSize: 12,
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  categoriesList: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 12,
-  },
-  categoryCard: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    borderRadius: 20,
-    marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    minWidth: 120,
-  },
-  categoryIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  categoryCount: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
+    color: '#059669',
+    fontWeight: '700',
   },
   providersHeader: {
     flexDirection: 'row',
@@ -701,18 +857,31 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   providerCard: {
-    backgroundColor: 'white',
     marginHorizontal: 20,
     marginBottom: 16,
-    padding: 20,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    overflow: 'hidden',
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    backgroundColor: '#fff',
+  },
+  providerGradient: {
+    padding: 20,
+  },
+  providerImageContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  providerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   providerHeader: {
     flexDirection: 'row',
@@ -729,37 +898,73 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   providerName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#1F2937',
-    marginRight: 8,
+    color: '#0f172a',
+    letterSpacing: -0.2,
+  },
+  verifiedBadgeSmall: {
+    marginLeft: 8,
+  },
+  providerCategoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 6,
+  },
+  categoryDotSmall: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3b82f6',
+    marginRight: 6,
   },
   providerCategory: {
-    fontSize: 13,
-    color: '#3B82F6',
-    marginBottom: 6,
+    fontSize: 11,
+    color: '#3b82f6',
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  ratingLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
   },
   rating: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400e',
+    marginLeft: 2,
   },
   location: {
     fontSize: 14,
     color: '#6B7280',
     marginLeft: 8,
   },
+  avatarWrapper: {
+    position: 'relative',
+  },
   avatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#9CA3AF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -767,48 +972,65 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#e0e0e0',
+  },
+  avatarRing: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(99, 102, 241, 0.15)',
   },
   description: {
-    fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 21,
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
     marginBottom: 16,
   },
   providerFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
   },
-  rateContainer: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+  priceContainer: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   rate: {
-    fontSize: 17,
+    fontSize: 20,
     fontWeight: '700',
     color: '#059669',
+    letterSpacing: -0.3,
   },
   contactButton: {
-    backgroundColor: '#3B82F6',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    gap: 6,
   },
   contactButtonText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
-    marginRight: 8,
     letterSpacing: 0.3,
   },
   emptyState: {

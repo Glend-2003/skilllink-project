@@ -5,11 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
 
 import { ProviderProfile } from '../../providers/entities/provider.entity';
 import { Category } from '../../categories/entities/category.entity';
+import { Gallery } from '../../gallery/entities/gallery.entity';
 
 @Entity('services')
 export class Service {
@@ -73,6 +75,9 @@ export class Service {
   })
   @JoinColumn({ name: 'category_id' })
   category: Category;
+
+  @OneToMany(() => Gallery, (gallery) => gallery.service)
+  gallery: Gallery[];
 
   // System Date Columns
 

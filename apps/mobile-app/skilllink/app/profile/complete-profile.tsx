@@ -86,23 +86,41 @@ export default function CompleteProfileScreen() {
         return;
       }
 
+      // Handle 404 - no profile exists yet
+      if (response.status === 404) {
+        console.log('No profile found, starting fresh');
+        return;
+      }
+
       if (response.ok) {
-        const profile = await response.json();
-        if (profile) {
-          setExistingProfile(profile);
-          setFormData({
-            first_name: profile.first_name || '',
-            last_name: profile.last_name || '',
-            date_of_birth: profile.date_of_birth || '',
-            gender: profile.gender || '',
-            bio: profile.bio || '',
-            address_line1: profile.address_line1 || '',
-            city: profile.city || '',
-            state_province: profile.state_province || '',
-            country: profile.country || '',
-            latitude: profile.latitude || '',
-            longitude: profile.longitude || '',
-          });
+        const text = await response.text();
+        
+        // Check if response has content
+        if (!text || text.trim() === '') {
+          console.log('Empty response, no profile data');
+          return;
+        }
+
+        try {
+          const profile = JSON.parse(text);
+          if (profile) {
+            setExistingProfile(profile);
+            setFormData({
+              first_name: profile.first_name || '',
+              last_name: profile.last_name || '',
+              date_of_birth: profile.date_of_birth || '',
+              gender: profile.gender || '',
+              bio: profile.bio || '',
+              address_line1: profile.address_line1 || '',
+              city: profile.city || '',
+              state_province: profile.state_province || '',
+              country: profile.country || '',
+              latitude: profile.latitude || '',
+              longitude: profile.longitude || '',
+            });
+          }
+        } catch (parseError) {
+          console.error('Error parsing profile JSON:', parseError);
         }
       }
     } catch (error) {

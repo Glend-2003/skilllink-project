@@ -132,7 +132,7 @@ export default function EditServiceScreen() {
 
     try {
       const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${user?.token}`,
           'Content-Type': 'application/json',
@@ -155,7 +155,10 @@ export default function EditServiceScreen() {
         router.back();
       } else {
         const data = await response.json();
-        Alert.alert('Error', data.message || 'No se pudo actualizar el servicio');
+        const errorMessage = Array.isArray(data.message) 
+          ? data.message.join('\n') 
+          : data.message || 'No se pudo actualizar el servicio';
+        Alert.alert('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error updating service:', error);

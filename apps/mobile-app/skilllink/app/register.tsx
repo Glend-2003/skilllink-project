@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, Toucha
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Config } from '@/constants/Config';
 import { useAuth } from './context/AuthContext';
 
@@ -69,7 +70,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/register`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -78,7 +79,8 @@ export default function RegisterScreen() {
           email: formData.email,
           password: formData.password,
           phoneNumber: formData.phone || null,
-          userType: userType, 
+          userType: userType,
+          fullName: formData.name,
         }),
       });
 
@@ -97,7 +99,7 @@ export default function RegisterScreen() {
         // If user registered as provider, create provider request
         if (userType === 'provider') {
           try {
-            const providerResponse = await fetch(`${Config.AUTH_SERVICE_URL}/provider-request`, {
+            const providerResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider-request`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -154,18 +156,25 @@ export default function RegisterScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <View style={styles.logo}>
-        <Image
-          source={require("../assets/images/skilllink.png")}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
+    <LinearGradient
+      colors={['#2563eb', '#1e40af', '#10b981']}
+      style={styles.gradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logoCircle}>
+            <Image
+              source={require("../assets/images/skilllink.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={styles.title}>SkillLink</Text>
+          <Text style={styles.subtitle}>Crea tu cuenta y comienza hoy</Text>
         </View>
-        <Text style={styles.subtitle}>Crea tu cuenta y comienza hoy</Text>
-      </View>
 
       {/* Progress Indicator */}
       <View style={styles.progressContainer}>
@@ -229,9 +238,20 @@ export default function RegisterScreen() {
                 </View>
               </TouchableOpacity>
 
-              <Pressable style={styles.buttonPrimary} onPress={handleNextStep}>
-                <Text style={styles.buttonPrimaryText}>Continuar</Text>
-              </Pressable>
+              <TouchableOpacity
+                style={styles.buttonWrapper}
+                onPress={handleNextStep}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#2563eb', '#10b981']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.buttonPrimary}
+                >
+                  <Text style={styles.buttonPrimaryText}>Continuar</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
               <View style={styles.loginLink}>
                 <Text style={styles.loginText}>¿Ya tienes una cuenta? </Text>
@@ -390,9 +410,21 @@ export default function RegisterScreen() {
                 <Pressable style={styles.buttonSecondary} onPress={() => setStep(1)}>
                   <Text style={styles.buttonSecondaryText}>Atrás</Text>
                 </Pressable>
-                <Pressable style={[styles.buttonPrimary, loading && styles.buttonDisabled]} onPress={handleRegister} disabled={loading}>
-                  <Text style={styles.buttonPrimaryText}>{loading ? "Creando..." : "Crear cuenta"}</Text>
-                </Pressable>
+                <TouchableOpacity
+                  style={[styles.buttonWrapper, styles.buttonWrapperFlex, loading && styles.buttonDisabled]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#2563eb', '#10b981']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.buttonPrimary}
+                  >
+                    <Text style={styles.buttonPrimaryText}>{loading ? "Creando..." : "Crear cuenta"}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.separator}>
@@ -423,15 +455,18 @@ export default function RegisterScreen() {
         )}
       </View>
 
-      <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
-    </ScrollView>
+        <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f0f9ff',
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -440,26 +475,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  logo: {
-    width: 64,
-  height: 64,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginBottom: 16,
-  },
-    logoImage: {
-    width: '200%',
-    height: '200%',
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#1e40af',
+    color: '#fff',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#e0f2fe',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   progressContainer: {
     flexDirection: 'row',
@@ -496,12 +538,12 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     width: '100%',
     maxWidth: 400,
   },
@@ -565,12 +607,17 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 4,
   },
-  buttonPrimary: {
-    backgroundColor: '#2563eb',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+  buttonWrapper: {
     marginTop: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  buttonWrapperFlex: {
+    flex: 1,
+  },
+  buttonPrimary: {
+    padding: 16,
+    alignItems: 'center',
   },
   buttonPrimaryText: {
     color: '#fff',
@@ -600,17 +647,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#1f2937',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
   },
   inputIcon: {
     marginRight: 8,
@@ -658,12 +706,13 @@ const styles = StyleSheet.create({
   },
   buttonSecondary: {
     flex: 1,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#d1d5db',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 24,
+    backgroundColor: '#fff',
   },
   buttonSecondaryText: {
     color: '#374151',
@@ -708,7 +757,7 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 32,
     fontSize: 12,
-    color: '#64748b',
+    color: '#e0f2fe',
     textAlign: 'center',
   },
 });

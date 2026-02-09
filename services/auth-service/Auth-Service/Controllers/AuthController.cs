@@ -70,11 +70,22 @@ namespace AuthController.Controllers
                 try
                 {
                     using var httpClient = new HttpClient();
+                    
+                    // Split full name into first and last name
+                    string firstName = "";
+                    string lastName = "";
+                    if (!string.IsNullOrWhiteSpace(model.fullName))
+                    {
+                        var nameParts = model.fullName.Trim().Split(' ', 2);
+                        firstName = nameParts[0];
+                        lastName = nameParts.Length > 1 ? nameParts[1] : "";
+                    }
+                    
                     var userProfileData = new
                     {
                         user_id = user.Id,
-                        first_name = "",
-                        last_name = "",
+                        first_name = firstName,
+                        last_name = lastName,
                         bio = ""
                     };
                     
@@ -85,6 +96,9 @@ namespace AuthController.Controllers
                     );
 
                     var userServiceUrl = _configuration["Services:UserService"] ?? "http://localhost:3004";
+                    Console.WriteLine($"Creating user profile for userId: {user.Id}, firstName: {firstName}, lastName: {lastName}");
+                    Console.WriteLine($"User service URL: {userServiceUrl}/user-profile");
+                    
                     var response = await httpClient.PostAsync(
                         $"{userServiceUrl}/user-profile",
                         jsonContent
@@ -92,7 +106,12 @@ namespace AuthController.Controllers
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}");
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}, Error: {errorContent}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"User profile created successfully for userId: {user.Id}");
                     }
                 }
                 catch (Exception profileEx)

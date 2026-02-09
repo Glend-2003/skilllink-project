@@ -17,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { ArrowLeft, Save, Briefcase, MapPin, Award, Settings } from 'lucide-react-native';
 
 interface ProviderProfile {
   providerId: number;
@@ -130,17 +131,36 @@ export default function EditProviderProfileScreen() {
         },
       });
 
+      if (response.status === 404) {
+        console.log('No provider profile found (404)');
+        setLoading(false);
+        return;
+      }
+
       if (response.ok) {
-        const profile: ProviderProfile = await response.json();
-        setFormData({
-          businessName: profile.businessName || '',
-          businessDescription: profile.businessDescription || '',
-          latitude: profile.latitude?.toString() || '',
-          longitude: profile.longitude?.toString() || '',
-          yearsExperience: profile.yearsExperience?.toString() || '',
-          serviceRadiusKm: profile.serviceRadiusKm?.toString() || '',
-          availableForWork: profile.availableForWork,
-        });
+        const text = await response.text();
+        
+        if (!text || text.trim() === '') {
+          console.log('Empty provider profile response');
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const profile: ProviderProfile = JSON.parse(text);
+          setFormData({
+            businessName: profile.businessName || '',
+            businessDescription: profile.businessDescription || '',
+            latitude: profile.latitude?.toString() || '',
+            longitude: profile.longitude?.toString() || '',
+            yearsExperience: profile.yearsExperience?.toString() || '',
+            serviceRadiusKm: profile.serviceRadiusKm?.toString() || '',
+            availableForWork: profile.availableForWork,
+          });
+        } catch (parseError) {
+          console.error('Error parsing provider profile JSON:', parseError);
+          Alert.alert('Error', 'Error al procesar datos del perfil');
+        }
       } else {
         Alert.alert('Error', 'No se pudo cargar el perfil de proveedor');
       }
@@ -202,60 +222,70 @@ export default function EditProviderProfileScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Editar Perfil de Proveedor',
-          headerStyle: { backgroundColor: '#007AFF' },
-          headerTintColor: '#fff',
-        }}
-      />
-      <ScrollView style={styles.container}>
+    <View style={styles.mainContainer}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Editar Perfil de Proveedor</Text>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={saving}
+          style={styles.headerSaveButton}
+        >
+          <Save size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Información del Negocio */}
         <View style={styles.section}>
-          <Text style={styles.label}>Nombre del Negocio *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.businessName}
-            onChangeText={(text) => setFormData({ ...formData, businessName: text })}
-            placeholder="Ej: Reparaciones Juan"
-          />
+          <View style={styles.sectionHeader}>
+            <Briefcase color="#007AFF" size={20} />
+            <Text style={styles.sectionTitle}>Información del Negocio</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Nombre del Negocio *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.businessName}
+              onChangeText={(text) => setFormData({ ...formData, businessName: text })}
+              placeholder="Ej: Reparaciones Juan"
+              placeholderTextColor="#9ca3af"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Descripción del Negocio</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={formData.businessDescription}
+              onChangeText={(text) => setFormData({ ...formData, businessDescription: text })}
+              placeholder="Describe tu negocio y servicios"
+              placeholderTextColor="#9ca3af"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
         </View>
 
+        {/* Ubicación */}
         <View style={styles.section}>
-          <Text style={styles.label}>Descripción del Negocio</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={formData.businessDescription}
-            onChangeText={(text) => setFormData({ ...formData, businessDescription: text })}
-            placeholder="Describe tu negocio y servicios"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
+          <View style={styles.sectionHeader}>
+            <MapPin color="#007AFF" size={20} />
+            <Text style={styles.sectionTitle}>Ubicación del Negocio</Text>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Ubicación (Latitud)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.latitude}
-            onChangeText={(text) => setFormData({ ...formData, latitude: text })}
-            placeholder="Ej: 14.6349"
-            keyboardType="decimal-pad"
-          />
-        </View>
+          {formData.latitude && formData.longitude && (
+            <View style={styles.locationInfo}>
+              <Text style={styles.locationText}>
+                📍 Ubicación guardada: {parseFloat(formData.latitude).toFixed(6)}, {parseFloat(formData.longitude).toFixed(6)}
+              </Text>
+            </View>
+          )}
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Ubicación (Longitud)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.longitude}
-            onChangeText={(text) => setFormData({ ...formData, longitude: text })}
-            placeholder="Ej: -90.5069"
-            keyboardType="decimal-pad"
-          />
-        </View>
-
-        <View style={styles.section}>
           <View style={styles.mapButtonsRow}>
             <TouchableOpacity style={styles.mapButton} onPress={openMapPicker}>
               <Text style={styles.mapButtonText}>📍 Seleccionar en Mapa</Text>
@@ -266,34 +296,55 @@ export default function EditProviderProfileScreen() {
           </View>
         </View>
 
+        {/* Experiencia y Servicios */}
         <View style={styles.section}>
-          <Text style={styles.label}>Años de Experiencia</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.yearsExperience}
-            onChangeText={(text) => setFormData({ ...formData, yearsExperience: text })}
-            placeholder="Ej: 5"
-            keyboardType="numeric"
-          />
+          <View style={styles.sectionHeader}>
+            <Award color="#007AFF" size={20} />
+            <Text style={styles.sectionTitle}>Experiencia y Cobertura</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Años de Experiencia</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.yearsExperience}
+              onChangeText={(text) => setFormData({ ...formData, yearsExperience: text })}
+              placeholder="Ej: 5"
+              placeholderTextColor="#9ca3af"
+              keyboardType="numeric"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Radio de Servicio (km)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.serviceRadiusKm}
+              onChangeText={(text) => setFormData({ ...formData, serviceRadiusKm: text })}
+              placeholder="Ej: 10"
+              placeholderTextColor="#9ca3af"
+              keyboardType="numeric"
+            />
+          </View>
         </View>
 
+        {/* Configuración */}
         <View style={styles.section}>
-          <Text style={styles.label}>Radio de Servicio (km)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.serviceRadiusKm}
-            onChangeText={(text) => setFormData({ ...formData, serviceRadiusKm: text })}
-            placeholder="Ej: 10"
-            keyboardType="numeric"
-          />
-        </View>
+          <View style={styles.sectionHeader}>
+            <Settings color="#007AFF" size={20} />
+            <Text style={styles.sectionTitle}>Configuración</Text>
+          </View>
 
-        <View style={styles.section}>
           <View style={styles.switchRow}>
-            <Text style={styles.label}>Disponible para Trabajar</Text>
+            <View>
+              <Text style={styles.label}>Disponible para Trabajar</Text>
+              <Text style={styles.switchDescription}>Los clientes podrán solicitar tus servicios</Text>
+            </View>
             <Switch
               value={formData.availableForWork}
               onValueChange={(value) => setFormData({ ...formData, availableForWork: value })}
+              trackColor={{ false: '#d1d5db', true: '#93c5fd' }}
+              thumbColor={formData.availableForWork ? '#007AFF' : '#f4f3f4'}
             />
           </View>
         </View>
@@ -309,6 +360,8 @@ export default function EditProviderProfileScreen() {
             <Text style={styles.saveButtonText}>Guardar Cambios</Text>
           )}
         </TouchableOpacity>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
 
       {/* Map Modal */}
@@ -359,83 +412,151 @@ export default function EditProviderProfileScreen() {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSaveButton: {
+    padding: 4,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f9fafb',
   },
   section: {
     backgroundColor: '#fff',
-    padding: 20,
-    marginBottom: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  helpText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-    fontStyle: 'italic',
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  field: {
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '500',
+    color: '#374151',
     marginBottom: 8,
   },
   input: {
+    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e5e7eb',
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
+    fontSize: 14,
+    color: '#1f2937',
   },
   textArea: {
-    height: 100,
-    textAlignVertical: 'top',
+    minHeight: 100,
+    paddingTop: 12,
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  switchDescription: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  locationInfo: {
+    backgroundColor: '#eff6ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  locationText: {
+    fontSize: 13,
+    color: '#1e40af',
+  },
   saveButton: {
     backgroundColor: '#007AFF',
-    margin: 20,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
   },
   saveButtonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#9ca3af',
   },
   saveButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-  },  mapButtonsRow: {
+    fontWeight: '600',
+  },
+  bottomPadding: {
+    height: 40,
+  },
+  mapButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 10,
   },
   mapButton: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   mapButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   mapModalContainer: {

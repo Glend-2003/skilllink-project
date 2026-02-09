@@ -58,7 +58,7 @@ export default function ProfileScreen() {
   const loadProfile = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/auth/profile`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -73,22 +73,36 @@ export default function ProfileScreen() {
         
         // Load user_profiles data
         try {
-          const userProfileResponse = await fetch(`${Config.USER_SERVICE_URL}/user-profile/me`, {
+          const userProfileResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/user-profile/me`, {
             headers: {
               'Authorization': `Bearer ${user?.token}`,
             },
           });
+          
           if (userProfileResponse.ok) {
-            const userProfileData = await userProfileResponse.json();
-            setUserProfileData(userProfileData);
-            // Update profile with names from user_profiles
-            if (userProfileData.first_name || userProfileData.last_name) {
-              setProfile(prev => prev ? {
-                ...prev,
-                first_name: userProfileData.first_name,
-                last_name: userProfileData.last_name
-              } : null);
+            const text = await userProfileResponse.text();
+            
+            // Check if response has content
+            if (text && text.trim() !== '') {
+              try {
+                const userProfileData = JSON.parse(text);
+                setUserProfileData(userProfileData);
+                // Update profile with names from user_profiles
+                if (userProfileData.first_name || userProfileData.last_name) {
+                  setProfile(prev => prev ? {
+                    ...prev,
+                    first_name: userProfileData.first_name,
+                    last_name: userProfileData.last_name
+                  } : null);
+                }
+              } catch (parseError) {
+                console.error('Error parsing user profile JSON:', parseError);
+              }
+            } else {
+              console.log('Empty user profile response, no profile data yet');
             }
+          } else if (userProfileResponse.status === 404) {
+            console.log('User profile not found (404), user needs to complete profile');
           }
         } catch (error) {
           console.error('Error loading user profile data:', error);
@@ -105,7 +119,7 @@ export default function ProfileScreen() {
   const handleSaveProfile = async () => {
     try {
       setIsSaving(true);
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/profile`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

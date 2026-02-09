@@ -30,7 +30,7 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
   const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const API_URL = Config.SERVICE_MANAGER_URL; // Puerto 3005
+  const API_URL = `${Config.API_GATEWAY_URL}/api/v1`;
 
   // Solicitar permisos
   const requestPermissions = async () => {

@@ -1,8 +1,11 @@
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter, Alert } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 
@@ -49,11 +52,11 @@ export default function ChatScreen() {
         return;
       }
       
-      const providerConvs = data.filter(c => c.is_provider === 1);
-      const mapped: ConversationItemUI[] = providerConvs.map(c => ({
+      // Mostrar todas las conversaciones, no solo las de proveedores
+      const mapped: ConversationItemUI[] = data.map(c => ({
         id: String(c.conversation_id),
-        providerName: c.other_user_name || c.other_user_email || 'Proveedor',
-        providerCategory: 'Servicios',
+        providerName: c.other_user_name || c.other_user_email || 'Usuario',
+        providerCategory: c.is_provider === 1 ? 'Servicios' : 'Usuario',
         lastMessage: c.last_message_text || 'Inicia una conversación',
         time: formatTime(c.last_activity_at || c.last_message_at || c.created_at),
         // PNG avatar to ensure RN Image compatibility
@@ -139,19 +142,58 @@ export default function ChatScreen() {
     );
   };
 
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    item: ConversationItemUI
+  ) => {
+    const trans = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [0, 100],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <TouchableOpacity
+        style={styles.deleteAction}
+        onPress={() => confirmDelete(item.id, item.providerName)}
+      >
+        <Animated.View
+          style={[
+            styles.deleteActionContent,
+            {
+              transform: [{ translateX: trans }],
+            },
+          ]}
+        >
+          <Ionicons name="trash-outline" size={24} color="#FFF" />
+          <Text style={styles.deleteText}>Eliminar</Text>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderConversation = ({ item }: { item: ConversationItemUI }) => (
-    <View style={styles.conversationWrapper}>
+    <Swipeable
+      renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item)}
+      overshootRight={false}
+      friction={2}
+    >
       <TouchableOpacity
         style={styles.conversationItem}
         onPress={() => router.push(`/chat/${item.id}`)}
+        activeOpacity={0.7}
       >
         <View style={styles.avatarContainer}>
           {item.profileImageUrl ? (
             <Image source={{ uri: item.profileImageUrl }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{item.providerName.charAt(0).toUpperCase()}</Text>
-            </View>
+            <LinearGradient
+              colors={['#58b9f1', '#2563eb']}
+              style={styles.avatarCircle}
+            >
+              <Ionicons name="person-circle-outline" size={28} color="#FFF" />
+            </LinearGradient>
           )}
         </View>
 
@@ -165,25 +207,18 @@ export default function ChatScreen() {
 
           <Text style={styles.category}>{item.providerCategory}</Text>
 
-          <Text style={styles.lastMessage} numberOfLines={1}>
+          <Text style={styles.lastMessage} numberOfLines={2}>
             {item.lastMessage}
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" style={styles.chevron} />
       </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={styles.deleteIconButton}
-        onPress={() => confirmDelete(item.id, item.providerName)}
-      >
-        <Ionicons name="trash-outline" size={20} color="#EF4444" />
-      </TouchableOpacity>
-    </View>
+    </Swipeable>
   );
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Mensajes</Text>
         <Text style={styles.subtitle}>{countText}</Text>
@@ -202,7 +237,7 @@ export default function ChatScreen() {
           </View>
         }
       />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -213,88 +248,81 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    paddingTop: 60,
     paddingBottom: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#1F2937',
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6B7280',
   },
   conversationsList: {
-    paddingBottom: 20,
-  },
-  conversationWrapper: {
-    position: 'relative',
+    paddingVertical: 12,
   },
   conversationItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    marginHorizontal: 20,
-    marginBottom: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
   },
-  deleteIconButton: {
-    position: 'absolute',
-    top: 8,
-    right: 28,
-    padding: 8,
-    zIndex: 10,
+  deleteAction: {
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  deleteActionContent: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 100,
+    height: '100%',
+    paddingHorizontal: 20,
+  },
+  deleteText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
   avatarContainer: {
-    position: 'relative',
     marginRight: 12,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#e0e0e0',
   },
   avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3B82F6',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  unreadBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#EF4444',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  unreadText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
   },
   conversationInfo: {
     flex: 1,
+    marginRight: 8,
   },
   headerRow: {
     flexDirection: 'row',
@@ -303,40 +331,35 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   providerName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#1F2937',
     flex: 1,
+    letterSpacing: -0.2,
   },
   time: {
     fontSize: 12,
     color: '#9CA3AF',
     marginLeft: 8,
+    fontWeight: '500',
   },
   category: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  serviceType: {
     fontSize: 13,
-    color: '#374151',
-    marginBottom: 4,
+    color: '#3B82F6',
+    marginBottom: 6,
     fontWeight: '500',
   },
   lastMessage: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 8,
+    lineHeight: 18,
   },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  chevron: {
+    marginLeft: 4,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 64,
+    paddingVertical: 80,
     paddingHorizontal: 20,
   },
   emptyTitle: {
