@@ -1,6 +1,6 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
-const { sendEmail } = require('./utils/mailer'); // Solo una vez
+const { sendEmail } = require('./utils/mailer');
 require('dotenv').config();
 
 const app = express();
@@ -28,7 +28,7 @@ app.post('/api/notifications/send', async (req, res) => {
         console.log(`[Notification] Preparando correo para: ${userEmail}`);
 
         if (userEmail) {
-            // Asegúrate de que el archivo src/templates/notification.hbs existe
+       
             await sendEmail(userEmail, title, 'notification', { title, message });
         }
 
