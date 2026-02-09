@@ -141,8 +141,8 @@ services:
       - DB_NAME=skilllink_db
       - EMAIL_HOST=smtp.gmail.com
       - EMAIL_PORT=465
-      - EMAIL_USER=glendrojas1040@gmail.com
-      - EMAIL_PASS=fkhg bnqj svap cebe
+      - EMAIL_USER=skilllinkcompany@gmail.com
+      - EMAIL_PASS=wzml qccc uzil suyj
 
 
 volumes:
