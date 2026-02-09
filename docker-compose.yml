@@ -51,9 +51,9 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=root
       - DB_DATABASE=skilllink_db
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - CLOUDINARY_CLOUD_NAME=dsr4zuujv
+      - CLOUDINARY_API_KEY=812532711416188
+      - CLOUDINARY_API_SECRET=FScVr1OfILG0oBXDAmd-TRGOH84
     depends_on:
       mysql_db:
         condition: service_healthy

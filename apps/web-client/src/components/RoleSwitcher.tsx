@@ -1,11 +1,28 @@
 import React from 'react';
+import { useRole } from '../context/RoleContext';
+import './RoleSwitcher.css';
 
-export default function RoleSwitcher({ roles, value, onChange }: { roles: string[]; value: string; onChange: (role: string) => void }) {
+export default function RoleSwitcher() {
+  const { activeRole, setActiveRole, isProvider } = useRole();
+
+  if (!isProvider) {
+    return null;
+  }
+
   return (
-    <select value={value} onChange={e => onChange(e.target.value)}>
-      {roles.map(role => (
-        <option key={role} value={role}>{role}</option>
-      ))}
-    </select>
+    <div className="role-switcher">
+      <button
+        className={`role-button ${activeRole === 'client' ? 'active' : ''}`}
+        onClick={() => setActiveRole('client')}
+      >
+        Cliente
+      </button>
+      <button
+        className={`role-button ${activeRole === 'provider' ? 'active' : ''}`}
+        onClick={() => setActiveRole('provider')}
+      >
+        Proveedor
+      </button>
+    </div>
   );
 }

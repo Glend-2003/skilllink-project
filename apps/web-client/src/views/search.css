@@ -11,7 +11,7 @@
 }
 
 .search-header-content {
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
 }
 
@@ -73,7 +73,7 @@
 }
 
 .search-content {
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: 32px 24px;
 }
@@ -164,7 +164,7 @@
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 24px;
 }
 

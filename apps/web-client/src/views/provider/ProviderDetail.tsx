@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
+import ServiceGalleryView from '../../components/ServiceGalleryView';
 import './ProviderDetail.css';
 
 interface Provider {
@@ -139,30 +140,37 @@ export default function ProviderDetail() {
 
   const handleContactProvider = async () => {
     if (!user) {
-      alert('Debes iniciar sesión para contactar al proveedor');
+      alert('Debes iniciar sesión para contactar proveedores');
       navigate('/login');
+      return;
+    }
+
+    if (!user.userId) {
+      alert('Sesión inválida. Por favor, cierra sesión e inicia sesión nuevamente.');
       return;
     }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/chat/conversations`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           participant1_user_id: user.userId,
-          participant2_user_id: provider?.user?.userId || id, // Use id from URL params if user object not present
+          participant2_user_id: parseInt(id as string),
         }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        const conversation = await response.json();
-        navigate(`/chat/${conversation.conversation_id}`);
+        const conversationId = data.conversation_id;
+        navigate(`/chat/${conversationId}`);
+      } else {
+        alert('No se pudo crear la conversación');
       }
     } catch (error) {
       console.error('Error creating conversation:', error);
-      alert('Error al crear la conversación');
+      alert('Error al intentar contactar al proveedor');
     }
   };
 
@@ -310,6 +318,17 @@ export default function ProviderDetail() {
                 <div key={service.serviceId} className="service-card">
                   <h3 className="service-title">{service.serviceTitle}</h3>
                   <p className="service-description">{service.serviceDescription}</p>
+                  
+                  {service.serviceId && (
+                    <div className="service-gallery">
+                      <ServiceGalleryView
+                        serviceId={service.serviceId}
+                        editable={false}
+                        maxImagesToShow={5}
+                      />
+                    </div>
+                  )}
+                  
                   <div className="service-footer">
                     <div className="service-price">
                       ₡{service.basePrice.toLocaleString()}

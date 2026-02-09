@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
-import './ServiceRequestModal.css';
+import './request-service.css';
 
 interface Service {
   serviceId: number;
@@ -10,26 +11,17 @@ interface Service {
   categoryId: number;
 }
 
-interface ServiceRequestModalProps {
-  visible: boolean;
-  onClose: () => void;
-  providerId: number;
-  providerName: string;
-  onSuccess?: () => void;
-}
-
-export default function ServiceRequestModal({
-  visible,
-  onClose,
-  providerId,
-  providerName,
-  onSuccess,
-}: ServiceRequestModalProps) {
+export default function RequestService() {
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  
+  const providerId = searchParams.get('providerId');
+  const providerName = searchParams.get('providerName') || 'Proveedor';
 
   // Services state
   const [services, setServices] = useState<Service[]>([]);
-  const [loadingServices, setLoadingServices] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(true);
   const [selectedService, setSelectedService] = useState<number | null>(null);
 
   // Form state
@@ -50,16 +42,21 @@ export default function ServiceRequestModal({
 
   // UI state
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (visible && providerId) {
-      loadProviderServices();
+    if (!providerId) {
+      alert('Proveedor no especificado');
+      navigate(-1);
+      return;
     }
-  }, [visible, providerId]);
+    loadProviderServices();
+  }, [providerId]);
 
   const loadProviderServices = async () => {
     setLoadingServices(true);
-
+    setError(null);
+    
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/v1/services/provider/${providerId}`
@@ -72,11 +69,11 @@ export default function ServiceRequestModal({
           setSelectedService(data[0].serviceId);
         }
       } else {
-        alert('No se pudieron cargar los servicios del proveedor');
+        setError('No se pudieron cargar los servicios del proveedor');
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      alert('Error al cargar servicios');
+      setError('Error al cargar servicios');
     } finally {
       setLoadingServices(false);
     }
@@ -94,15 +91,16 @@ export default function ServiceRequestModal({
       async (position) => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-
+        
         setLatitude(lat);
         setLongitude(lon);
 
+        // Try to get address from coordinates using reverse geocoding
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
           );
-
+          
           if (response.ok) {
             const data = await response.json();
             if (data.display_name) {
@@ -120,7 +118,7 @@ export default function ServiceRequestModal({
       (error) => {
         setLoadingLocation(false);
         console.error('Error getting location:', error);
-        alert('No se pudo obtener la ubicación');
+        alert('No se pudo obtener la ubicación. Por favor, ingresa la dirección manualmente.');
       },
       {
         enableHighAccuracy: true,
@@ -154,8 +152,17 @@ export default function ServiceRequestModal({
       alert('Obtén tu ubicación antes de enviar');
       return;
     }
+    if (!preferredDate) {
+      alert('Selecciona una fecha preferida');
+      return;
+    }
+    if (!preferredTime) {
+      alert('Selecciona una hora preferida');
+      return;
+    }
 
     setLoading(true);
+    setError(null);
 
     try {
       const requestData = {
@@ -175,83 +182,73 @@ export default function ServiceRequestModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.token}`,
+          'Authorization': `Bearer ${user?.token}`,
         },
         body: JSON.stringify(requestData),
       });
 
       if (response.ok) {
-        alert(`Solicitud enviada a ${providerName}`);
-        resetForm();
-        onClose();
-        onSuccess?.();
+        alert(`Solicitud enviada a ${providerName} correctamente`);
+        navigate('/my-requests');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'No se pudo enviar la solicitud');
+        setError(errorData.message || 'No se pudo enviar la solicitud');
       }
     } catch (error) {
       console.error('Error submitting request:', error);
-      alert('Error al enviar la solicitud');
+      setError('Error al enviar la solicitud');
     } finally {
       setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setRequestTitle('');
-    setRequestDescription('');
-    setServiceAddress('');
-    setAddressDetails('');
-    setContactPhone('');
-    setPreferredDate(new Date().toISOString().split('T')[0]);
-    setPreferredTime('09:00');
-    setLatitude(null);
-    setLongitude(null);
-    setSelectedService(services.length > 0 ? services[0].serviceId : null);
-  };
-
   const selectedServiceData = services.find((s) => s.serviceId === selectedService);
 
-  if (!visible) return null;
-
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 className="modal-title">Solicitar Servicio</h2>
-          <button className="modal-close" onClick={onClose}>
-            ×
+    <div className="request-service-container">
+      <div className="request-service-content">
+        <div className="request-service-header">
+          <h1 className="request-service-title">Solicitar Servicio</h1>
+          <button onClick={() => navigate(-1)} className="back-button">
+            ← Volver
           </button>
         </div>
 
-        <div className="modal-body">
-          <p className="provider-text">
-            Solicitud para: <span className="provider-name">{providerName}</span>
-          </p>
+        <div className="request-form-card">
+          <div className="provider-info">
+            <p className="provider-label">Solicitud para:</p>
+            <h2 className="provider-name">{providerName}</h2>
+          </div>
+
+          {error && <div className="error-message">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             {/* Service Selection */}
             <div className="form-group">
-              <label className="form-label">Servicio *</label>
+              <label className="form-label form-label-required">Servicio</label>
               {loadingServices ? (
                 <div className="loading-services">
                   <div className="loading-spinner"></div>
                   <p>Cargando servicios...</p>
                 </div>
+              ) : services.length === 0 ? (
+                <p style={{ color: '#6b7280' }}>
+                  No hay servicios disponibles para este proveedor
+                </p>
               ) : (
                 <div className="services-grid">
                   {services.map((service) => (
                     <div
                       key={service.serviceId}
-                      className={`service-card ${
+                      className={`service-option ${
                         selectedService === service.serviceId ? 'selected' : ''
                       }`}
                       onClick={() => setSelectedService(service.serviceId)}
                     >
-                      <span className="service-name">{service.serviceTitle}</span>
-                      <span className="service-price">
+                      <h3 className="service-option-name">{service.serviceTitle}</h3>
+                      <p className="service-option-price">
                         ₡{service.basePrice.toLocaleString()}
-                      </span>
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -260,7 +257,9 @@ export default function ServiceRequestModal({
 
             {/* Request Title */}
             <div className="form-group">
-              <label className="form-label">Título de la solicitud *</label>
+              <label className="form-label form-label-required">
+                Título de la solicitud
+              </label>
               <input
                 type="text"
                 className="form-input"
@@ -274,23 +273,24 @@ export default function ServiceRequestModal({
 
             {/* Request Description */}
             <div className="form-group">
-              <label className="form-label">Descripción *</label>
+              <label className="form-label form-label-required">Descripción</label>
               <textarea
                 className="form-input form-textarea"
                 placeholder="Describe el trabajo que necesitas..."
                 value={requestDescription}
                 onChange={(e) => setRequestDescription(e.target.value)}
-                rows={4}
                 required
               />
             </div>
 
             {/* Service Address */}
             <div className="form-group">
-              <label className="form-label">Dirección del servicio *</label>
+              <label className="form-label form-label-required">
+                Dirección del servicio
+              </label>
               <div className="address-input-group">
                 <textarea
-                  className="form-input address-input"
+                  className="form-input"
                   placeholder="Ingresa la dirección"
                   value={serviceAddress}
                   onChange={(e) => setServiceAddress(e.target.value)}
@@ -304,14 +304,21 @@ export default function ServiceRequestModal({
                   disabled={loadingLocation}
                 >
                   {loadingLocation ? (
-                    <div className="loading-spinner-small"></div>
+                    <>
+                      <div className="loading-spinner" style={{ width: '16px', height: '16px' }}></div>
+                      Obteniendo...
+                    </>
                   ) : (
-                    '📍'
+                    <>
+                      📍 Obtener ubicación
+                    </>
                   )}
                 </button>
               </div>
               {latitude && longitude && (
-                <p className="location-hint">✓ Ubicación obtenida</p>
+                <p className="location-hint">
+                  ✓ Ubicación obtenida correctamente
+                </p>
               )}
             </div>
 
@@ -343,7 +350,7 @@ export default function ServiceRequestModal({
             {/* Date and Time */}
             <div className="date-time-grid">
               <div className="form-group">
-                <label className="form-label">Fecha preferida *</label>
+                <label className="form-label form-label-required">Fecha preferida</label>
                 <input
                   type="date"
                   className="form-input"
@@ -355,7 +362,7 @@ export default function ServiceRequestModal({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Hora preferida *</label>
+                <label className="form-label form-label-required">Hora preferida</label>
                 <input
                   type="time"
                   className="form-input"
@@ -369,25 +376,25 @@ export default function ServiceRequestModal({
             {/* Cost Display */}
             {selectedServiceData && (
               <div className="cost-display">
-                <span className="cost-label">Precio base estimado:</span>
-                <span className="cost-value">
+                <h3 className="cost-label">Precio base estimado:</h3>
+                <p className="cost-value">
                   ₡{selectedServiceData.basePrice.toLocaleString()}
-                </span>
+                </p>
               </div>
             )}
 
             {/* Form Actions */}
-            <div className="modal-footer">
+            <div className="form-actions">
               <button
                 type="button"
-                className="modal-button secondary"
-                onClick={onClose}
+                className="cancel-button"
+                onClick={() => navigate(-1)}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="modal-button primary"
+                className="submit-button"
                 disabled={loading || loadingServices}
               >
                 {loading ? 'Enviando...' : 'Enviar Solicitud'}

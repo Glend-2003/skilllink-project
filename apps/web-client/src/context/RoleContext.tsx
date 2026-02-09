@@ -6,6 +6,7 @@ interface RoleContextType {
   activeRole: Role;
   setActiveRole: (role: Role) => Promise<void>;
   isProvider: boolean;
+  isAdmin: boolean;
   reloadProviderStatus: () => Promise<void>;
 }
 
@@ -14,6 +15,7 @@ const RoleContext = createContext<RoleContextType | undefined>(undefined);
 export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [activeRole, setActiveRoleState] = useState<Role>('client');
   const [isProvider, setIsProvider] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadActiveRole();
@@ -25,11 +27,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       if (savedRole === 'provider' || savedRole === 'client') {
         setActiveRoleState(savedRole);
       }
-      const profile = localStorage.getItem('userProfile');
-      if (profile) {
-        const parsedProfile = JSON.parse(profile);
-        const userType = parsedProfile.userType?.toLowerCase();
-        setIsProvider(userType === 'provider');
+      // Read from 'userData' which is set by AuthContext on login
+      const userDataStr = localStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        const userType = userData.userType?.toLowerCase();
+        setIsProvider(userType === 'provider' || userType === 'admin');
+        setIsAdmin(userType === 'admin');
+        
+        console.log('RoleContext loaded - userType:', userType, 'isProvider:', userType === 'provider' || userType === 'admin', 'isAdmin:', userType === 'admin');
       }
     } catch (error) {
       console.error('Error loading active role:', error);
@@ -46,7 +52,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <RoleContext.Provider value={{ activeRole, setActiveRole, isProvider, reloadProviderStatus: loadActiveRole }}>
+    <RoleContext.Provider value={{ activeRole, setActiveRole, isProvider, isAdmin, reloadProviderStatus: loadActiveRole }}>
       {children}
     </RoleContext.Provider>
   );

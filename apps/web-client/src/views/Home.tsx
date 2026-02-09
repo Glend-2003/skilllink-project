@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
+import { useRole } from '../context/RoleContext';
+import RoleSwitcher from '../components/RoleSwitcher';
 import './Home.css';
 
 interface Category {
@@ -59,6 +61,7 @@ const getIconForCategory = (categoryName: string) => {
 export default function Home() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { activeRole, isProvider } = useRole();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
@@ -66,7 +69,6 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isProviderMode, setIsProviderMode] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -242,15 +244,7 @@ export default function Home() {
               </div>
             </nav>
             <div className="hero-right">
-              <div className="mode-toggle">
-                <span>Modo Cliente</span>
-                <div 
-                  className={`toggle-switch ${isProviderMode ? 'active' : ''}`}
-                  onClick={() => setIsProviderMode(!isProviderMode)}
-                >
-                  <div className="toggle-slider" />
-                </div>
-              </div>
+              <RoleSwitcher />
               <div className="user-avatar" onClick={() => navigate('/profile')}>
                 {user ? (
                   <span style={{ fontSize: '18px' }}>👤</span>
@@ -262,8 +256,19 @@ export default function Home() {
           </header>
 
           <div className="hero-main">
-            <h1 className="hero-title">Encuentra el profesional<br />que necesitas</h1>
-            <p className="hero-subtitle">Conecta con expertos locales verificados cerca de ti</p>
+            <h1 className="hero-title">
+              {activeRole === 'provider' ? (
+                <>Gestiona tus servicios<br />y solicitudes</>
+              ) : (
+                <>Encuentra el profesional<br />que necesitas</>
+              )}
+            </h1>
+            <p className="hero-subtitle">
+              {activeRole === 'provider' 
+                ? 'Panel de control para proveedores de servicios'
+                : 'Conecta con expertos locales verificados cerca de ti'
+              }
+            </p>
             
             <div className="search-bar">
               <input
@@ -284,6 +289,36 @@ export default function Home() {
 
       {/* Content Section */}
       <section className="content-section">
+        {activeRole === 'provider' ? (
+          /* Provider View */
+          <div className="provider-dashboard">
+            <h2 className="section-title">Panel de Proveedor</h2>
+            <div className="dashboard-grid">
+              <div className="dashboard-card" onClick={() => navigate('/provider/services')}>
+                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>📋</div>
+                <h3>Mis Servicios</h3>
+                <p>Gestiona los servicios que ofreces</p>
+              </div>
+              <div className="dashboard-card" onClick={() => navigate('/my-requests')}>
+                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' }}>📬</div>
+                <h3>Solicitudes</h3>
+                <p>Revisa solicitudes de clientes</p>
+              </div>
+              <div className="dashboard-card" onClick={() => navigate('/provider/edit-profile')}>
+                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' }}>✏️</div>
+                <h3>Editar Perfil</h3>
+                <p>Actualiza tu información</p>
+              </div>
+              <div className="dashboard-card" onClick={() => navigate('/chat')}>
+                <div className="dashboard-card-icon" style={{ background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' }}>💬</div>
+                <h3>Mensajes</h3>
+                <p>Chat con tus clientes</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Client View */
+          <>
         {/* Categories */}
         <div className="categories-section">
           <h2 className="section-title">Categorías populares</h2>
@@ -466,6 +501,8 @@ export default function Home() {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </section>
     </div>

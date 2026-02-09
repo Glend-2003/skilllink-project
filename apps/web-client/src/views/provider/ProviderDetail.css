@@ -3,7 +3,7 @@
   min-height: 100vh;
   background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
   padding: 24px;
-  max-width: 1200px;
+  max-width: 1500px;
   margin: 0 auto;
 }
 
@@ -219,6 +219,8 @@
   cursor: pointer;
   transition: all 0.3s;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  width: 100%;
+  max-width: 300px;
 }
 
 .contact-button:hover {
@@ -272,7 +274,7 @@
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 24px;
 }
 
@@ -303,6 +305,10 @@
   font-size: 14px;
   line-height: 1.5;
   margin: 0 0 16px 0;
+}
+
+.service-gallery {
+  margin: 16px 0;
 }
 
 .service-footer {

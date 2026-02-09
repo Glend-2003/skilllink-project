@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import { Config, API_BASE_URL } from '../../constants/Config';
+import ServiceRequestModal from '../../components/ServiceRequestModal';
 import '../chat.css';
 
 interface Message {
@@ -25,6 +26,17 @@ interface ConversationInfo {
   other_user_profile_image?: string;
 }
 
+interface Provider {
+  id: string;
+  providerId?: number;
+  name: string;
+  category: string;
+  rating: number;
+  avatar: string;
+  verified: boolean;
+  profileImageUrl?: string;
+}
+
 export default function ChatDetail() {
   const { id: conversationId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -33,6 +45,8 @@ export default function ChatDetail() {
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,10 +72,29 @@ export default function ChatDetail() {
         const convData = await convRes.json();
         const currentConv = convData.find((c: any) => String(c.conversation_id) === conversationId);
         
+        console.log('Current conversation data:', currentConv);
+        
         if (currentConv) {
+          // Try to find the provider - check both participants
+          // First check if we have explicit provider_user_id
+          let providerUserId = currentConv.provider_user_id;
+          
+          // If not, determine the other user in the conversation
+          if (!providerUserId) {
+            // Get other user ID (the one that's not the current user)
+            const otherUserId = currentConv.participant1_user_id === user.userId
+              ? currentConv.participant2_user_id
+              : currentConv.participant1_user_id;
+            
+            console.log('Other user ID:', otherUserId);
+            
+            // Try to load as provider
+            providerUserId = otherUserId;
+          }
+
           setConversationInfo({
             conversation_id: currentConv.conversation_id,
-            provider_user_id: currentConv.provider_user_id,
+            provider_user_id: providerUserId, // Use the determined provider user id
             client_user_id: currentConv.client_user_id,
             service_id: currentConv.service_id,
             created_at: currentConv.created_at,
@@ -69,6 +102,34 @@ export default function ChatDetail() {
             other_user_email: currentConv.other_user_email,
             other_user_profile_image: currentConv.other_user_profile_image,
           });
+          
+          console.log('Attempting to load provider with ID:', providerUserId);
+          
+          if (providerUserId) {
+            try {
+              const providerRes = await fetch(`${API_BASE_URL}/api/v1/providers/user/${providerUserId}`);
+              console.log('Provider fetch response status:', providerRes.status);
+              
+              if (providerRes.ok) {
+                const providerData = await providerRes.json();
+                console.log('Provider data loaded:', providerData);
+                setProvider({
+                  id: providerUserId.toString(),
+                  providerId: providerData.id || providerData.providerId,
+                  name: providerData.businessName || currentConv.other_user_name || 'Proveedor',
+                  category: providerData.category?.categoryName || 'Servicios',
+                  rating: providerData.rating || 0,
+                  avatar: currentConv.other_user_profile_image || `https://i.pravatar.cc/150?u=${providerUserId}`,
+                  verified: providerData.verified || providerData.isVerified || false,
+                  profileImageUrl: providerData.profileImageUrl,
+                });
+              } else {
+                console.log('Failed to load provider, status:', providerRes.status);
+              }
+            } catch (error) {
+              console.error('Error loading provider:', error);
+            }
+          }
         }
 
         // Get messages
@@ -265,6 +326,31 @@ export default function ChatDetail() {
       </div>
 
       <div className="chat-input-container">
+        <button
+          className="chat-add-button"
+          onClick={() => {
+            console.log('Provider info:', provider);
+            console.log('Current user ID:', user?.userId);
+            console.log('Provider user ID:', conversationInfo?.provider_user_id);
+            
+            if (!provider?.providerId) {
+              alert('Este usuario no está registrado como proveedor. Solo puedes enviar solicitudes de servicio a proveedores.');
+              return;
+            }
+            
+            // Prevent providers from requesting services from themselves
+            if (user?.userId === conversationInfo?.provider_user_id) {
+              alert('No puedes solicitarte servicios a ti mismo.');
+              return;
+            }
+            
+            setShowRequestModal(true);
+          }}
+          title="Solicitar servicio"
+        >
+          +
+        </button>
+        
         <input
           ref={inputRef}
           type="text"
@@ -289,6 +375,19 @@ export default function ChatDetail() {
           ➤
         </button>
       </div>
+
+      {/* Service Request Modal */}
+      {provider && provider.providerId && (
+        <ServiceRequestModal
+          visible={showRequestModal}
+          onClose={() => setShowRequestModal(false)}
+          providerId={provider.providerId}
+          providerName={provider.name}
+          onSuccess={() => {
+            alert('Tu solicitud ha sido enviada al proveedor');
+          }}
+        />
+      )}
     </div>
   );
 }

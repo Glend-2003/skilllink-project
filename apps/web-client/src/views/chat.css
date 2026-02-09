@@ -483,6 +483,35 @@
   align-items: center;
 }
 
+.chat-add-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  color: white;
+  font-size: 32px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  line-height: 1;
+  padding-bottom: 2px;
+}
+
+.chat-add-button:hover {
+  transform: scale(1.05) rotate(90deg);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.chat-add-button:active {
+  transform: scale(0.95) rotate(90deg);
+}
+
 .chat-input {
   flex: 1;
   padding: 12px 20px;
