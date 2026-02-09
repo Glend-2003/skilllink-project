@@ -7,15 +7,18 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Config } from '@/constants/Config';
 import { useAuth } from '@/app/context/AuthContext';
+import CustomAlert from './CustomAlert';
 
 interface ServiceRequestModalProps {
   visible: boolean;
@@ -57,11 +60,26 @@ export default function ServiceRequestModal({
   // Location state
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [tempLocation, setTempLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   
   // UI state
   const [loading, setLoading] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   // Load provider services
   useEffect(() => {
@@ -74,7 +92,7 @@ export default function ServiceRequestModal({
     setLoadingServices(true);
     try {
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/services/provider/${providerId}`
+        `${Config.API_GATEWAY_URL}/api/v1/services/provider/${providerId}`
       );
       
       if (response.ok) {
@@ -91,11 +109,21 @@ export default function ServiceRequestModal({
           setSelectedService(mappedServices[0].serviceId);
         }
       } else {
-        Alert.alert('Error', 'No se pudieron cargar los servicios del proveedor');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar los servicios del proveedor',
+        });
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      Alert.alert('Error', 'Error al cargar servicios');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar servicios',
+      });
     } finally {
       setLoadingServices(false);
     }
@@ -107,58 +135,155 @@ export default function ServiceRequestModal({
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert(
-          'Permisos requeridos',
-          'Necesitamos acceso a tu ubicación para la solicitud de servicio'
-        );
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Permisos requeridos',
+          message: 'Necesitamos acceso a tu ubicación para la solicitud de servicio',
+        });
         setLoadingLocation(false);
         return;
       }
 
       const location = await Location.getCurrentPositionAsync({});
-      setLatitude(location.coords.latitude);
-      setLongitude(location.coords.longitude);
-
-      // Reverse geocoding to get address
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+      await updateLocationAndAddress(location.coords.latitude, location.coords.longitude);
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación actual obtenida correctamente',
       });
-
-      if (address) {
-        const fullAddress = `${address.street || ''} ${address.streetNumber || ''}, ${address.city || ''}, ${address.region || ''}`.trim();
-        setServiceAddress(fullAddress);
-      }
-
-      Alert.alert('Éxito', 'Ubicación obtenida correctamente');
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'No se pudo obtener la ubicación');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo obtener la ubicación',
+      });
     } finally {
       setLoadingLocation(false);
     }
   };
 
+  const updateLocationAndAddress = async (lat: number, lng: number) => {
+    setLatitude(lat);
+    setLongitude(lng);
+
+    try {
+      // Reverse geocoding to get address
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
+
+      if (address) {
+        const addressParts = [];
+        if (address.street) addressParts.push(address.street);
+        if (address.streetNumber) addressParts.push(address.streetNumber);
+        if (address.district) addressParts.push(address.district);
+        if (address.city) addressParts.push(address.city);
+        if (address.region) addressParts.push(address.region);
+        if (address.country) addressParts.push(address.country);
+        
+        const fullAddress = addressParts.join(', ');
+        setServiceAddress(fullAddress || `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`);
+      } else {
+        setServiceAddress(`Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`);
+      }
+    } catch (error) {
+      console.error('Error in reverse geocoding:', error);
+      setServiceAddress(`Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`);
+    }
+  };
+
+  const openMapForSelection = async () => {
+    // Open map immediately with existing or default location
+    if (latitude && longitude) {
+      setTempLocation({ latitude, longitude });
+    } else {
+      // Use default location (Mexico City) while loading actual location
+      setTempLocation({
+        latitude: 19.4326,
+        longitude: -99.1332,
+      });
+    }
+    setShowMapModal(true);
+
+    // Then try to get actual location in background if we don't have it
+    if (!latitude || !longitude) {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({});
+          setTempLocation({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
+        }
+      } catch (error) {
+        console.error('Error getting location in background:', error);
+      }
+    }
+  };
+
+  const handleMapPress = (event: any) => {
+    const { latitude, longitude } = event.nativeEvent.coordinate;
+    setTempLocation({ latitude, longitude });
+  };
+
+  const confirmMapLocation = async () => {
+    if (tempLocation) {
+      setLoadingLocation(true);
+      await updateLocationAndAddress(tempLocation.latitude, tempLocation.longitude);
+      setLoadingLocation(false);
+      setShowMapModal(false);
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación seleccionada correctamente',
+      });
+    }
+  };
+
   const handleSubmit = async () => {
     // Validation
-    if (!selectedService) {
-      Alert.alert('Error', 'Selecciona un servicio');
-      return;
-    }
     if (!requestTitle.trim()) {
-      Alert.alert('Error', 'Ingresa un título para la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa un título para la solicitud',
+      });
       return;
     }
     if (!requestDescription.trim()) {
-      Alert.alert('Error', 'Describe lo que necesitas');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Describe lo que necesitas',
+      });
       return;
     }
     if (!serviceAddress.trim()) {
-      Alert.alert('Error', 'Ingresa la dirección del servicio');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa la dirección del servicio',
+      });
       return;
     }
     if (!latitude || !longitude) {
-      Alert.alert('Error', 'Obtén tu ubicación antes de enviar');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Obtén tu ubicación antes de enviar',
+      });
       return;
     }
 
@@ -171,7 +296,7 @@ export default function ServiceRequestModal({
       const formattedTime = `${hours}:${minutes}`; // HH:MM
 
       const requestData = {
-        serviceId: selectedService,
+        serviceId: selectedService || undefined,
         requestTitle: requestTitle.trim(),
         requestDescription: requestDescription.trim(),
         serviceAddress: serviceAddress.trim(),
@@ -185,7 +310,7 @@ export default function ServiceRequestModal({
 
       const token = user?.token;
       
-      const response = await fetch(`${Config.SERVICE_MANAGER_URL}/requests`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -195,27 +320,34 @@ export default function ServiceRequestModal({
       });
 
       if (response.ok) {
-        Alert.alert(
-          'Éxito',
-          `Solicitud enviada a ${providerName}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                resetForm();
-                onClose();
-                onSuccess?.();
-              },
-            },
-          ]
-        );
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: `Solicitud enviada a ${providerName}`,
+          onConfirm: () => {
+            resetForm();
+            onClose();
+            onSuccess?.();
+          },
+        });
       } else {
         const errorData = await response.json();
-        Alert.alert('Error', errorData.message || 'No se pudo enviar la solicitud');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: errorData.message || 'No se pudo enviar la solicitud',
+        });
       }
     } catch (error) {
       console.error('Error submitting request:', error);
-      Alert.alert('Error', 'Error al enviar la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al enviar la solicitud',
+      });
     } finally {
       setLoading(false);
     }
@@ -237,13 +369,90 @@ export default function ServiceRequestModal({
   const selectedServiceData = services.find(s => s.serviceId === selectedService);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
+    <>
+      {/* Map Selection Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={styles.mapModalContainer}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.mapTitle}>Selecciona la ubicación del servicio</Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)} style={styles.mapCloseButton}>
+              <Ionicons name="close" size={28} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+          
+          {tempLocation && (
+            <MapView
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              initialRegion={{
+                latitude: tempLocation.latitude,
+                longitude: tempLocation.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              onPress={handleMapPress}
+              showsUserLocation={true}
+              showsMyLocationButton={true}
+              loadingEnabled={true}
+              loadingIndicatorColor="#3B82F6"
+              loadingBackgroundColor="#F9FAFB"
+            >
+              <Marker
+                coordinate={tempLocation}
+                draggable
+                onDragEnd={handleMapPress}
+                title="Ubicación del servicio"
+                description="Arrastra para ajustar"
+                pinColor="#EF4444"
+              />
+            </MapView>
+          )}
+          
+          <View style={styles.mapFooter}>
+            <View style={styles.mapCoordinatesInfo}>
+              {tempLocation && (
+                <Text style={styles.mapCoordinatesText}>
+                  📍 Lat: {tempLocation.latitude.toFixed(6)}, Lng: {tempLocation.longitude.toFixed(6)}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.mapHint}>Toca el mapa o arrastra el marcador para ajustar la ubicación</Text>
+            <TouchableOpacity
+              style={styles.confirmLocationButton}
+              onPress={confirmMapLocation}
+              disabled={loadingLocation}
+            >
+              <LinearGradient
+                colors={['#3B82F6', '#2563EB']}
+                style={styles.confirmLocationGradient}
+              >
+                {loadingLocation ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={24} color="white" />
+                    <Text style={styles.confirmLocationText}>Confirmar Ubicación</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Main Request Modal */}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Solicitar Servicio</Text>
@@ -259,10 +468,10 @@ export default function ServiceRequestModal({
 
             {/* Service Selection */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Servicio *</Text>
+              <Text style={styles.label}>Servicio (Opcional)</Text>
               {loadingServices ? (
                 <ActivityIndicator size="small" color="#3B82F6" />
-              ) : (
+              ) : services.length > 0 ? (
                 <View style={styles.servicesContainer}>
                   {services.map((service) => (
                     <TouchableOpacity
@@ -288,7 +497,9 @@ export default function ServiceRequestModal({
                     </TouchableOpacity>
                   ))}
                 </View>
-              )}
+            ) : (
+              <Text style={styles.noServicesText}>No hay servicios disponibles. Puedes continuar sin seleccionar uno.</Text>
+            )}
             </View>
 
             {/* Request Title */}
@@ -320,31 +531,55 @@ export default function ServiceRequestModal({
             {/* Service Address */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Dirección del servicio *</Text>
-              <View style={styles.addressInputContainer}>
-                <TextInput
-                  style={[styles.input, styles.addressInput]}
-                  placeholder="Ingresa la dirección"
-                  value={serviceAddress}
-                  onChangeText={setServiceAddress}
-                  multiline
-                />
+              <TextInput
+                style={[styles.input, styles.addressInputReadOnly]}
+                placeholder="Selecciona tu ubicación"
+                value={serviceAddress}
+                editable={false}
+                multiline
+              />
+              {latitude && longitude && (
+                <View style={styles.locationInfoContainer}>
+                  <Ionicons name="location" size={16} color="#10B981" />
+                  <Text style={styles.locationHint}>
+                    Ubicación exacta: {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.locationButtonsContainer}>
                 <TouchableOpacity
-                  style={styles.locationButton}
+                  style={styles.locationOptionButton}
                   onPress={getCurrentLocation}
                   disabled={loadingLocation}
                 >
-                  {loadingLocation ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Ionicons name="location" size={20} color="white" />
-                  )}
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    style={styles.locationButtonGradient}
+                  >
+                    {loadingLocation ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <>
+                        <Ionicons name="navigate" size={20} color="white" />
+                        <Text style={styles.locationButtonText}>Ubicación Actual</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.locationOptionButton}
+                  onPress={openMapForSelection}
+                  disabled={loadingLocation}
+                >
+                  <LinearGradient
+                    colors={['#3B82F6', '#2563EB']}
+                    style={styles.locationButtonGradient}
+                  >
+                    <Ionicons name="map" size={20} color="white" />
+                    <Text style={styles.locationButtonText}>Seleccionar en Mapa</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
-              {latitude && longitude && (
-                <Text style={styles.locationHint}>
-                  📍 Ubicación obtenida
-                </Text>
-              )}
             </View>
 
             {/* Address Details */}
@@ -454,6 +689,22 @@ export default function ServiceRequestModal({
         </View>
       </View>
     </Modal>
+
+    <CustomAlert
+      visible={alert.visible}
+      type={alert.type}
+      title={alert.title}
+      message={alert.message}
+      showCancel={alert.showCancel}
+      onConfirm={() => {
+        if (alert.onConfirm) {
+          alert.onConfirm();
+        }
+        setAlert({ ...alert, visible: false });
+      }}
+      onCancel={() => setAlert({ ...alert, visible: false })}
+    />
+    </>
   );
 }
 
@@ -475,6 +726,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
+    paddingTop: 60,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
@@ -519,27 +771,120 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
   },
-  addressInputContainer: {
+  addressInputReadOnly: {
+    backgroundColor: '#F3F4F6',
+    color: '#6B7280',
+    minHeight: 60,
+  },
+  locationInfoContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  addressInput: {
-    flex: 1,
-    marginRight: 8,
-  },
-  locationButton: {
-    backgroundColor: '#3B82F6',
-    borderRadius: 8,
-    padding: 12,
-    justifyContent: 'center',
     alignItems: 'center',
-    width: 48,
-    height: 48,
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 4,
   },
   locationHint: {
     fontSize: 12,
     color: '#10B981',
-    marginTop: 4,
+    fontWeight: '500',
+  },
+  locationButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  locationOptionButton: {
+    flex: 1,
+  },
+  locationButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    padding: 14,
+  },
+  locationButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  mapModalContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1,
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+  },
+  mapCloseButton: {
+    padding: 4,
+  },
+  map: {
+    flex: 1,
+    width: '100%',
+  },
+  mapCoordinatesInfo: {
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  mapCoordinatesText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  mapFooter: {
+    backgroundColor: 'white',
+    padding: 20,
+    paddingBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  mapHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  confirmLocationButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  confirmLocationGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+  },
+  confirmLocationText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
   },
   dateButton: {
     flexDirection: 'row',
@@ -626,4 +971,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
+  noServicesText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+  },
 });
+
+const { width, height } = Dimensions.get('window');

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateUserProfileDto } from './user-profile/dto/create-user-profile.dto';
-import { UserProfile } from './user-profile/user-profile.entity'; // Asegura la ruta correcta
+import { UserProfile } from './user-profile/user-profile.entity';
 
 @Injectable()
 export class UserService {

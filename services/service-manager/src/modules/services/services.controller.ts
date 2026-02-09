@@ -7,11 +7,21 @@ import {
   Param,
   Delete,
   ParseIntPipe,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 import { ServicesService } from './services.service';
 import { CreateServiceDto } from './dto/serviceCreate.dto';
 import { UpdateServiceDto } from './dto/serviceUpdate.dto';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    userId: number;
+    email: string;
+  };
+}
 
 @Controller('services')
 export class ServicesController {
@@ -25,6 +35,12 @@ export class ServicesController {
   @Get()
   findAll() {
     return this.servicesService.findAll();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('provider/me')
+  findMyServices(@Request() req: AuthenticatedRequest) {
+    return this.servicesService.findByUserId(req.user.userId);
   }
 
   @Get('provider/:providerId')

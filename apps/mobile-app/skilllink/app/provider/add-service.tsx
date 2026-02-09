@@ -86,6 +86,11 @@ export default function AddServiceScreen() {
   };
 
   const handleSave = async () => {
+    if (!providerId) {
+      Alert.alert('Error', 'No se pudo obtener tu perfil de proveedor');
+      return;
+    }
+
     if (!formData.serviceTitle.trim()) {
       Alert.alert('Error', 'El título del servicio es requerido');
       return;
@@ -101,6 +106,11 @@ export default function AddServiceScreen() {
       return;
     }
 
+    if (formData.priceType !== 'negotiable' && (!formData.basePrice || parseFloat(formData.basePrice) <= 0)) {
+      Alert.alert('Error', 'El precio base es requerido y debe ser mayor a 0');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -111,6 +121,7 @@ export default function AddServiceScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          providerId: providerId,
           categoryId: formData.categoryId,
           serviceTitle: formData.serviceTitle,
           serviceDescription: formData.serviceDescription,
@@ -144,7 +155,10 @@ export default function AddServiceScreen() {
         );
       } else {
         const data = await response.json();
-        Alert.alert('Error', data.message || 'No se pudo crear el servicio');
+        const errorMessage = Array.isArray(data.message) 
+          ? data.message.join('\n') 
+          : data.message || 'No se pudo crear el servicio';
+        Alert.alert('Error', errorMessage);
       }
     } catch (error) {
       console.error('Error creating service:', error);
@@ -230,7 +244,9 @@ export default function AddServiceScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Precio Base ($)</Text>
+          <Text style={styles.label}>
+            Precio Base ($) {formData.priceType !== 'negotiable' && '*'}
+          </Text>
           <TextInput
             style={styles.input}
             value={formData.basePrice}

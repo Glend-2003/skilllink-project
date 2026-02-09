@@ -6,5 +6,6 @@ namespace Auth_Service.DTOs
         public string password { get; set; }
         public string? phoneNumber { get; set; }
         public string userType { get; set; }
+        public string? fullName { get; set; }
     }
 }

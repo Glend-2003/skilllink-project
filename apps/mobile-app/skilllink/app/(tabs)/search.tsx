@@ -9,9 +9,13 @@ import {
   ActivityIndicator,
   ScrollView,
   Image,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Search as SearchIcon, X, DollarSign, Clock } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Config } from '@/constants/Config';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
@@ -66,6 +70,11 @@ interface Service {
       email: string;
     };
   };
+  gallery?: Array<{
+    galleryId: number;
+    imageUrl: string;
+    displayOrder: number;
+  }>;
   rating?: number;
   reviewCount?: number;
 }
@@ -78,6 +87,7 @@ export default function SearchScreen() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -90,7 +100,7 @@ export default function SearchScreen() {
   const loadInitialData = async () => {
     try {
       const [categoriesRes, servicesRes] = await Promise.all([
-        fetch(`${Config.AUTH_SERVICE_URL}/categories`).catch(() => null),
+        fetch(`${Config.API_GATEWAY_URL}/api/v1/categories`).catch(() => null),
         fetch(`${Config.API_GATEWAY_URL}/api/v1/services`).catch(() => null),
       ]);
 
@@ -109,6 +119,12 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadInitialData();
+    setRefreshing(false);
   };
 
   const filterServices = () => {
@@ -144,9 +160,13 @@ export default function SearchScreen() {
   };
 
   const handleServicePress = (service: Service) => {
-    // Use userId from provider.user, fallback to providerId if not available
-    const userId = service.provider?.user?.userId || service.providerId;
-    router.push(`/provider/${userId}`);
+    // Always use userId from provider.user - this is the user_id that the API expects
+    const userId = service.provider?.user?.userId;
+    if (userId) {
+      router.push(`/provider/${userId}`);
+    } else {
+      Alert.alert('Error', 'No se pudo obtener la información del proveedor');
+    }
   };
 
   const getPriceDisplay = (service: Service) => {
@@ -198,49 +218,73 @@ export default function SearchScreen() {
     );
   };
 
-  const renderService = ({ item }: { item: Service }) => (
-    <TouchableOpacity style={styles.serviceCard} onPress={() => handleServicePress(item)}>
-      <View style={styles.serviceHeader}>
-        <View style={styles.serviceInfo}>
-          <Text style={styles.serviceName}>{item.serviceTitle}</Text>
-          <Text style={styles.providerName}>Por: {item.provider.businessName}</Text>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{item.category.categoryName}</Text>
-          </View>
-        </View>
-        {item.provider?.user?.profileImageUrl ? (
-          <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.provider.businessName.charAt(0)}</Text>
-          </View>
-        )}
-      </View>
-
-      <Text style={styles.description} numberOfLines={2}>
-        {item.serviceDescription}
-      </Text>
-
-      <View style={styles.serviceFooter}>
-        <View style={styles.infoRow}>
-          <Text style={styles.priceText}>{getPriceDisplay(item)}</Text>
-          
-          {item.estimatedDurationMinutes && (
-            <Text style={styles.infoText}> • {getDurationDisplay(item.estimatedDurationMinutes)}</Text>
-          )}
-        </View>
-
-        <View style={styles.ratingContainer}>
-          <Text style={styles.rating}>{(item.rating || 4.5).toFixed(1)}</Text>
-          {item.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedText}>Verificado</Text>
+  const renderService = ({ item }: { item: Service }) => {
+    const serviceImage = item.gallery && item.gallery.length > 0 
+      ? item.gallery.sort((a, b) => a.displayOrder - b.displayOrder)[0].imageUrl 
+      : null;
+    
+    return (
+      <TouchableOpacity style={styles.serviceCard} onPress={() => handleServicePress(item)}>
+        <View style={styles.providerGradient}>
+          {serviceImage && (
+            <View style={styles.serviceImageContainer}>
+              <Image source={{ uri: serviceImage }} style={styles.serviceImageFull} />
             </View>
           )}
+          
+          <View style={styles.serviceHeader}>
+            <View style={styles.serviceInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.serviceName}>{item.serviceTitle}</Text>
+              </View>
+              <View style={styles.categoryBadgeContainer}>
+                <View style={styles.categoryDotSmall} />
+                <Text style={styles.categoryBadgeText}>{item.category.categoryName}</Text>
+              </View>
+              <View style={styles.ratingRow}>
+                <Text style={styles.ratingStar}>★</Text>
+                <Text style={styles.rating}>
+                  {item.rating && item.rating > 0 ? item.rating.toFixed(1) : 'N/A'}
+                </Text>
+                {item.rating && item.rating > 0 ? (
+                  <Text style={styles.ratingLabel}>
+                    • {item.rating >= 4.5 ? 'Excelente' : item.rating >= 4 ? 'Muy bueno' : item.rating >= 3 ? 'Bueno' : 'Regular'}
+                  </Text>
+                ) : (
+                  <Text style={styles.ratingLabel}>• Sin calificaciones</Text>
+                )}
+                <Text style={styles.providerName}>• {item.provider?.businessName || 'Proveedor'}</Text>
+              </View>
+            </View>
+            <View style={styles.avatarWrapper}>
+              {item.provider?.user?.profileImageUrl ? (
+                <Image source={{ uri: item.provider.user.profileImageUrl }} style={styles.avatarImage} />
+              ) : (
+                <LinearGradient
+                  colors={['#58b9f1', '#2563eb']}
+                  style={styles.avatar}
+                >
+                  <Ionicons name="person-circle-outline" size={24} color="#FFF" />
+                </LinearGradient>
+              )}
+              <View style={styles.avatarRing} />
+            </View>
+          </View>
+
+          <Text style={styles.description} numberOfLines={2}>
+            {item.serviceDescription}
+          </Text>
+
+          <View style={styles.serviceFooter}>
+            <View style={styles.footerLeft}>
+              <Text style={styles.priceLabel}>Desde</Text>
+              <Text style={styles.priceText}>{getPriceDisplay(item)}</Text>
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -252,7 +296,18 @@ export default function SearchScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#3B82F6']}
+          tintColor="#3B82F6"
+        />
+      }
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Buscar Servicios</Text>
@@ -474,116 +529,151 @@ const styles = StyleSheet.create({
   },
   serviceCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderRadius: 20,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  providerGradient: {
+    padding: 20,
+    backgroundColor: '#fafbfc',
+  },
+  serviceImageContainer: {
+    width: '100%',
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  serviceImageFull: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   serviceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   serviceInfo: {
     flex: 1,
   },
-  serviceName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#1F2937',
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  providerName: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 6,
+  serviceName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0f172a',
+    letterSpacing: -0.2,
   },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  categoryBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 6,
+  },
+  categoryDotSmall: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3b82f6',
+    marginRight: 6,
   },
   categoryBadgeText: {
-    fontSize: 12,
-    color: '#3B82F6',
-    fontWeight: '500',
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e0e0e0',
-  },
-  avatarText: {
-    fontSize: 18,
+    fontSize: 11,
+    color: '#3b82f6',
     fontWeight: '600',
-    color: '#fff',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  description: {
-    fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  serviceFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  infoItem: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  priceText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  infoText: {
+  ratingStar: {
     fontSize: 14,
-    color: '#666',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    color: '#fbbf24',
   },
   rating: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#92400e',
+    marginLeft: 2,
   },
-  verifiedBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+  ratingLabel: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
   },
-  verifiedText: {
-    fontSize: 11,
+  providerName: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarRing: {
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(99, 102, 241, 0.15)',
+  },
+  description: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  footerLeft: {
+    flex: 1,
+  },
+  priceLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
     fontWeight: '600',
-    color: '#10B981',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  priceText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#059669',
+    letterSpacing: -0.3,
   },
   emptyState: {
     alignItems: 'center',

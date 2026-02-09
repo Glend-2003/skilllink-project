@@ -71,11 +71,22 @@ namespace AuthController.Controllers
                 try
                 {
                     using var httpClient = new HttpClient();
+                    
+                    // Split full name into first and last name
+                    string firstName = "";
+                    string lastName = "";
+                    if (!string.IsNullOrWhiteSpace(model.fullName))
+                    {
+                        var nameParts = model.fullName.Trim().Split(' ', 2);
+                        firstName = nameParts[0];
+                        lastName = nameParts.Length > 1 ? nameParts[1] : "";
+                    }
+                    
                     var userProfileData = new
                     {
                         user_id = user.Id,
-                        first_name = "",
-                        last_name = "",
+                        first_name = firstName,
+                        last_name = lastName,
                         bio = ""
                     };
 
@@ -86,6 +97,9 @@ namespace AuthController.Controllers
                     );
 
                     var userServiceUrl = _configuration["Services:UserService"] ?? "http://localhost:3004";
+                    Console.WriteLine($"Creating user profile for userId: {user.Id}, firstName: {firstName}, lastName: {lastName}");
+                    Console.WriteLine($"User service URL: {userServiceUrl}/user-profile");
+                    
                     var response = await httpClient.PostAsync(
                         $"{userServiceUrl}/user-profile",
                         jsonContent
@@ -93,7 +107,12 @@ namespace AuthController.Controllers
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}");
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}, Error: {errorContent}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"User profile created successfully for userId: {user.Id}");
                     }
                 }
                 catch (Exception profileEx)
@@ -422,6 +441,119 @@ namespace AuthController.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Status = "Error", Message = "Error revisando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
+            
+            if (user == null)
+            {
+                // Don't reveal that the user doesn't exist for security reasons
+                return Ok(new { Status = "Success", Message = "Si el correo existe, recibirás un código de recuperación" });
+            }
+
+            // Generate a 6-digit code
+            var random = new Random();
+            var code = random.Next(100000, 999999).ToString();
+
+            // Store the code and set expiration (15 minutes)
+            user.ResetPasswordCode = code;
+            user.ResetCodeExpiration = DateTime.UtcNow.AddMinutes(15);
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                // Send email with the code via notification service
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    var notificationServiceUrl = _configuration["Services:NotificationService"] ?? "http://localhost:3006";
+                    
+                    var emailData = new
+                    {
+                        to = user.Email,
+                        subject = "Recuperar Contraseña - SkillLink",
+                        code = code,
+                        type = "password-reset"
+                    };
+                    
+                    var jsonContent = new StringContent(
+                        System.Text.Json.JsonSerializer.Serialize(emailData),
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+
+                    var response = await httpClient.PostAsync(
+                        $"{notificationServiceUrl}/api/notifications/send-email",
+                        jsonContent
+                    );
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"✅ Recovery email sent to {user.Email}");
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"⚠️ Failed to send email: {errorContent}");
+                        Console.WriteLine($"📧 Recovery code for {user.Email}: {code}");
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    // Log but don't fail - user can still recover if we log the code
+                    Console.WriteLine($"⚠️ Error sending email: {emailEx.Message}");
+                    Console.WriteLine($"📧 Recovery code for {user.Email}: {code}");
+                }
+
+                return Ok(new { Status = "Success", Message = "Si el correo existe, recibirás un código de recuperación" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error procesando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
+            
+            if (user == null)
+            {
+                return BadRequest(new { Status = "Error", Message = "Código inválido o expirado" });
+            }
+
+            // Check if code matches and is not expired
+            if (string.IsNullOrEmpty(user.ResetPasswordCode) || 
+                user.ResetPasswordCode != model.code ||
+                user.ResetCodeExpiration == null ||
+                user.ResetCodeExpiration < DateTime.UtcNow)
+            {
+                return BadRequest(new { Status = "Error", Message = "Código inválido o expirado" });
+            }
+
+            // Update password
+            user.PasswordHash = _passwordHasher.HashPassword(user, model.newPassword);
+            user.ResetPasswordCode = null;
+            user.ResetCodeExpiration = null;
+            user.SecurityStamp = Guid.NewGuid().ToString();
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Contraseña actualizada exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error actualizando contraseña", Detail = ex.Message });
             }
         }
 

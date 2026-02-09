@@ -1,5 +1,4 @@
 services:
-  # Servicio de Base de Datos
   mysql_db:
     image: mysql:8.0
     container_name: skilllink_db
@@ -17,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Servicio de Autenticación
   auth-service:
     build:
       context: ./services/auth-service/Auth-Service
@@ -31,7 +29,6 @@ services:
     depends_on:
       - mysql_db
 
-  # Servicio de Usuarios
   user-service:
     build: ./services/user-service
     ports:
@@ -40,7 +37,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Gestor de Servicios
   service-manager:
     build: ./services/service-manager
     ports:
@@ -58,7 +54,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Proveedores
   provider-service:
     build: ./services/provider-service
     ports:
@@ -73,7 +68,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Chat
   chat-service:
     build: ./services/chat-service
     ports:
@@ -89,7 +83,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Pagos
   payment-service:
     build: ./services/payment-service
     ports:
@@ -103,7 +96,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # API Gateway 
   api-gateway:
     build: ./services/api-gateway
     container_name: api_gateway
