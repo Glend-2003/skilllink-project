@@ -85,22 +85,8 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    setAlert({
-      visible: true,
-      type: 'info',
-      title: 'Próximamente',
-      message: `La autenticación con ${provider} estará disponible pronto.`,
-    });
-  };
-
   const handleForgotPassword = () => {
-    setAlert({
-      visible: true,
-      type: 'info',
-      title: 'Recuperar Contraseña',
-      message: 'La funcionalidad de recuperación de contraseña estará disponible pronto.',
-    });
+    router.push("/forgot-password");
   };
 
   return (
@@ -198,29 +184,6 @@ export default function LoginScreen() {
               </Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          <View style={styles.separator}>
-            <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>O continúa con</Text>
-            <View style={styles.separatorLine} />
-          </View>
-
-          <View style={styles.socialButtons}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => handleSocialLogin('Google')}
-            >
-              <Ionicons name="logo-google" size={20} color="#db4437" />
-              <Text style={styles.socialButtonText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={() => handleSocialLogin('Facebook')}
-            >
-              <Ionicons name="logo-facebook" size={20} color="#4267b2" />
-              <Text style={styles.socialButtonText}>Facebook</Text>
-            </TouchableOpacity>
-          </View>
 
           <View style={styles.registerLink}>
             <Text style={styles.registerText}>¿No tienes una cuenta? </Text>
@@ -395,41 +358,6 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  separator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  separatorLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  separatorText: {
-    paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    padding: 12,
-    borderRadius: 8,
-  },
-  socialButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#374151',
-  },
   registerLink: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -451,3 +379,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+  

@@ -31,5 +31,11 @@ namespace Auth_Service.Models
 
         [Column("profile_image_url")]
         public string? ProfileImageUrl { get; set; }
+
+        [Column("reset_password_code")]
+        public string? ResetPasswordCode { get; set; }
+
+        [Column("reset_code_expiration")]
+        public DateTime? ResetCodeExpiration { get; set; }
     }
 }
