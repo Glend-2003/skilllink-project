@@ -20,7 +20,7 @@ export class CreateUserProfileDto {
   @MaxLength(100)
   last_name?: string;
 
-  @IsOptional() // Puede ser nulo o indefinido
+  @IsOptional()
   @IsString()
   @MaxLength(500)
   bio?: string;

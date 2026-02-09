@@ -78,14 +78,51 @@ export class ServicesService {
   }
 
   async findAll() {
-    return this.serviceRepository.find({
+    const services = await this.serviceRepository.find({
+      where: {
+        approvalStatus: 'approved',
+        isActive: true,
+      },
       relations: {
         provider: {
           user: true,
         },
         category: true,
+        gallery: true,
       },
     });
+
+    // Calculate average rating for each service based on provider's reviews
+    const servicesWithRating = await Promise.all(
+      services.map(async (service) => {
+        const result = await this.serviceRepository.query(
+          `
+          SELECT 
+            COALESCE(AVG(r.rating), 0) as avgRating,
+            COUNT(r.review_id) as reviewCount
+          FROM services s
+          INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+          LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+          WHERE s.service_id = ?
+          GROUP BY s.service_id
+          `,
+          [service.serviceId],
+        );
+
+        const rating = result[0]?.avgRating 
+          ? parseFloat(result[0].avgRating) 
+          : null;
+        const reviewCount = result[0]?.reviewCount || 0;
+
+        return {
+          ...service,
+          rating,
+          reviewCount,
+        };
+      }),
+    );
+
+    return servicesWithRating;
   }
 
   async findOne(id: number) {
@@ -96,10 +133,36 @@ export class ServicesService {
           user: true,
         },
         category: true,
+        gallery: true,
       },
     });
     if (!service) throw new NotFoundException('Servicio no encontrado');
-    return service;
+
+    // Calculate average rating based on provider's reviews
+    const result = await this.serviceRepository.query(
+      `
+      SELECT 
+        COALESCE(AVG(r.rating), 0) as avgRating,
+        COUNT(r.review_id) as reviewCount
+      FROM services s
+      INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+      LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+      WHERE s.service_id = ?
+      GROUP BY s.service_id
+      `,
+      [id],
+    );
+
+    const rating = result[0]?.avgRating 
+      ? parseFloat(result[0].avgRating) 
+      : null;
+    const reviewCount = result[0]?.reviewCount || 0;
+
+    return {
+      ...service,
+      rating,
+      reviewCount,
+    };
   }
 
   async findByProvider(providerId: number) {
@@ -113,18 +176,117 @@ export class ServicesService {
       );
     }
 
-    return this.serviceRepository.find({
-      where: { providerId },
+    // Only return approved and active services for public viewing
+    const services = await this.serviceRepository.find({
+      where: { 
+        providerId,
+        approvalStatus: 'approved',
+        isActive: true,
+      },
       relations: {
         category: true,
         provider: {
           user: true,
         },
+        gallery: true,
       },
       order: {
         createdAt: 'DESC',
       },
     });
+
+    // Calculate average rating for each service based on provider's reviews
+    const servicesWithRating = await Promise.all(
+      services.map(async (service) => {
+        const result = await this.serviceRepository.query(
+          `
+          SELECT 
+            COALESCE(AVG(r.rating), 0) as avgRating,
+            COUNT(r.review_id) as reviewCount
+          FROM services s
+          INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+          LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+          WHERE s.service_id = ?
+          GROUP BY s.service_id
+          `,
+          [service.serviceId],
+        );
+
+        const rating = result[0]?.avgRating 
+          ? parseFloat(result[0].avgRating) 
+          : null;
+        const reviewCount = result[0]?.reviewCount || 0;
+
+        return {
+          ...service,
+          rating,
+          reviewCount,
+        };
+      }),
+    );
+
+    return servicesWithRating;
+  }
+
+  async findByUserId(userId: number) {
+    // Find the provider profile for this user
+    const provider = await this.providerProfile.findOne({
+      where: { userId },
+    });
+    
+    if (!provider) {
+      throw new NotFoundException(
+        `No se encontró perfil de proveedor para el usuario ${userId}`,
+      );
+    }
+
+    // Return ALL services for the provider (including pending and rejected)
+    // This is used by the authenticated provider to see their own services
+    const services = await this.serviceRepository.find({
+      where: { providerId: provider.providerId },
+      relations: {
+        category: true,
+        provider: {
+          user: true,
+        },
+        gallery: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    // Calculate average rating for each service based on provider's reviews
+    const servicesWithRating = await Promise.all(
+      services.map(async (service) => {
+        const result = await this.serviceRepository.query(
+          `
+          SELECT 
+            COALESCE(AVG(r.rating), 0) as avgRating,
+            COUNT(r.review_id) as reviewCount
+          FROM services s
+          INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+          LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+          WHERE s.service_id = ?
+          GROUP BY s.service_id
+          `,
+          [service.serviceId],
+        );
+
+        const rating = result[0]?.avgRating 
+          ? parseFloat(result[0].avgRating) 
+          : null;
+        const reviewCount = result[0]?.reviewCount || 0;
+
+        return {
+          ...service,
+          rating,
+          reviewCount,
+        };
+      }),
+    );
+
+    return servicesWithRating;
   }
 
   async remove(id: number) {
@@ -144,38 +306,106 @@ export class ServicesService {
 
   // Admin methods for service approval
   async findPending() {
-    return await this.serviceRepository.find({
+    const services = await this.serviceRepository.find({
       where: { approvalStatus: 'pending' },
       relations: {
         provider: {
           user: true,
         },
         category: true,
+        gallery: true,
       },
       order: {
         createdAt: 'ASC',
       },
     });
+
+    // Calculate average rating for each service
+    const servicesWithRating = await Promise.all(
+      services.map(async (service) => {
+        const result = await this.serviceRepository.query(
+          `
+          SELECT 
+            COALESCE(AVG(r.rating), 0) as avgRating,
+            COUNT(r.review_id) as reviewCount
+          FROM services s
+          INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+          LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+          WHERE s.service_id = ?
+          GROUP BY s.service_id
+          `,
+          [service.serviceId],
+        );
+
+        const rating = result[0]?.avgRating 
+          ? parseFloat(result[0].avgRating) 
+          : null;
+        const reviewCount = result[0]?.reviewCount || 0;
+
+        return {
+          ...service,
+          rating,
+          reviewCount,
+        };
+      }),
+    );
+
+    return servicesWithRating;
   }
 
   async findAllForAdmin() {
-    return await this.serviceRepository.find({
+    const services = await this.serviceRepository.find({
       relations: {
         provider: {
           user: true,
         },
         category: true,
+        gallery: true,
       },
       order: {
         createdAt: 'DESC',
       },
     });
+
+    // Calculate average rating for each service
+    const servicesWithRating = await Promise.all(
+      services.map(async (service) => {
+        const result = await this.serviceRepository.query(
+          `
+          SELECT 
+            COALESCE(AVG(r.rating), 0) as avgRating,
+            COUNT(r.review_id) as reviewCount
+          FROM services s
+          INNER JOIN provider_profiles pp ON s.provider_id = pp.provider_id
+          LEFT JOIN reviews r ON r.reviewed_user_id = pp.user_id
+          WHERE s.service_id = ?
+          GROUP BY s.service_id
+          `,
+          [service.serviceId],
+        );
+
+        const rating = result[0]?.avgRating 
+          ? parseFloat(result[0].avgRating) 
+          : null;
+        const reviewCount = result[0]?.reviewCount || 0;
+
+        return {
+          ...service,
+          rating,
+          reviewCount,
+        };
+      }),
+    );
+
+    return servicesWithRating;
   }
 
   async approveService(id: number) {
     const service = await this.findOne(id);
     service.approvalStatus = 'approved';
     service.isActive = true;
+    service.isVerified = true;
+    service.verificationDate = new Date();
     await this.serviceRepository.save(service);
     return this.findOne(id);
   }

@@ -56,7 +56,7 @@ export const ServiceGalleryView: React.FC<ServiceGalleryViewProps> = ({
   const loadImages = async () => {
     try {
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/gallery/service/${serviceId}`
+        `${Config.API_GATEWAY_URL}/api/v1/gallery/service/${serviceId}`
       );
 
       if (response.ok) {
@@ -83,7 +83,7 @@ export const ServiceGalleryView: React.FC<ServiceGalleryViewProps> = ({
             setDeleting(galleryId);
             try {
               const response = await fetch(
-                `${Config.SERVICE_MANAGER_URL}/gallery/${galleryId}`,
+                `${Config.API_GATEWAY_URL}/api/v1/gallery/${galleryId}`,
                 { method: 'DELETE' }
               );
 

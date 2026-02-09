@@ -14,8 +14,6 @@ type Message = {
   timestamp: string;
 };
 
-type ConversationStatus = 'active' | 'pending' | 'completed' | 'cancelled';
-
 interface Provider {
   id: string;
   providerId?: number;
@@ -67,7 +65,6 @@ export default function ChatDetail() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('active');
   const [provider, setProvider] = useState<Provider | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
 
@@ -138,11 +135,12 @@ export default function ChatDetail() {
             const errorText = await providerProfileRes.text();
             setProvider({
               id: conversation.other_user_id.toString(),
-              name: conversation.other_user_email || 'Usuario',
+              name: conversation.other_user_name || conversation.other_user_email || 'Usuario',
               category: 'Usuario',
               rating: 0,
               avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${conversation.other_user_id}`,
               verified: false,
+              profileImageUrl: conversation.other_user_profile_image,
             });
           }
         }
@@ -218,7 +216,15 @@ export default function ChatDetail() {
     setText("");
   };
 
+  const handleProfilePress = () => {
+    if (!provider) return;
 
+    if (provider.providerId) {
+      router.push(`/provider/${provider.id}`);
+    } else {
+      router.push(`/profile/user/${provider.id}`);
+    }
+  };
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = item.sender === "me";
@@ -253,39 +259,35 @@ export default function ChatDetail() {
           <Ionicons name="arrow-back" size={24} color="#374151" />
         </TouchableOpacity>
         
-        {provider.profileImageUrl ? (
-          <Image source={{ uri: provider.profileImageUrl }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{provider.name.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
+        <TouchableOpacity 
+          onPress={handleProfilePress}
+          style={styles.profileTouchable}
+          activeOpacity={0.7}
+        >
+          {provider.profileImageUrl ? (
+            <Image source={{ uri: provider.profileImageUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{provider.name.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
 
-        <View style={styles.providerInfo}>
-          <Text style={styles.providerName}>{provider.name}</Text>
-          <View style={styles.providerDetails}>
-            <Text style={styles.providerCategory}>{provider.category}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.rating}>{provider.rating}</Text>
+          <View style={styles.providerInfo}>
+            <View style={styles.providerNameContainer}>
+              <Text style={styles.providerName}>{provider.name}</Text>
+              <Ionicons name="chevron-forward" size={16} color="#9CA3AF" style={{ marginLeft: 4 }} />
+            </View>
+            <View style={styles.providerDetails}>
+              <Text style={styles.providerCategory}>{provider.category}</Text>
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Text style={styles.rating}>{provider.rating}</Text>
+              </View>
             </View>
           </View>
-        </View>
-        <View style={styles.statusIndicator}>
-          <View style={[styles.statusDot, {
-            backgroundColor: conversationStatus === 'active' ? '#10B981' :
-                           conversationStatus === 'pending' ? '#F59E0B' :
-                           conversationStatus === 'completed' ? '#6B7280' : '#EF4444'
-          }]} />
-          <Text style={styles.statusText}>
-            {conversationStatus === 'active' ? 'Activo' :
-             conversationStatus === 'pending' ? 'Pendiente' :
-             conversationStatus === 'completed' ? 'Completado' : 'Cancelado'}
-          </Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
-      {/* Lista de mensajes */}
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -295,7 +297,6 @@ export default function ChatDetail() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Input de mensaje */}
       <View style={styles.inputContainer}>
         <TouchableOpacity
           style={styles.attachButton}
@@ -384,18 +385,21 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  profileTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   avatarImage: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginLeft: 12,
     backgroundColor: '#e0e0e0',
   },
   avatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginLeft: 12,
     backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
@@ -408,6 +412,10 @@ const styles = StyleSheet.create({
   providerInfo: {
     flex: 1,
     marginLeft: 12,
+  },
+  providerNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   providerName: {
     fontSize: 18,

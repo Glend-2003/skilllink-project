@@ -5,15 +5,15 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
-import { Plus, Edit2, Trash2, DollarSign, Clock } from 'lucide-react-native';
+import { Plus, Edit2, Trash2, DollarSign, Clock, ArrowLeft, RotateCw } from 'lucide-react-native';
 import { ServiceGalleryView } from '@/components/ServiceGalleryView';
+import CustomAlert from '../../components/CustomAlert';
 
 interface Service {
   serviceId: number;
@@ -31,12 +31,28 @@ interface Service {
   createdAt: string;
 }
 
+type FilterType = 'all' | 'approved' | 'pending' | 'rejected';
+
 export default function ServicesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadServices();
@@ -44,7 +60,7 @@ export default function ServicesScreen() {
 
   const loadServices = async () => {
     try {
-      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider/services`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services/provider/me`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
@@ -54,11 +70,21 @@ export default function ServicesScreen() {
         const data = await response.json();
         setServices(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar los servicios');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar los servicios',
+        });
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -71,24 +97,20 @@ export default function ServicesScreen() {
   };
 
   const handleDelete = (serviceId: number, title: string) => {
-    Alert.alert(
-      'Eliminar Servicio',
-      `¿Estás seguro de eliminar "${title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => deleteService(serviceId),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Eliminar Servicio',
+      message: `¿Estás seguro de eliminar "${title}"?`,
+      showCancel: true,
+      onConfirm: () => deleteService(serviceId),
+    });
   };
 
   const deleteService = async (serviceId: number) => {
     try {
       const response = await fetch(
-        `${Config.API_GATEWAY_URL}/api/v1/provider/services/${serviceId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/services/${serviceId}`,
         {
           method: 'DELETE',
           headers: {
@@ -98,21 +120,38 @@ export default function ServicesScreen() {
       );
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Servicio eliminado');
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: 'Servicio eliminado',
+        });
         loadServices();
       } else {
-        Alert.alert('Error', 'No se pudo eliminar el servicio');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo eliminar el servicio',
+        });
       }
     } catch (error) {
       console.error('Error deleting service:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     }
   };
 
   const getPriceDisplay = (service: Service) => {
-    if (!service.basePrice) return 'Precio a negociar';
+    if (service.basePrice == null || service.basePrice === undefined) {
+      return 'Precio a negociar';
+    }
     
-    const price = `$${service.basePrice.toFixed(2)}`;
+    const price = `$${Number(service.basePrice).toFixed(2)}`;
     
     if (service.priceType === 'hourly') return `${price}/hora`;
     if (service.priceType === 'negotiable') return `${price} (negociable)`;
@@ -126,6 +165,25 @@ export default function ServicesScreen() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+  };
+
+  const getFilteredServices = () => {
+    if (filter === 'all') return services;
+    return services.filter(service => service.approvalStatus === filter);
+  };
+
+  const renderFilterButton = (filterType: FilterType, label: string) => {
+    const isActive = filter === filterType;
+    return (
+      <TouchableOpacity
+        style={[styles.filterButton, isActive && styles.filterButtonActive]}
+        onPress={() => setFilter(filterType)}
+      >
+        <Text style={[styles.filterButtonText, isActive && styles.filterButtonTextActive]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   const renderService = ({ item }: { item: Service }) => (
@@ -146,9 +204,9 @@ export default function ServicesScreen() {
               item.approvalStatus === 'rejected' && styles.rejectedBadge,
             ]}>
               <Text style={styles.approvalText}>
-                {item.approvalStatus === 'approved' && '✓ Aprobado'}
-                {item.approvalStatus === 'pending' && '⌛ Pendiente'}
-                {item.approvalStatus === 'rejected' && '✗ Rechazado'}
+                {item.approvalStatus === 'approved' && 'Aprobado'}
+                {item.approvalStatus === 'pending' && 'Pendiente'}
+                {item.approvalStatus === 'rejected' && 'Rechazado'}
               </Text>
             </View>
           )}
@@ -182,7 +240,6 @@ export default function ServicesScreen() {
 
       <View style={styles.infoRow}>
         <View style={styles.infoItem}>
-          <DollarSign size={16} color="#666" />
           <Text style={styles.infoText}>{getPriceDisplay(item)}</Text>
         </View>
         
@@ -213,39 +270,62 @@ export default function ServicesScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Mis Servicios',
-          headerStyle: { backgroundColor: '#007AFF' },
-          headerTintColor: '#fff',
-        }}
-      />
-      <View style={styles.container}>
-        <FlatList
-          data={services}
-          renderItem={renderService}
-          keyExtractor={(item) => item.serviceId.toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No tienes servicios registrados</Text>
-              <Text style={styles.emptySubtext}>Agrega tu primer servicio</Text>
-            </View>
-          }
-        />
-
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => router.push('/provider/add-service')}
-        >
-          <Plus size={28} color="#fff" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Mis Servicios</Text>
+        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+          <RotateCw size={24} color="#fff" />
         </TouchableOpacity>
       </View>
-    </>
+
+      <View style={styles.filterContainer}>
+        {renderFilterButton('all', 'Todos')}
+        {renderFilterButton('approved', 'Aprobados')}
+        {renderFilterButton('pending', 'Pendientes')}
+        {renderFilterButton('rejected', 'Rechazados')}
+      </View>
+
+      <FlatList
+        data={getFilteredServices()}
+        renderItem={renderService}
+        keyExtractor={(item) => item.serviceId.toString()}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No tienes servicios registrados</Text>
+            <Text style={styles.emptySubtext}>Agrega tu primer servicio</Text>
+          </View>
+        }
+      />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/provider/add-service')}
+      >
+        <Plus size={28} color="#fff" />
+      </TouchableOpacity>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
+    </View>
   );
 }
 
@@ -258,6 +338,59 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  refreshButton: {
+    padding: 4,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
   },
   listContent: {
     padding: 16,

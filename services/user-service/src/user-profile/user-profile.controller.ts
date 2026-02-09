@@ -83,8 +83,18 @@ export class UserProfileController {
 
   @Get(':userId')
   async findOne(@Param('userId') userId: string) {
-
-    return this.userProfileService.findOne(+userId);
+    const profile = await this.userProfileService.findOne(+userId);
+    
+    // If no profile exists, return basic user info from users table
+    if (!profile) {
+      const basicUserInfo = await this.userProfileService.findBasicUserInfo(+userId);
+      if (!basicUserInfo) {
+        return null;
+      }
+      return basicUserInfo;
+    }
+    
+    return profile;
   }
 
   @Get('profiles')

@@ -5,11 +5,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider } from './context/AuthContext';
 import { RoleProvider } from './context/RoleContext';
-// import { NotificationProvider } from './context/NotificationContext'; // Temporal: esperando nuevo build con Firebase
+// import { NotificationProvider } from './context/NotificationContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -52,25 +53,28 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        {/* <NotificationProvider> */}
-          <RoleProvider>
-            <Stack>
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="register" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="provider/[id]" options={{ headerShown: false }} />
-              <Stack.Screen name="provider/provider-requests" options={{ headerShown: false }} />
-              <Stack.Screen name="provider/edit-profile" options={{ headerShown: false }} />
-              <Stack.Screen name="provider/services" options={{ headerShown: false }} />
-              <Stack.Screen name="review/[requestId]" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-            </Stack>
-          </RoleProvider>
-        {/* </NotificationProvider> */}
-      </AuthProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AuthProvider>
+          {/* <NotificationProvider> */}
+            <RoleProvider>
+              <Stack>
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="register" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="chat/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="provider/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="provider/provider-requests" options={{ headerShown: false }} />
+                <Stack.Screen name="provider/edit-profile" options={{ headerShown: false }} />
+                <Stack.Screen name="provider/services" options={{ headerShown: false }} />
+                <Stack.Screen name="profile/user/[id]" options={{ headerShown: false }} />
+                <Stack.Screen name="review/[requestId]" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+              </Stack>
+            </RoleProvider>
+          {/* </NotificationProvider> */}
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
