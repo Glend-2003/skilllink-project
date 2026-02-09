@@ -5,7 +5,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -14,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
 import { Plus, Edit2, Trash2, DollarSign, Clock, ArrowLeft, RotateCw } from 'lucide-react-native';
 import { ServiceGalleryView } from '@/components/ServiceGalleryView';
+import CustomAlert from '../../components/CustomAlert';
 
 interface Service {
   serviceId: number;
@@ -40,6 +40,19 @@ export default function ServicesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadServices();
@@ -57,11 +70,21 @@ export default function ServicesScreen() {
         const data = await response.json();
         setServices(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar los servicios');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar los servicios',
+        });
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -74,18 +97,14 @@ export default function ServicesScreen() {
   };
 
   const handleDelete = (serviceId: number, title: string) => {
-    Alert.alert(
-      'Eliminar Servicio',
-      `¿Estás seguro de eliminar "${title}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => deleteService(serviceId),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Eliminar Servicio',
+      message: `¿Estás seguro de eliminar "${title}"?`,
+      showCancel: true,
+      onConfirm: () => deleteService(serviceId),
+    });
   };
 
   const deleteService = async (serviceId: number) => {
@@ -101,14 +120,29 @@ export default function ServicesScreen() {
       );
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Servicio eliminado');
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: 'Servicio eliminado',
+        });
         loadServices();
       } else {
-        Alert.alert('Error', 'No se pudo eliminar el servicio');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo eliminar el servicio',
+        });
       }
     } catch (error) {
       console.error('Error deleting service:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     }
   };
 
@@ -170,9 +204,9 @@ export default function ServicesScreen() {
               item.approvalStatus === 'rejected' && styles.rejectedBadge,
             ]}>
               <Text style={styles.approvalText}>
-                {item.approvalStatus === 'approved' && '✓ Aprobado'}
-                {item.approvalStatus === 'pending' && '⌛ Pendiente'}
-                {item.approvalStatus === 'rejected' && '✗ Rechazado'}
+                {item.approvalStatus === 'approved' && 'Aprobado'}
+                {item.approvalStatus === 'pending' && 'Pendiente'}
+                {item.approvalStatus === 'rejected' && 'Rechazado'}
               </Text>
             </View>
           )}
@@ -206,7 +240,6 @@ export default function ServicesScreen() {
 
       <View style={styles.infoRow}>
         <View style={styles.infoItem}>
-          <DollarSign size={16} color="#666" />
           <Text style={styles.infoText}>{getPriceDisplay(item)}</Text>
         </View>
         
@@ -277,6 +310,21 @@ export default function ServicesScreen() {
       >
         <Plus size={28} color="#fff" />
       </TouchableOpacity>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

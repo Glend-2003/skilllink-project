@@ -146,7 +146,6 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
     }
   };
 
-  // Remover imagen seleccionada
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
   };
@@ -213,7 +212,7 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
             </View>
           ) : (
             <Text style={styles.uploadButtonText}>
-              ⬆️ Subir {selectedImages.length} imagen(es)
+              ⬆Subir {selectedImages.length} imagen(es)
             </Text>
           )}
         </TouchableOpacity>

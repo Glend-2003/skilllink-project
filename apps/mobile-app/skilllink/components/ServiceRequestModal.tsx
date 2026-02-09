@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
   Dimensions,
@@ -19,6 +18,7 @@ import * as Location from 'expo-location';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Config } from '@/constants/Config';
 import { useAuth } from '@/app/context/AuthContext';
+import CustomAlert from './CustomAlert';
 
 interface ServiceRequestModalProps {
   visible: boolean;
@@ -67,6 +67,19 @@ export default function ServiceRequestModal({
   const [loading, setLoading] = useState(false);
   const [loadingServices, setLoadingServices] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   // Load provider services
   useEffect(() => {
@@ -96,11 +109,21 @@ export default function ServiceRequestModal({
           setSelectedService(mappedServices[0].serviceId);
         }
       } else {
-        Alert.alert('Error', 'No se pudieron cargar los servicios del proveedor');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar los servicios del proveedor',
+        });
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      Alert.alert('Error', 'Error al cargar servicios');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar servicios',
+      });
     } finally {
       setLoadingServices(false);
     }
@@ -112,20 +135,32 @@ export default function ServiceRequestModal({
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert(
-          'Permisos requeridos',
-          'Necesitamos acceso a tu ubicación para la solicitud de servicio'
-        );
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Permisos requeridos',
+          message: 'Necesitamos acceso a tu ubicación para la solicitud de servicio',
+        });
         setLoadingLocation(false);
         return;
       }
 
       const location = await Location.getCurrentPositionAsync({});
       await updateLocationAndAddress(location.coords.latitude, location.coords.longitude);
-      Alert.alert('Éxito', 'Ubicación actual obtenida correctamente');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación actual obtenida correctamente',
+      });
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'No se pudo obtener la ubicación');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo obtener la ubicación',
+      });
     } finally {
       setLoadingLocation(false);
     }
@@ -204,26 +239,51 @@ export default function ServiceRequestModal({
       await updateLocationAndAddress(tempLocation.latitude, tempLocation.longitude);
       setLoadingLocation(false);
       setShowMapModal(false);
-      Alert.alert('Éxito', 'Ubicación seleccionada correctamente');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación seleccionada correctamente',
+      });
     }
   };
 
   const handleSubmit = async () => {
     // Validation
     if (!requestTitle.trim()) {
-      Alert.alert('Error', 'Ingresa un título para la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa un título para la solicitud',
+      });
       return;
     }
     if (!requestDescription.trim()) {
-      Alert.alert('Error', 'Describe lo que necesitas');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Describe lo que necesitas',
+      });
       return;
     }
     if (!serviceAddress.trim()) {
-      Alert.alert('Error', 'Ingresa la dirección del servicio');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa la dirección del servicio',
+      });
       return;
     }
     if (!latitude || !longitude) {
-      Alert.alert('Error', 'Obtén tu ubicación antes de enviar');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Obtén tu ubicación antes de enviar',
+      });
       return;
     }
 
@@ -260,27 +320,34 @@ export default function ServiceRequestModal({
       });
 
       if (response.ok) {
-        Alert.alert(
-          'Éxito',
-          `Solicitud enviada a ${providerName}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                resetForm();
-                onClose();
-                onSuccess?.();
-              },
-            },
-          ]
-        );
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: `Solicitud enviada a ${providerName}`,
+          onConfirm: () => {
+            resetForm();
+            onClose();
+            onSuccess?.();
+          },
+        });
       } else {
         const errorData = await response.json();
-        Alert.alert('Error', errorData.message || 'No se pudo enviar la solicitud');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: errorData.message || 'No se pudo enviar la solicitud',
+        });
       }
     } catch (error) {
       console.error('Error submitting request:', error);
-      Alert.alert('Error', 'Error al enviar la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al enviar la solicitud',
+      });
     } finally {
       setLoading(false);
     }
@@ -622,6 +689,21 @@ export default function ServiceRequestModal({
         </View>
       </View>
     </Modal>
+
+    <CustomAlert
+      visible={alert.visible}
+      type={alert.type}
+      title={alert.title}
+      message={alert.message}
+      showCancel={alert.showCancel}
+      onConfirm={() => {
+        if (alert.onConfirm) {
+          alert.onConfirm();
+        }
+        setAlert({ ...alert, visible: false });
+      }}
+      onCancel={() => setAlert({ ...alert, visible: false })}
+    />
     </>
   );
 }

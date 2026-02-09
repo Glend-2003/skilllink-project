@@ -187,7 +187,6 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
     }
   };
 
-  // Remover imagen seleccionada
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
   };

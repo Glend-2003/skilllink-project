@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Switch,
   Modal,
@@ -18,6 +17,7 @@ import { Config } from '@/constants/Config';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { ArrowLeft, Save, Briefcase, MapPin, Award, Settings } from 'lucide-react-native';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ProviderProfile {
   providerId: number;
@@ -41,6 +41,19 @@ export default function EditProviderProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -66,7 +79,12 @@ export default function EditProviderProfileScreen() {
   const requestLocationPermission = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso Denegado', 'Se necesita permiso de ubicación para usar esta función');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Permiso Denegado',
+        message: 'Se necesita permiso de ubicación para usar esta función',
+      });
       return false;
     }
     return true;
@@ -87,9 +105,19 @@ export default function EditProviderProfileScreen() {
         latitude: location.coords.latitude.toString(),
         longitude: location.coords.longitude.toString(),
       });
-      Alert.alert('Éxito', 'Ubicación actual obtenida correctamente');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación actual obtenida correctamente',
+      });
     } catch (error) {
-      Alert.alert('Error', 'No se pudo obtener la ubicación actual');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo obtener la ubicación actual',
+      });
     }
   };
 
@@ -119,7 +147,12 @@ export default function EditProviderProfileScreen() {
         longitude: selectedLocation.longitude.toFixed(6),
       });
       setShowMapModal(false);
-      Alert.alert('Éxito', 'Ubicación seleccionada correctamente');
+      setAlert({
+        visible: true,
+        type: 'success',
+        title: 'Éxito',
+        message: 'Ubicación seleccionada correctamente',
+      });
     }
   };
 
@@ -159,14 +192,29 @@ export default function EditProviderProfileScreen() {
           });
         } catch (parseError) {
           console.error('Error parsing provider profile JSON:', parseError);
-          Alert.alert('Error', 'Error al procesar datos del perfil');
+          setAlert({
+            visible: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Error al procesar datos del perfil',
+          });
         }
       } else {
-        Alert.alert('Error', 'No se pudo cargar el perfil de proveedor');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo cargar el perfil de proveedor',
+        });
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     } finally {
       setLoading(false);
     }
@@ -174,7 +222,12 @@ export default function EditProviderProfileScreen() {
 
   const handleSave = async () => {
     if (!formData.businessName.trim()) {
-      Alert.alert('Error', 'El nombre del negocio es requerido');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'El nombre del negocio es requerido',
+      });
       return;
     }
 
@@ -199,15 +252,30 @@ export default function EditProviderProfileScreen() {
       });
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Perfil actualizado correctamente');
-        router.back();
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: 'Perfil actualizado correctamente',
+          onConfirm: () => router.back(),
+        });
       } else {
         const data = await response.json();
-        Alert.alert('Error', data.message || 'No se pudo actualizar el perfil');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: data.message || 'No se pudo actualizar el perfil',
+        });
       }
     } catch (error) {
       console.error('Error updating provider profile:', error);
-      Alert.alert('Error', 'Error de conexión');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error de conexión',
+      });
     } finally {
       setSaving(false);
     }
@@ -281,22 +349,21 @@ export default function EditProviderProfileScreen() {
           {formData.latitude && formData.longitude && (
             <View style={styles.locationInfo}>
               <Text style={styles.locationText}>
-                📍 Ubicación guardada: {parseFloat(formData.latitude).toFixed(6)}, {parseFloat(formData.longitude).toFixed(6)}
+                Ubicación guardada: {parseFloat(formData.latitude).toFixed(6)}, {parseFloat(formData.longitude).toFixed(6)}
               </Text>
             </View>
           )}
 
           <View style={styles.mapButtonsRow}>
             <TouchableOpacity style={styles.mapButton} onPress={openMapPicker}>
-              <Text style={styles.mapButtonText}>📍 Seleccionar en Mapa</Text>
+              <Text style={styles.mapButtonText}>Seleccionar en Mapa</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.mapButton} onPress={getCurrentLocation}>
-              <Text style={styles.mapButtonText}>🎯 Ubicación Actual</Text>
+              <Text style={styles.mapButtonText}>Ubicación Actual</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Experiencia y Servicios */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Award color="#007AFF" size={20} />
@@ -328,7 +395,6 @@ export default function EditProviderProfileScreen() {
           </View>
         </View>
 
-        {/* Configuración */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Settings color="#007AFF" size={20} />
@@ -412,6 +478,21 @@ export default function EditProviderProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

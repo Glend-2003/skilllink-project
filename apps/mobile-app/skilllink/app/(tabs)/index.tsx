@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image, Alert, Platform, Animated, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TextInput, FlatList, Pressable, ScrollView, TouchableOpacity, Image, Platform, Animated, RefreshControl } from "react-native";
 import { router } from "expo-router";
 import { useState, useEffect, useRef } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import CustomAlert from '../../components/CustomAlert';
 
 // Interface for provider list items (from GET /api/v1/providers/)
 interface ProviderListItem {
@@ -67,6 +68,17 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { logout, user } = useAuth();
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
   
   const scrollY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
@@ -171,7 +183,12 @@ export default function HomeScreen() {
     }
 
     if (!user) {
-      Alert.alert('Error', 'You must log in to contact the provider');
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Inicia Sesión',
+        message: 'Debes iniciar sesión para contactar con proveedores.',
+      });
       return;
     }
 
@@ -199,7 +216,12 @@ export default function HomeScreen() {
       router.push(`/chat/${conversation.conversation_id}`);
     } catch (error) {
       console.error('Error contacting provider:', error);
-      Alert.alert('Error', 'Could not start conversation');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo iniciar la conversación. Intenta nuevamente.',
+      });
     }
   };
 
@@ -481,6 +503,14 @@ export default function HomeScreen() {
         }
       />
       </Animated.ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

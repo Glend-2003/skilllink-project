@@ -198,7 +198,11 @@ app.get("/api/conversations/:userId", async (req, res) => {
         END AS other_user_id,
         u_other.email AS other_user_email,
         u_other.profile_image_url AS other_user_profile_image,
-        COALESCE(pp.business_name, u_other.email) AS other_user_name,
+        COALESCE(
+          pp.business_name, 
+          NULLIF(TRIM(CONCAT(COALESCE(up.first_name, ''), ' ', COALESCE(up.last_name, ''))), ''),
+          u_other.email
+        ) AS other_user_name,
         CASE WHEN pp.provider_id IS NOT NULL THEN 1 ELSE 0 END AS is_provider,
         (SELECT m.message_text FROM messages m 
          WHERE m.conversation_id = c.conversation_id 
@@ -213,6 +217,7 @@ app.get("/api/conversations/:userId", async (req, res) => {
         END
       )
       LEFT JOIN provider_profiles pp ON pp.user_id = u_other.user_id
+      LEFT JOIN user_profiles up ON up.user_id = u_other.user_id
       WHERE c.participant1_user_id = ? OR c.participant2_user_id = ?
       ORDER BY last_activity_at DESC`,
       [userId, userId, userId, userId]
@@ -260,6 +265,12 @@ app.get("/api/conversations/details/:conversationId", async (req, res) => {
           ELSE c.participant1_user_id
         END AS other_user_id,
         u_other.email AS other_user_email,
+        COALESCE(
+          pp.business_name, 
+          NULLIF(TRIM(CONCAT(COALESCE(up.first_name, ''), ' ', COALESCE(up.last_name, ''))), ''),
+          u_other.email
+        ) AS other_user_name,
+        u_other.profile_image_url AS other_user_profile_image,
         c.created_at,
         c.last_message_at
       FROM conversations c
@@ -269,6 +280,8 @@ app.get("/api/conversations/details/:conversationId", async (req, res) => {
           ELSE c.participant1_user_id
         END
       )
+      LEFT JOIN provider_profiles pp ON pp.user_id = u_other.user_id
+      LEFT JOIN user_profiles up ON up.user_id = u_other.user_id
       WHERE c.conversation_id = ? 
         AND (c.participant1_user_id = ? OR c.participant2_user_id = ?)`,
       [userId, userId, conversationId, userId, userId]

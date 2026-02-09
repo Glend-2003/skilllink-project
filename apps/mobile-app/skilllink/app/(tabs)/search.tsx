@@ -10,6 +10,7 @@ import {
   ScrollView,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Search as SearchIcon, X, DollarSign, Clock } from 'lucide-react-native';
@@ -159,9 +160,13 @@ export default function SearchScreen() {
   };
 
   const handleServicePress = (service: Service) => {
-    // Use userId from provider.user, fallback to providerId if not available
-    const userId = service.provider?.user?.userId || service.providerId;
-    router.push(`/provider/${userId}`);
+    // Always use userId from provider.user - this is the user_id that the API expects
+    const userId = service.provider?.user?.userId;
+    if (userId) {
+      router.push(`/provider/${userId}`);
+    } else {
+      Alert.alert('Error', 'No se pudo obtener la información del proveedor');
+    }
   };
 
   const getPriceDisplay = (service: Service) => {

@@ -1029,7 +1029,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  // Estilos para solicitudes
   requestsSection: {
     backgroundColor: 'white',
     borderRadius: 12,

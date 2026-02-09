@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, TouchableOpacity, Image } from "react-native";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from './context/AuthContext';
 import { Config } from '@/constants/Config';
+import CustomAlert from '../components/CustomAlert';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -12,12 +13,28 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Por favor, ingresa email y contraseña.");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Campos Requeridos',
+        message: 'Por favor, ingresa email y contraseña.',
+      });
       return;
     }
 
@@ -49,21 +66,41 @@ export default function LoginScreen() {
         await login(userData);
         router.replace("/(tabs)");
       } else {
-        Alert.alert("Error", data.message || "Credenciales incorrectas.");
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error de Autenticación',
+          message: data.message || 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.',
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo conectar al servidor.");
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Sin Conexión',
+        message: 'No se pudo conectar al servidor. Verifica tu conexión a internet.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider: string) => {
-    Alert.alert("Info", `Iniciando sesión con ${provider}... (Funcionalidad próximamente)`);
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Próximamente',
+      message: `La autenticación con ${provider} estará disponible pronto.`,
+    });
   };
 
   const handleForgotPassword = () => {
-    Alert.alert("Info", "Funcionalidad de recuperación próximamente");
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Recuperar Contraseña',
+      message: 'La funcionalidad de recuperación de contraseña estará disponible pronto.',
+    });
   };
 
   return (
@@ -83,7 +120,6 @@ export default function LoginScreen() {
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.title}>SkillLink</Text>
           <Text style={styles.subtitle}>Conecta con los mejores profesionales</Text>
         </View>
 
@@ -197,6 +233,14 @@ export default function LoginScreen() {
 
         <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
       </ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={() => setAlert({ ...alert, visible: false })}
+      />
     </LinearGradient>
   );
 }

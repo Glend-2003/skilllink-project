@@ -1,5 +1,4 @@
 ### Gallery API - Testing Endpoints
-### Asegúrate de tener el service-manager corriendo en el puerto 3004
 
 @baseUrl = http://localhost:3004
 @providerId = 1
@@ -42,7 +41,7 @@ GET {{baseUrl}}/gallery/service/{{serviceId}}
 ### 3. Get single image by ID
 GET {{baseUrl}}/gallery/1
 
-### 4. Create gallery entry with URL (método anterior)
+### 4. Create gallery entry with URL
 POST {{baseUrl}}/gallery
 Content-Type: application/json
 

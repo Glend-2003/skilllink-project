@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Modal,
   ScrollView,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Config } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ServiceRequest {
   requestId: number;
@@ -74,6 +74,19 @@ export default function MyRequestsScreen() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadRequests();
@@ -98,11 +111,21 @@ export default function MyRequestsScreen() {
         const data = await response.json();
         setRequests(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar las solicitudes');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar las solicitudes. Intenta nuevamente.',
+        });
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      Alert.alert('Error', 'Error al cargar solicitudes');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar solicitudes.',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -114,41 +137,52 @@ export default function MyRequestsScreen() {
   }, []);
 
   const cancelRequest = async (requestId: number) => {
-    Alert.alert(
-      'Cancelar Solicitud',
-      '¿Estás seguro de que deseas cancelar esta solicitud?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí, cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = user?.token;
-              const response = await fetch(
-                `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
-                {
-                  method: 'DELETE',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                  },
-                }
-              );
-
-              if (response.ok) {
-                Alert.alert('Éxito', 'Solicitud cancelada');
-                loadRequests();
-              } else {
-                Alert.alert('Error', 'No se pudo cancelar la solicitud');
-              }
-            } catch (error) {
-              console.error('Error cancelling request:', error);
-              Alert.alert('Error', 'Error al cancelar la solicitud');
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Cancelar Solicitud',
+      message: '¿Estás seguro de que deseas cancelar esta solicitud?',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          const token = user?.token;
+          const response = await fetch(
+            `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
             }
-          },
-        },
-      ]
-    );
+          );
+
+          if (response.ok) {
+            setAlert({
+              visible: true,
+              type: 'success',
+              title: '¡Listo!',
+              message: 'La solicitud ha sido cancelada.',
+            });
+            loadRequests();
+          } else {
+            setAlert({
+              visible: true,
+              type: 'error',
+              title: 'Error',
+              message: 'No se pudo cancelar la solicitud. Intenta nuevamente.',
+            });
+          }
+        } catch (error) {
+          console.error('Error cancelling request:', error);
+          setAlert({
+            visible: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Error al cancelar la solicitud.',
+          });
+        }
+      },
+    });
   };
 
   const filteredRequests = selectedStatus
@@ -529,6 +563,20 @@ export default function MyRequestsScreen() {
           }
         />
       )}
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

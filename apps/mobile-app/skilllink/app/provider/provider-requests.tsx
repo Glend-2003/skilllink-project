@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Modal,
   TextInput,
   ScrollView,
@@ -20,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Config } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ServiceRequest {
   requestId: number;
@@ -77,6 +77,19 @@ export default function ProviderRequestsScreen() {
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [finalCost, setFinalCost] = useState('');
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadProviderProfile();
@@ -102,12 +115,22 @@ export default function ProviderRequestsScreen() {
         setProviderId(actualProviderId);
         loadRequests(actualProviderId);
       } else {
-        Alert.alert('Error', 'No se encontró el perfil de proveedor');
-        router.back();
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se encontró el perfil de proveedor',
+          onConfirm: () => router.back(),
+        });
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      Alert.alert('Error', 'Error al cargar perfil');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar perfil',
+      });
     }
   };
 
@@ -130,11 +153,21 @@ export default function ProviderRequestsScreen() {
         const data = await response.json();
         setRequests(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar las solicitudes');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar las solicitudes',
+        });
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      Alert.alert('Error', 'Error al cargar solicitudes');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar solicitudes',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -172,18 +205,33 @@ export default function ProviderRequestsScreen() {
       );
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Solicitud actualizada');
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: 'Solicitud actualizada',
+        });
         if (providerId) {
           loadRequests(providerId);
         }
         return true;
       } else {
-        Alert.alert('Error', 'No se pudo actualizar la solicitud');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo actualizar la solicitud',
+        });
         return false;
       }
     } catch (error) {
       console.error('Error updating request:', error);
-      Alert.alert('Error', 'Error al actualizar la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al actualizar la solicitud',
+      });
       return false;
     }
   };
@@ -193,75 +241,67 @@ export default function ProviderRequestsScreen() {
 
     const cost = parseFloat(finalCost);
     if (isNaN(cost) || cost <= 0) {
-      Alert.alert('Error', 'Ingresa un costo válido');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa un costo válido',
+      });
       return;
     }
 
-    Alert.alert(
-      'Aceptar Solicitud',
-      `¿Deseas aceptar esta solicitud por $${cost}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Aceptar',
-          onPress: async () => {
-            const success = await updateRequestStatus(
-              selectedRequest.requestId,
-              'accepted',
-              cost
-            );
-            if (success) {
-              setShowAcceptModal(false);
-              setFinalCost('');
-              setSelectedRequest(null);
-            }
-          },
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Aceptar Solicitud',
+      message: `¿Deseas aceptar esta solicitud por $${cost}?`,
+      showCancel: true,
+      onConfirm: async () => {
+        const success = await updateRequestStatus(
+          selectedRequest.requestId,
+          'accepted',
+          cost
+        );
+        if (success) {
+          setShowAcceptModal(false);
+          setFinalCost('');
+          setSelectedRequest(null);
+        }
+      },
+    });
   };
 
   const handleRejectRequest = (requestId: number) => {
-    Alert.alert(
-      'Rechazar Solicitud',
-      '¿Estás seguro de que deseas rechazar esta solicitud?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Rechazar',
-          style: 'destructive',
-          onPress: () => updateRequestStatus(requestId, 'cancelled'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Rechazar Solicitud',
+      message: '¿Estás seguro de que deseas rechazar esta solicitud?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'cancelled'),
+    });
   };
 
   const handleCompleteRequest = (requestId: number) => {
-    Alert.alert(
-      'Completar Servicio',
-      '¿El servicio ha sido completado?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Completar',
-          onPress: () => updateRequestStatus(requestId, 'completed'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Completar Servicio',
+      message: '¿El servicio ha sido completado?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'completed'),
+    });
   };
 
   const handleStartProgress = (requestId: number) => {
-    Alert.alert(
-      'Iniciar Servicio',
-      '¿Deseas marcar este servicio como en progreso?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Iniciar',
-          onPress: () => updateRequestStatus(requestId, 'in_progress'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Iniciar Servicio',
+      message: '¿Deseas marcar este servicio como en progreso?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'in_progress'),
+    });
   };
 
   const filteredRequests = selectedStatus
@@ -813,6 +853,21 @@ export default function ProviderRequestsScreen() {
           </View>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }

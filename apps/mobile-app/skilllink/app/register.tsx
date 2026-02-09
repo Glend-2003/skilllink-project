@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, TouchableOpacity, Image} from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, TouchableOpacity, Image} from "react-native";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Config } from '@/constants/Config';
 import { useAuth } from './context/AuthContext';
+import CustomAlert from '../components/CustomAlert';
 
 export default function RegisterScreen() {
   const { login } = useAuth();
@@ -25,6 +26,18 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -33,7 +46,12 @@ export default function RegisterScreen() {
   const handleNextStep = () => {
     if (step === 1) {
       if (!userType) {
-        Alert.alert("Error", "Selecciona el tipo de cuenta");
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Selección Requerida',
+          message: 'Por favor, selecciona el tipo de cuenta que deseas crear.',
+        });
         return;
       }
       setStep(2);
@@ -42,29 +60,54 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!formData.name || !formData.email || !formData.password) {
-      Alert.alert("Error", "Por favor completa todos los campos obligatorios");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Campos Requeridos',
+        message: 'Por favor completa todos los campos obligatorios: nombre, email y contraseña.',
+      });
       return;
     }
 
     if (userType === 'provider') {
       if (!formData.businessName || !formData.description || !formData.location) {
-        Alert.alert("Error", "Por favor completa todos los campos de proveedor");
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Campos de Proveedor Requeridos',
+          message: 'Por favor completa todos los campos: nombre del negocio, descripción y ubicación.',
+        });
         return;
       }
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert("Error", "Las contraseñas no coinciden");
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Contraseñas No Coinciden',
+        message: 'Las contraseñas ingresadas no coinciden. Por favor, verifica e inténtalo de nuevo.',
+      });
       return;
     }
 
     if (formData.password.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Contraseña Muy Corta',
+        message: 'La contraseña debe tener al menos 6 caracteres para mayor seguridad.',
+      });
       return;
     }
 
     if (!acceptTerms) {
-      Alert.alert("Error", "Debes aceptar los términos y condiciones");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Términos y Condiciones',
+        message: 'Debes aceptar los términos y condiciones para continuar.',
+      });
       return;
     }
 
@@ -114,45 +157,70 @@ export default function RegisterScreen() {
             });
 
             if (providerResponse.ok) {
-              Alert.alert(
-                "Registro Exitoso",
-                "Tu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente. Te notificaremos cuando sea aprobada.",
-                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-              );
+              setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Registro Exitoso',
+                message: 'Tu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente.',
+                onConfirm: () => router.replace("/(tabs)"),
+              });
             } else {
               const errorData = await providerResponse.json();
               console.error('Provider request error:', errorData);
-              Alert.alert(
-                "Cuenta Creada",
-                "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
-                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-              );
+              setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Cuenta Creada',
+                message: 'Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil.',
+                onConfirm: () => router.replace("/(tabs)"),
+              });
             }
           } catch (error) {
             console.error('Provider request exception:', error);
-            Alert.alert(
-              "Cuenta Creada",
-              "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
-              [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-            );
+            setAlert({
+              visible: true,
+              type: 'warning',
+              title: 'Cuenta Creada',
+              message: 'Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil.',
+              onConfirm: () => router.replace("/(tabs)"),
+            });
           }
         } else {
-          Alert.alert("Éxito", "Tu cuenta ha sido creada exitosamente", [
-            { text: "OK", onPress: () => router.replace("/(tabs)") },
-          ]);
+          setAlert({
+            visible: true,
+            type: 'success',
+            title: '¡Bienvenido!',
+            message: 'Tu cuenta ha sido creada exitosamente. Ahora puedes comenzar a usar SkillLink.',
+            onConfirm: () => router.replace("/(tabs)"),
+          });
         }
       } else {
-        Alert.alert("Error", data.message || "Error al registrar.");
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error de Registro',
+          message: data.message || 'No se pudo completar el registro. Intenta nuevamente.',
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo conectar al servidor.");
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Sin Conexión',
+        message: 'No se pudo conectar al servidor. Verifica tu conexión a internet.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialRegister = (provider: string) => {
-    Alert.alert("Info", `Registrándose con ${provider}... (Funcionalidad próximamente)`);
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Próximamente',
+      message: `El registro con ${provider} estará disponible pronto.`,
+    });
   };
 
   return (
@@ -165,14 +233,6 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Image
-              source={require("../assets/images/skilllink.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.title}>SkillLink</Text>
           <Text style={styles.subtitle}>Crea tu cuenta y comienza hoy</Text>
         </View>
 
@@ -457,6 +517,19 @@ export default function RegisterScreen() {
 
         <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
       </ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+      />
     </LinearGradient>
   );
 }

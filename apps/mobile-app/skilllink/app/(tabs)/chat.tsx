@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter, Alert, Animated } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, Image, StyleSheet, DeviceEventEmitter, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '../context/AuthContext';
 import { Config } from '@/constants/Config';
+import CustomAlert from '../../components/CustomAlert';
 
 type ApiConversation = {
   conversation_id: number;
@@ -37,6 +38,20 @@ export default function ChatScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState<ConversationItemUI[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const fetchConversations = useCallback(async () => {
     if (!user || !user.userId) {
@@ -52,7 +67,6 @@ export default function ChatScreen() {
         return;
       }
       
-      // Mostrar todas las conversaciones, no solo las de proveedores
       const mapped: ConversationItemUI[] = data.map(c => ({
         id: String(c.conversation_id),
         providerName: c.other_user_name || c.other_user_email || 'Usuario',
@@ -116,30 +130,34 @@ export default function ChatScreen() {
       if (response.ok) {
         setItems(prevItems => prevItems.filter(item => item.id !== conversationId));
       } else {
-        Alert.alert('Error', 'No se pudo eliminar la conversación');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo eliminar la conversación. Intenta nuevamente.',
+        });
       }
     } catch (error) {
       console.error('Error deleting conversation:', error);
-      Alert.alert('Error', 'Error al eliminar la conversación');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ocurrió un error al eliminar la conversación.',
+      });
     }
   };
 
   const confirmDelete = (conversationId: string, providerName: string) => {
-    Alert.alert(
-      'Eliminar conversación',
-      `¿Estás seguro de que deseas eliminar la conversación con ${providerName}?`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => deleteConversation(conversationId),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Eliminar Conversación',
+      message: `¿Estás seguro de que deseas eliminar la conversación con ${providerName}?`,
+      showCancel: true,
+      onConfirm: () => deleteConversation(conversationId),
+      onCancel: () => {},
+    });
   };
 
   const renderRightActions = (
@@ -236,6 +254,26 @@ export default function ChatScreen() {
             <Text style={styles.emptyText}>Contacta a un profesional para comenzar una conversación</Text>
           </View>
         }
+      />
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={alert.onCancel ? () => {
+          if (alert.onCancel) {
+            alert.onCancel();
+          }
+          setAlert({ ...alert, visible: false });
+        } : undefined}
       />
     </GestureHandlerRootView>
   );
