@@ -176,18 +176,13 @@ export default function ProviderServices() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Mis Servicios</h1>
-            <p className="text-slate-600">Gestiona y administra todos tus servicios</p>
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Mis Servicios</h1>
+              <p className="text-slate-600">Gestiona y administra todos tus servicios</p>
+            </div>
           </div>
-          <Button 
-            onClick={() => navigate('/provider/add-service')}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Agregar Servicio
-          </Button>
         </div>
 
         {services.length === 0 ? (
@@ -196,20 +191,14 @@ export default function ProviderServices() {
               <div className="text-5xl mb-4">📋</div>
               <h3 className="text-xl font-bold mb-2">No tienes servicios registrados</h3>
               <p className="text-slate-600 mb-6">Agrega tu primer servicio para empezar a recibir solicitudes</p>
-              <Button 
-                onClick={() => navigate('/provider/add-service')}
-                className="gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Agregar Servicio
-              </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <p className="text-sm text-slate-600">{services.length} {services.length === 1 ? 'servicio' : 'servicios'}</p>
-              <Button 
+              <div>
+                <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => loadServices(true)}
@@ -219,6 +208,17 @@ export default function ProviderServices() {
                 <RefreshCw className="w-4 h-4" />
                 {refreshing ? 'Actualizando...' : 'Actualizar'}
               </Button>
+              <Button 
+                variant="outline" 
+                disabled={refreshing}
+                size="sm"
+                onClick={() => navigate('/provider/add-service')}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar Servicio
+              </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">

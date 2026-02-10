@@ -188,10 +188,10 @@ export default function AddService() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
-      <div className="max-w-2xl mx-auto px-4 md:px-6 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Agregar Servicio</h1>
-          <p className="text-slate-600">Crea un nuevo servicio para tu negocio</p>
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Crear Nuevo Servicio</h1>
+          <p className="text-slate-600">Completa la información para agregar un nuevo servicio a tu perfil</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -201,9 +201,11 @@ export default function AddService() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="categoryId">Categoría <span className="text-red-600">*</span></Label>
+                <Label htmlFor="categoryId" className="text-sm font-semibold mb-2 block">
+                  Categoría <span className="text-red-600">*</span>
+                </Label>
                 <Select value={formData.categoryId.toString()} onValueChange={(value) => setFormData({ ...formData, categoryId: parseInt(value) })}>
-                  <SelectTrigger id="categoryId">
+                  <SelectTrigger id="categoryId" className="h-11 border-slate-200">
                     <SelectValue placeholder="Selecciona una categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -214,21 +216,26 @@ export default function AddService() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-slate-500 mt-2">Elige la categoría que mejor describe tu servicio</p>
                 {categories.length === 0 && (
-                  <p className="text-sm text-red-600 mt-1">No hay categorías disponibles</p>
+                  <p className="text-sm text-red-600 mt-2">No hay categorías disponibles</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="serviceTitle">Título del Servicio <span className="text-red-600">*</span></Label>
+                <Label htmlFor="serviceTitle" className="text-sm font-semibold mb-2 block">
+                  Título del Servicio <span className="text-red-600">*</span>
+                </Label>
                 <Input
                   id="serviceTitle"
                   name="serviceTitle"
-                  placeholder="Ej: Reparación de plomería"
+                  placeholder="Ej: Reparación completa de plomería"
                   value={formData.serviceTitle}
                   onChange={handleChange}
+                  className="h-11 border-slate-200"
                   required
                 />
+                <p className="text-xs text-slate-500 mt-2">Sé específico y descriptivo para atraer mejores solicitudes</p>
               </div>
 
               <div>
@@ -297,6 +304,7 @@ export default function AddService() {
             </CardContent>
           </Card>
 
+          {/* Estado del Servicio */}
           <Card>
             <CardHeader>
               <CardTitle>Estado del Servicio</CardTitle>
@@ -316,6 +324,7 @@ export default function AddService() {
             </CardContent>
           </Card>
 
+          {/* Botones de Acción */}
           <div className="flex justify-end gap-3">
             <Button 
               type="button"

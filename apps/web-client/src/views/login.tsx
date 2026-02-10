@@ -41,14 +41,21 @@ export default function LoginScreen() {
       const data = await response.json();
 
       if (response.ok) {
+        console.log('Login response data:', data); // Para ver qué devuelve el backend
         const userData = {
           userId: data.userId,
           email: data.email,
           userType: data.userType,
-          token: data.token
+          token: data.token,
+          providerStatus: data.providerStatus // Incluir el estado del proveedor si existe
         };
+        console.log('userData being saved:', userData); // Para ver qué se está guardando
 
         login(userData);
+        
+        // Disparar evento para que RoleContext se recargue inmediatamente
+        window.dispatchEvent(new Event('userDataChanged'));
+        
         navigate('/');
       } else {
         alert(data.message || 'Credenciales incorrectas.');

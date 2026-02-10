@@ -2,6 +2,7 @@ import React from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { useAuth } from './context/AuthContext'
+import { useRole } from './context/RoleContext'
 import { Navigation } from './components/Navigation'
 import Login from './views/login'
 import Register from './views/register'
@@ -32,6 +33,33 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" />
 }
 
+function ProviderRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+  const { isProvider } = useRole()
+  if (isLoading) return <div>Cargando...</div>
+  
+  if (!user) return <Navigate to="/login" />
+  if (!isProvider) {
+    // Redirigir a la página de perfil o dashboard según corresponda
+    return <Navigate to="/profile" />
+  }
+  
+  return <>{children}</>
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth()
+  const { isAdmin } = useRole()
+  if (isLoading) return <div>Cargando...</div>
+  
+  if (!user) return <Navigate to="/login" />
+  if (!isAdmin) {
+    return <Navigate to="/" />
+  }
+  
+  return <>{children}</>
+}
+
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const hideNavigation = ['/login', '/register'].includes(location.pathname)
@@ -59,15 +87,18 @@ function App() {
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/review/:requestId" element={<ProtectedRoute><ReviewRequest /></ProtectedRoute>} />
           <Route path="/request-service" element={<ProtectedRoute><RequestService /></ProtectedRoute>} />
-          <Route path="/provider/add-service" element={<ProtectedRoute><AddService /></ProtectedRoute>} />
-          <Route path="/provider/edit-service" element={<ProtectedRoute><EditService /></ProtectedRoute>} />
-          <Route path="/provider/edit-profile" element={<ProtectedRoute><EditProviderProfile /></ProtectedRoute>} />
-          <Route path="/provider/services" element={<ProtectedRoute><ProviderServices /></ProtectedRoute>} />
+          {/* Rutas de Proveedor - Requieren aprobación */}
+          <Route path="/provider/add-service" element={<ProviderRoute><AddService /></ProviderRoute>} />
+          <Route path="/provider/edit-service" element={<ProviderRoute><EditService /></ProviderRoute>} />
+          <Route path="/provider/edit-profile" element={<ProviderRoute><EditProviderProfile /></ProviderRoute>} />
+          <Route path="/provider/services" element={<ProviderRoute><ProviderServices /></ProviderRoute>} />
           <Route path="/profile/become-provider" element={<ProtectedRoute><BecomeProvider /></ProtectedRoute>} />
           <Route path="/profile/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
-          <Route path="/admin/categories-management" element={<ProtectedRoute><CategoriesManagement /></ProtectedRoute>} />
-          <Route path="/admin/provider-requests" element={<ProtectedRoute><AdminProviderRequests /></ProtectedRoute>} />
-          <Route path="/admin/services-approval" element={<ProtectedRoute><ServicesApproval /></ProtectedRoute>} />
+          {/* Rutas de Admin */}
+          <Route path="/admin/categories-management" element={<AdminRoute><CategoriesManagement /></AdminRoute>} />
+          <Route path="/admin/provider-requests" element={<AdminRoute><AdminProviderRequests /></AdminRoute>} />
+          <Route path="/admin/services-approval" element={<AdminRoute><ServicesApproval /></AdminRoute>} />
+          {/* Rutas Públicas */}
           <Route path="/chat/:id" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
           <Route path="/provider/:id" element={<ProtectedRoute><ProviderDetail /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />

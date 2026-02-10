@@ -6,6 +6,7 @@ interface User {
   email: string;
   userType: string;
   token: string;
+  providerStatus?: 'pending' | 'approved' | 'rejected';
 }
 
 interface AuthContextType {

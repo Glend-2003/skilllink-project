@@ -5,6 +5,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import ServiceGalleryUpload from '../../components/ServiceGalleryUpload';
 import ServiceGalleryView from '../../components/ServiceGalleryView';
 import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Textarea } from '../../ui/textarea';
+import { Label } from '../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { ArrowLeft, Save } from 'lucide-react';
 
 interface ServiceCategory {
   categoryId: number;
@@ -118,14 +125,12 @@ export default function EditService() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setFormData({ ...formData, [name]: checked });
-    } else if (name === 'categoryId') {
-      setFormData({ ...formData, [name]: parseInt(value) || 0 });
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -185,147 +190,203 @@ export default function EditService() {
 
   if (loading) {
     return (
-      <div className="add-service-container">
-        <div className="add-service-loading">Cargando servicio...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando servicio...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="add-service-container">
-      <div className="add-service-header">
-        <button onClick={() => navigate('/provider/services')} className="back-button">← Volver</button>
-        <h1>Editar Servicio</h1>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
+        <div className="mb-8 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/provider/services')}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold mb-1">Editar Servicio</h1>
+            <p className="text-slate-600">Actualiza la información de tu servicio</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Información Básica</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="categoryId">Categoría <span className="text-red-600">*</span></Label>
+                <Select value={formData.categoryId.toString()} onValueChange={(value) => setFormData({ ...formData, categoryId: parseInt(value) })}>
+                  <SelectTrigger id="categoryId">
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.categoryId} value={cat.categoryId.toString()}>
+                        {cat.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="serviceTitle">Título del Servicio <span className="text-red-600">*</span></Label>
+                <Input
+                  id="serviceTitle"
+                  name="serviceTitle"
+                  placeholder="Ej: Reparación de plomería"
+                  value={formData.serviceTitle}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="serviceDescription">Descripción <span className="text-red-600">*</span></Label>
+                <Textarea
+                  id="serviceDescription"
+                  name="serviceDescription"
+                  placeholder="Describe en detalle tu servicio, qué incluye, requisitos, etc."
+                  value={formData.serviceDescription}
+                  onChange={handleChange}
+                  required
+                  rows={5}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Precio y Duración</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="priceType">Tipo de Precio</Label>
+                  <Select value={formData.priceType} onValueChange={(value) => setFormData({ ...formData, priceType: value as any })}>
+                    <SelectTrigger id="priceType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Precio Fijo</SelectItem>
+                      <SelectItem value="hourly">Por Hora</SelectItem>
+                      <SelectItem value="negotiable">Negociable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="basePrice">Precio Base <span className="text-red-600">*</span></Label>
+                  <Input
+                    id="basePrice"
+                    name="basePrice"
+                    type="number"
+                    placeholder="50.00"
+                    min="0"
+                    step="0.01"
+                    value={formData.basePrice}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="estimatedDurationMinutes">Duración Estimada (minutos)</Label>
+                <Input
+                  id="estimatedDurationMinutes"
+                  name="estimatedDurationMinutes"
+                  type="number"
+                  placeholder="60"
+                  min="1"
+                  value={formData.estimatedDurationMinutes}
+                  onChange={handleChange}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Estado del Servicio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  name="isActive"
+                  checked={formData.isActive}
+                  onChange={handleChange}
+                  className="w-5 h-5 rounded"
+                />
+                <Label htmlFor="isActive" className="mb-0">Servicio activo (visible para clientes)</Label>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Galería */}
+          {serviceId && providerId && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Galería del Servicio</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ServiceGalleryView serviceId={parseInt(serviceId)} editable={true} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Agregar Más Fotos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ServiceGalleryUpload
+                    serviceId={parseInt(serviceId)}
+                    providerId={providerId}
+                    onUploadComplete={() => {
+                      toast.success('Fotos agregadas correctamente');
+                      loadService();
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <Button 
+              type="button"
+              variant="outline" 
+              onClick={() => navigate('/provider/services')}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="submit"
+              disabled={saving}
+              className="gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </div>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit} className="add-service-form">
-        <div className="form-group">
-          <label htmlFor="categoryId">Categoría</label>
-          <select
-            id="categoryId"
-            name="categoryId"
-            value={formData.categoryId}
-            onChange={handleChange}
-            className="form-control"
-          >
-            <option value={0}>Selecciona una categoría</option>
-            {categories.map((cat) => (
-              <option key={cat.categoryId} value={cat.categoryId}>
-                {cat.categoryName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="serviceTitle">Título del Servicio *</label>
-          <input
-            type="text"
-            id="serviceTitle"
-            name="serviceTitle"
-            value={formData.serviceTitle}
-            onChange={handleChange}
-            placeholder="Ej: Reparación de plomería"
-            className="form-control"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="serviceDescription">Descripción *</label>
-          <textarea
-            id="serviceDescription"
-            name="serviceDescription"
-            value={formData.serviceDescription}
-            onChange={handleChange}
-            placeholder="Describe en detalle tu servicio"
-            rows={4}
-            className="form-control"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="priceType">Tipo de Precio</label>
-          <select
-            id="priceType"
-            name="priceType"
-            value={formData.priceType}
-            onChange={handleChange}
-            className="form-control"
-          >
-            <option value="fixed">Precio Fijo</option>
-            <option value="hourly">Por Hora</option>
-            <option value="negotiable">Negociable</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="basePrice">Precio Base ($)</label>
-          <input
-            type="number"
-            id="basePrice"
-            name="basePrice"
-            value={formData.basePrice}
-            onChange={handleChange}
-            placeholder="Ej: 50.00"
-            step="0.01"
-            min="0"
-            className="form-control"
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="estimatedDurationMinutes">Duración Estimada (minutos)</label>
-          <input
-            type="number"
-            id="estimatedDurationMinutes"
-            name="estimatedDurationMinutes"
-            value={formData.estimatedDurationMinutes}
-            onChange={handleChange}
-            placeholder="Ej: 60"
-            min="0"
-            className="form-control"
-          />
-        </div>
-
-        <div className="form-group checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              name="isActive"
-              checked={formData.isActive}
-              onChange={handleChange}
-            />
-            <span>Servicio Activo</span>
-          </label>
-        </div>
-
-        {serviceId && providerId && (
-          <>
-            <div className="gallery-section">
-              <h3>Galería del Servicio</h3>
-              <ServiceGalleryView serviceId={parseInt(serviceId)} editable={true} />
-            </div>
-
-            <div className="gallery-section">
-              <h3>Agregar Más Fotos</h3>
-              <ServiceGalleryUpload
-                serviceId={parseInt(serviceId)}
-                providerId={providerId}
-                onUploadComplete={(images) => {
-                  toast.success('Fotos agregadas correctamente');
-                  loadService();
-                }}
-              />
-            </div>
-          </>
-        )}
-
-        <button type="submit" className="submit-button" disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar Cambios'}
-        </button>
-      </form>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import {  useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, Wrench, Zap, Scissors, Car, Palette, Home as HomeIcon, Paintbrush, Hammer, Star, MapPin, Verified } from 'lucide-react';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
@@ -65,8 +65,8 @@ const getIconForCategory = (categoryName: string) => {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { activeRole, isProvider } = useRole();
+  const { user } = useAuth();
+  const { activeRole, isAdmin } = useRole();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
   const [allProviders, setAllProviders] = useState<Provider[]>([]);
@@ -207,11 +207,6 @@ export default function Home() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   if (loading) {
     return (
       <div className="loading-container">
@@ -264,8 +259,53 @@ export default function Home() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-8">
-        {activeRole === 'provider' ? (
-          /* Provider View */
+        {isAdmin ? (
+          /* Admin View - Panel de Administrador */
+          <div className="admin-dashboard">
+            <h2 className="text-2xl font-bold mb-6">Panel de Administrador</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/admin/categories-management')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">📂</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Categorías</h3>
+                  <p className="text-sm text-slate-600">Gestiona las categorías de servicios</p>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/admin/provider-requests')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">✋</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Solicitudes de Proveedores</h3>
+                  <p className="text-sm text-slate-600">Revisa y aprueba solicitudes</p>
+                </CardContent>
+              </Card>
+              
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-all hover:scale-105" 
+                onClick={() => navigate('/admin/services-approval')}
+              >
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">✅</span>
+                  </div>
+                  <h3 className="font-bold mb-2">Aprobación de Servicios</h3>
+                  <p className="text-sm text-slate-600">Revisa y aprueba nuevos servicios</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        ) : activeRole === 'provider' ? (
+          /* Provider View - Solo para proveedores aprobados */
           <div className="provider-dashboard">
             <h2 className="text-2xl font-bold mb-6">Panel de Proveedor</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

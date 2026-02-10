@@ -1,4 +1,5 @@
-import { Menu, User, MessageCircle, History, LayoutDashboard, Settings, LogOut, Home, Search as SearchIcon, Wrench } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, User, MessageCircle, History, LayoutDashboard, Settings, LogOut, Home, Search as SearchIcon, Wrench, Shield } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -11,14 +12,78 @@ import {
   SheetTrigger,
 } from '../ui/sheet';
 import { useAuth } from '../context/AuthContext';
+import { useRole } from '../context/RoleContext';
+import { API_BASE_URL } from '../constants/Config';
 import RoleSwitcher from './RoleSwitcher';
 
 export function Navigation() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
-  
-  const isProvider = user?.userType === 'provider';
+  const { isProvider, isAdmin } = useRole();
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Cargar imagen de perfil al montar el componente o cuando cambia el usuario
+  useEffect(() => {
+    if (user?.token) {
+      loadProfileImage();
+    }
+  }, [user?.token]);
+
+  // Recargar imagen cuando cambia (útil para cuando se actualiza en profile)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (user?.token) {
+        loadProfileImage();
+      }
+    };
+
+    const handleProfileImageUpdated = () => {
+      if (user?.token) {
+        loadProfileImage();
+      }
+    };
+
+    // Escuchar cambios en localStorage (cuando ProfileImageUploader actualiza la foto)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Escuchar evento custom de actualización de foto de perfil
+    window.addEventListener('profileImageUpdated', handleProfileImageUpdated);
+    
+    // También recargar cuando el usuario regresa al tab (visibilitychange)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && user?.token) {
+        loadProfileImage();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('profileImageUpdated', handleProfileImageUpdated);
+      document.removeEventListener('visibilitychange', () => {});
+    };
+  }, [user?.token]);
+
+  const loadProfileImage = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${user?.token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.profileImageUrl) {
+          setProfileImageUrl(data.profileImageUrl);
+        } else {
+          setProfileImageUrl(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading profile image:', error);
+    }
+  };
 
   const clientMenuItems = [
     { path: '/', label: 'Inicio', icon: Home },
@@ -34,10 +99,19 @@ export function Navigation() {
     { path: '/my-requests', label: 'Solicitudes', icon: History },
   ];
 
-  const menuItems = isProvider ? providerMenuItems : clientMenuItems;
+  const adminMenuItems = [
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/admin/categories-management', label: 'Categorías', icon: Settings },
+    { path: '/admin/provider-requests', label: 'Solicitudes', icon: User },
+    { path: '/admin/services-approval', label: 'Servicios', icon: Shield },
+  ];
+
+  const menuItems = isAdmin ? adminMenuItems : isProvider ? providerMenuItems : clientMenuItems;
 
   const handleLogout = () => {
     logout();
+    // Disparar evento para que RoleContext se resetee
+    window.dispatchEvent(new Event('userDataChanged'));
     navigate('/login');
   };
 
@@ -83,7 +157,7 @@ export function Navigation() {
             title="Mi Perfil"
           >
             <Avatar className="cursor-pointer w-8 h-8">
-              <AvatarImage src="" alt={user?.email || 'Usuario'} />
+              <AvatarImage src={profileImageUrl || ''} alt={user?.email || 'Usuario'} />
               <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
           </Button>
@@ -115,12 +189,12 @@ export function Navigation() {
             <div className="mt-6 space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
                 <Avatar>
-                  <AvatarImage src="" alt={user?.email || 'Usuario'} />
+                  <AvatarImage src={profileImageUrl || ''} alt={user?.email || 'Usuario'} />
                   <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-medium">{user?.email || 'Usuario'}</p>
-                  <p className="text-sm text-slate-600">{isProvider ? 'Proveedor' : 'Cliente'}</p>
+                  <p className="text-sm text-slate-600">{isAdmin ? 'Administrador' : isProvider ? 'Proveedor' : 'Cliente'}</p>
                 </div>
               </div>
 
