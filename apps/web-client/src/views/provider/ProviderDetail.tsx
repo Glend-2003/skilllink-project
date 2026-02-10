@@ -55,10 +55,22 @@ interface Review {
   reviewId: number;
   rating: number;
   comment: string;
+  title?: string;
   createdAt: string;
   client?: {
     email: string;
+    profileImageUrl?: string;
+    image?: string;
   };
+  clientEmail?: string;
+  email?: string;
+  user?: {
+    email: string;
+    profileImageUrl?: string;
+    image?: string;
+  };
+  userName?: string;
+  username?: string;
 }
 
 export default function ProviderDetail() {
@@ -176,7 +188,19 @@ export default function ProviderDetail() {
           
           if (reviewsRes.ok) {
             const reviewsData = await reviewsRes.json();
-            console.log('Reviews data received:', reviewsData);
+            console.log('Reviews data received (full structure):', reviewsData);
+            // Log cada review para ver su estructura
+            if (Array.isArray(reviewsData)) {
+              reviewsData.forEach((review, index) => {
+                console.log(`=== Review ${index} (${review.client?.email || review.email || 'Usuario'}) ===`);
+                console.log('Full review object:', review);
+                console.log('review.client:', review.client);
+                console.log('review.user:', review.user);
+                console.log('Keys in review:', Object.keys(review));
+                if (review.client) console.log('Keys in review.client:', Object.keys(review.client));
+                if (review.user) console.log('Keys in review.user:', Object.keys(review.user));
+              });
+            }
             setReviews(Array.isArray(reviewsData) ? reviewsData : []);
           }
         } catch (reviewsError) {
@@ -271,6 +295,43 @@ export default function ProviderDetail() {
       month: 'long', 
       day: 'numeric' 
     });
+  };
+
+  // Helper function to extract email and image from review
+  const getReviewClientInfo = (review: Review) => {
+    let email = 'Usuario';
+    let imageUrl = null;
+    
+    // Try to find email in various fields
+    if (review.client?.email) {
+      email = review.client.email;
+      // Try to find image from multiple sources on client object
+      imageUrl = review.client.profileImageUrl || review.client.image || (review.client as any).avatar || (review.client as any).profileImage || null;
+    } else if (review.clientEmail) {
+      email = review.clientEmail;
+    } else if (review.email) {
+      email = review.email;
+    } else if (review.user?.email) {
+      email = review.user.email;
+      // Try to find image from multiple sources on user object
+      imageUrl = review.user.profileImageUrl || review.user.image || (review.user as any).avatar || (review.user as any).profileImage || null;
+    } else if ((review as any).userName) {
+      email = (review as any).userName;
+    } else if ((review as any).username) {
+      email = (review as any).username;
+    }
+    
+    // Try additional image sources if still not found
+    if (!imageUrl) {
+      imageUrl = (review as any).profileImageUrl || (review as any).imageUrl || (review as any).image || (review as any).avatar || null;
+    }
+    
+    // Get initial from email
+    const initial = email.includes('@') ? email.split('@')[0].charAt(0).toUpperCase() : email.charAt(0).toUpperCase();
+    
+    console.log(`Review (${email}): imageUrl found: ${imageUrl}`);
+    
+    return { email, initial, imageUrl };
   };
 
   if (loading) {
@@ -479,26 +540,34 @@ export default function ProviderDetail() {
                     <p className="text-slate-500">No hay reseñas aún</p>
                   </div>
                 ) : (
-                  reviews.map((review, index) => (
-                    <div key={review.reviewId}>
-                      {index > 0 && <Separator className="my-6" />}
-                      <div className="flex gap-4">
-                        <Avatar>
-                          <AvatarFallback>{review.client?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">{review.client?.email || 'Usuario'}</h4>
-                            <span className="text-sm text-slate-600">{formatDate(review.createdAt)}</span>
+                  reviews.map((review, index) => {
+                    const { email, initial, imageUrl } = getReviewClientInfo(review);
+                    
+                    return (
+                      <div key={review.reviewId}>
+                        {index > 0 && <Separator className="my-6" />}
+                        <div className="flex gap-4">
+                          <Avatar>
+                            {imageUrl && <AvatarImage src={imageUrl} alt={email} />}
+                            <AvatarFallback>{initial}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-slate-900">{email}</h4>
+                              <span className="text-sm text-slate-600">{formatDate(review.createdAt)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 mb-2">
+                              {renderStars(review.rating)}
+                            </div>
+                            {review.title && (
+                              <p className="font-medium text-slate-800 mb-1">{review.title}</p>
+                            )}
+                            <p className="text-slate-700">{review.comment}</p>
                           </div>
-                          <div className="flex items-center gap-1 mb-2">
-                            {renderStars(review.rating)}
-                          </div>
-                          <p className="text-slate-700">{review.comment}</p>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </CardContent>
             </Card>
