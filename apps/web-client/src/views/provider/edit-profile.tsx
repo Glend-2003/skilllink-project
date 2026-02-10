@@ -27,11 +27,20 @@ interface ProviderProfile {
   availableForWork: boolean;
 }
 
+interface UserProfile {
+  userId: number;
+  email: string;
+  profileImageUrl?: string;
+  phoneNumber?: string;
+  createdAt?: string;
+}
+
 export default function EditProviderProfile() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [formData, setFormData] = useState({
     businessName: '',
     businessDescription: '',
@@ -43,9 +52,39 @@ export default function EditProviderProfile() {
   });
 
   useEffect(() => {
-    loadProviderProfile();
+    const loadData = async () => {
+      await Promise.all([
+        loadProviderProfile(),
+        loadUserProfile()
+      ]);
+      setLoading(false);
+    };
+    loadData();
     // eslint-disable-next-line
   }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
+        headers: { 'Authorization': `Bearer ${user?.token}` },
+      });
+
+      if (response.ok) {
+        const profile: UserProfile = await response.json();
+        console.log('=== User Profile from Auth Endpoint ===');
+        console.log('Full profile response:', profile);
+        console.log('profileImageUrl:', profile.profileImageUrl);
+        console.log('All keys in profile:', Object.keys(profile));
+        setUserProfile(profile);
+      } else {
+        console.log('Could not load user profile, status:', response.status);
+        const text = await response.text();
+        console.log('Response body:', text);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
 
   const loadProviderProfile = async () => {
     try {
@@ -73,8 +112,6 @@ export default function EditProviderProfile() {
     } catch (error) {
       console.error('Error loading provider profile:', error);
       alert('Error de conexión');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -155,8 +192,20 @@ export default function EditProviderProfile() {
             <CardContent className="space-y-6">
               <div className="flex flex-col md:flex-row gap-6 items-start">
                 <div className="relative">
+                  <div className="text-xs text-slate-500 mb-2">
+                    Foto: {userProfile?.profileImageUrl ? '✓ Cargada' : '✗ No disponible'}
+                  </div>
                   <Avatar className="w-24 h-24">
-                    <AvatarImage src="https://i.pravatar.cc/150" alt="Avatar" />
+                    <AvatarImage 
+                      src={userProfile?.profileImageUrl} 
+                      alt="Avatar" 
+                      onError={(e) => {
+                        console.log('Avatar image failed to load, src was:', (e.target as any).src);
+                      }}
+                      onLoad={(e) => {
+                        console.log('Avatar image loaded successfully from:', (e.target as any).src);
+                      }}
+                    />
                     <AvatarFallback>{formData.businessName.charAt(0) || 'P'}</AvatarFallback>
                   </Avatar>
                   <Button 
