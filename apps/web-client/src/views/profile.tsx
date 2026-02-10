@@ -179,6 +179,30 @@ export default function Profile() {
             </Card>
           )}
 
+          {/* Client Profile Card */}
+          {!isProvider && (
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-600" />
+                  Mi Perfil
+                </CardTitle>
+                <CardDescription>
+                  Completa y actualiza tu información personal para una mejor experiencia en la búsqueda de servicios.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => navigate('/client/edit-profile')}
+                  className="w-full"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar Perfil
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Provider Options Card */}
           {isProvider && (
             <Card className="hover:shadow-lg transition-shadow md:col-span-2">

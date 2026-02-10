@@ -9,6 +9,7 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
+import { RefreshCw } from 'lucide-react';
 
 interface ServiceRequest {
   requestId: number;
@@ -45,8 +46,10 @@ export default function ProviderRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -61,21 +64,67 @@ export default function ProviderRequests() {
     if (!user) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/providers/user/${user.userId}`, {
+      // Try localStorage first (cached from service requests)
+      const cachedProv = localStorage.getItem(`provider_${user.userId}`);
+      if (cachedProv) {
+        try {
+          const cached = JSON.parse(cachedProv);
+          if (cached.providerId) {
+            setProviderId(cached.providerId);
+            await loadRequests(cached.providerId);
+            return;
+          }
+        } catch (e) {
+          console.warn('Could not parse cached provider:', e);
+        }
+      }
+
+      // Try API endpoint for provider profile
+      const profileResponse = await fetch(`${API_BASE_URL}/api/v1/provider/profile`, {
         headers: {
           'Authorization': `Bearer ${user.token}`,
         },
       });
 
-      if (response.ok) {
-        const provider = await response.json();
-        setProviderId(provider.id || provider.providerId);
-        await loadRequests(provider.id || provider.providerId);
-      } else {
-        console.error('Could not load provider profile');
-        toast.error('No se encontró tu perfil de proveedor');
-        navigate('/profile');
+      if (profileResponse.ok) {
+        const provider = await profileResponse.json();
+        const provId = provider.providerId || provider.id;
+        if (provId) {
+          setProviderId(provId);
+          // Cache for future use
+          localStorage.setItem(`provider_${user.userId}`, JSON.stringify({ 
+            providerId: provId,
+            businessName: provider.businessName
+          }));
+          await loadRequests(provId);
+          return;
+        }
       }
+
+      // Try alternative endpoint
+      const altResponse = await fetch(`${API_BASE_URL}/api/v1/providers/user/${user.userId}`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        },
+      });
+
+      if (altResponse.ok) {
+        const provider = await altResponse.json();
+        const provId = provider.providerId || provider.id;
+        if (provId) {
+          setProviderId(provId);
+          localStorage.setItem(`provider_${user.userId}`, JSON.stringify({ 
+            providerId: provId,
+            businessName: provider.businessName
+          }));
+          await loadRequests(provId);
+          return;
+        }
+      }
+
+      console.error('Could not load provider profile from any endpoint');
+      toast.error('No se encontró tu perfil de proveedor. Verifica que estés registrado como proveedor.');
+      setLoading(false);
     } catch (error) {
       console.error('Error loading provider profile:', error);
       toast.error('Error al cargar el perfil de proveedor');
@@ -84,29 +133,52 @@ export default function ProviderRequests() {
   };
 
   const loadRequests = async (provId: number) => {
-    setLoading(true);
-
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/requests/provider/${provId}`, {
+      setError(null);
+      // Try primary endpoint
+      let response = await fetch(`${API_BASE_URL}/api/v1/requests/provider/${provId}`, {
         headers: {
           'Authorization': `Bearer ${user?.token}`,
         },
       });
 
-      console.log('Provider requests response status:', response.status);
+      // If primary fails, try alternative endpoints
+      if (!response.ok) {
+        console.warn(`Primary endpoint failed with status ${response.status}, trying alternatives...`);
+        
+        // Try alternative 1: /api/v1/provider-requests
+        response = await fetch(`${API_BASE_URL}/api/v1/provider-requests`, {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`,
+          },
+        });
+
+        // Try alternative 2: /api/v1/providers/requests
+        if (!response.ok) {
+          response = await fetch(`${API_BASE_URL}/api/v1/providers/requests`, {
+            headers: {
+              'Authorization': `Bearer ${user?.token}`,
+            },
+          });
+        }
+      }
 
       if (response.ok) {
         const data = await response.json();
-        setRequests(data);
+        setRequests(Array.isArray(data) ? data : []);
+        setError(null);
       } else {
-        console.error('Error loading requests:', response.status);
-        toast.error('No se pudieron cargar las solicitudes');
+        console.error('All endpoints failed with status:', response.status);
+        setRequests([]);
+        setError('No se pudieron cargar las solicitudes en este momento');
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      toast.error('Error al cargar las solicitudes');
+      setRequests([]);
+      setError('No se pudieron cargar las solicitudes en este momento');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -175,8 +247,55 @@ export default function ProviderRequests() {
 
   if (loading) {
     return (
-      <div className="provider-requests-container">
-        <div className="loading">⏳ Cargando solicitudes...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando solicitudes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Mis Solicitudes</h1>
+            <p className="text-slate-600">Gestiona las solicitudes de tus clientes</p>
+          </div>
+
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-6">
+              <div className="flex gap-4">
+                <div className="text-3xl">ℹ️</div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-blue-900 mb-2">Solicitudes no disponibles temporalmente</h3>
+                  <p className="text-blue-800 mb-4">
+                    No podemos cargar tus solicitudes en este momento. Por favor, intenta más tarde.
+                  </p>
+                  <Button 
+                    onClick={() => {
+                      setError(null);
+                      setRefreshing(true);
+                      if (providerId) {
+                        loadRequests(providerId).finally(() => setRefreshing(false));
+                      } else {
+                        loadProviderProfile();
+                      }
+                    }}
+                    disabled={refreshing}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Reintentando...' : 'Reintentar'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -185,8 +304,28 @@ export default function ProviderRequests() {
     <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Mis Solicitudes</h1>
-          <p className="text-slate-600">Gestiona las solicitudes de tus clientes</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Mis Solicitudes</h1>
+              <p className="text-slate-600">Gestiona las solicitudes de tus clientes</p>
+            </div>
+            <Button
+              onClick={() => {
+                setRefreshing(true);
+                if (providerId) {
+                  loadRequests(providerId).finally(() => setRefreshing(false));
+                } else {
+                  loadProviderProfile();
+                }
+              }}
+              disabled={refreshing}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+          </div>
         </div>
 
         <Tabs value={selectedStatus || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : value)}>

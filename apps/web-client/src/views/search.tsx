@@ -21,6 +21,18 @@ import {
 } from '../ui/sheet';
 import './search.css';
 
+// Helper function to calculate distance between two coordinates (Haversine formula)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 export default function Search() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -30,6 +42,9 @@ export default function Search() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [maxDistance, setMaxDistance] = useState([20]);
   const [minRating, setMinRating] = useState([0]);
+  const [useLocation, setUseLocation] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -39,6 +54,37 @@ export default function Search() {
     fetchCategories();
     fetchServices();
   }, []);
+
+  // New: Handle location toggle
+  const handleLocationToggle = async () => {
+    if (useLocation) {
+      setUseLocation(false);
+      setUserLocation(null);
+    } else {
+      setLoadingLocation(true);
+      try {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              setUserLocation({
+                lat: position.coords.latitude,
+                lon: position.coords.longitude,
+              });
+              setUseLocation(true);
+            },
+            (error) => {
+              console.error('Error getting location:', error);
+              alert('No se pudo acceder a tu ubicación. Verifica los permisos del navegador.');
+            }
+          );
+        } else {
+          alert('Tu navegador no soporta geolocalización');
+        }
+      } finally {
+        setLoadingLocation(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const query = searchParams.get('q');
@@ -67,10 +113,6 @@ export default function Search() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/services`);
       const data = await res.json();
-      console.log('Services fetched - first service:', data[0]);
-      console.log('First service provider:', data[0]?.provider);
-      console.log('First service provider.user:', data[0]?.provider?.user);
-      console.log('First service provider.user.userId:', data[0]?.provider?.user?.userId);
       setServices(data);
       setFilteredServices(data);
     } catch (error) {
@@ -103,13 +145,34 @@ export default function Search() {
       });
     }
     
-    // Rating filter (using existing rating or default 4.5)
+    // Rating filter
     if (minRating[0] > 0) {
       filtered = filtered.filter((s: any) => (s.rating || 4.5) >= minRating[0]);
     }
+
+    // Location filter
+    if (useLocation && userLocation) {
+      filtered = filtered.filter((s: any) => {
+        const providerLat = parseFloat(s.provider?.userProfile?.latitude);
+        const providerLon = parseFloat(s.provider?.userProfile?.longitude);
+        
+        if (!providerLat || !providerLon || isNaN(providerLat) || isNaN(providerLon)) {
+          return false;
+        }
+        
+        const distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lon,
+          providerLat,
+          providerLon
+        );
+        
+        return distance <= maxDistance[0];
+      });
+    }
     
     setFilteredServices(filtered);
-  }, [searchQuery, selectedCategory, minRating, services, categories]);
+  }, [searchQuery, selectedCategory, minRating, services, categories, useLocation, userLocation, maxDistance]);
 
   const handleClearSearch = () => {
     setSearchQuery('');
@@ -125,19 +188,31 @@ export default function Search() {
   };
 
   const handleViewProvider = (service: any) => {
-    console.log('handleViewProvider - service data:', service);
-    console.log('provider object:', service.provider);
-    console.log('provider.user.userId:', service.provider?.user?.userId);
-    
-    // Use userId (not providerId) because backend expects user_id
+    // First try to get userId from provider.user.userId
     const userId = service.provider?.user?.userId;
+    // Fallback to providerId if userId not available
+    const providerId = service.provider?.providerId;
     
-    console.log('Final userId to navigate:', userId);
+    const idToUse = userId || providerId;
     
-    if (userId) {
-      navigate(`/provider/${userId}`);
+    console.log('Final ID to navigate:', idToUse, '(userId:', userId, 'providerId:', providerId + ')');
+    
+    if (idToUse) {
+      // Save provider data to localStorage to avoid backend API calls
+      const providerData = {
+        providerId: service.provider?.providerId,
+        businessName: service.provider?.businessName,
+        businessDescription: service.provider?.businessDescription,
+        yearsExperience: service.provider?.yearsExperience,
+        isVerified: service.provider?.isVerified,
+        email: service.provider?.user?.email,
+        profileImageUrl: service.provider?.user?.profileImageUrl,
+        rating: service.rating,
+      };
+      localStorage.setItem(`provider_${idToUse}`, JSON.stringify(providerData));
+      navigate(`/provider/${idToUse}`);
     } else {
-      console.error('No user ID found in service.provider.user:', service);
+      console.error('No valid ID found:', service);
       alert('No se pudo encontrar el ID del proveedor');
     }
   };
@@ -167,27 +242,68 @@ export default function Search() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            participant1_user_id: user.userId,
-            participant2_user_id: providerId,
+            recipient_id: providerId,
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error('Error al crear conversación');
+        throw new Error('Error creating conversation');
       }
 
       const conversation = await response.json();
-      navigate(`/chat/${conversation.conversation_id}`);
+      navigate(`/chat/${conversation.conversationId}`);
     } catch (error) {
       console.error('Error contacting provider:', error);
-      alert('No se pudo iniciar la conversación');
+      alert('No se pudo crear la conversación');
     }
   };
 
   // Filter Panel Component
   const FilterPanel = () => (
     <div className="space-y-6">
+      {/* Location Filter */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <Label className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Buscar por ubicación
+          </Label>
+          <button
+            onClick={handleLocationToggle}
+            disabled={loadingLocation}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              useLocation ? 'bg-blue-600' : 'bg-slate-300'
+            } ${loadingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                useLocation ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        
+        {useLocation && userLocation && (
+          <div className="text-sm text-slate-600 mb-3">
+            📍 Ubicación activa
+          </div>
+        )}
+      </div>
+
+      {useLocation && (
+        <div>
+          <Label className="mb-3 block">Distancia máxima: {maxDistance[0]} km</Label>
+          <Slider
+            value={maxDistance}
+            onValueChange={setMaxDistance}
+            max={50}
+            min={1}
+            step={1}
+            className="mt-2"
+          />
+        </div>
+      )}
       <div>
         <Label className="mb-3 block">Categoría</Label>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -203,18 +319,6 @@ export default function Search() {
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div>
-        <Label className="mb-3 block">Distancia máxima: {maxDistance[0]} km</Label>
-        <Slider
-          value={maxDistance}
-          onValueChange={setMaxDistance}
-          max={20}
-          min={1}
-          step={1}
-          className="mt-2"
-        />
       </div>
 
       <div>
@@ -285,7 +389,7 @@ export default function Search() {
 
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <span>{filteredServices.length} proveedores encontrados</span>
-            {(selectedCategory !== 'all' || searchQuery || minRating[0] > 0) && (
+            {(selectedCategory !== 'all' || searchQuery || minRating[0] > 0 || useLocation) && (
               <Button 
                 variant="link" 
                 size="sm" 

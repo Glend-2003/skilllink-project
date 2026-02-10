@@ -106,28 +106,70 @@ export default function ChatDetail() {
           console.log('Attempting to load provider with ID:', providerUserId);
           
           if (providerUserId) {
-            try {
-              const providerRes = await fetch(`${API_BASE_URL}/api/v1/providers/user/${providerUserId}`);
-              console.log('Provider fetch response status:', providerRes.status);
-              
-              if (providerRes.ok) {
-                const providerData = await providerRes.json();
-                console.log('Provider data loaded:', providerData);
+            // Try to load from localStorage first
+            const cachedProvider = localStorage.getItem(`provider_${providerUserId}`);
+            if (cachedProvider) {
+              console.log('Loading provider from localStorage');
+              try {
+                const cachedData = JSON.parse(cachedProvider);
                 setProvider({
                   id: providerUserId.toString(),
-                  providerId: providerData.id || providerData.providerId,
-                  name: providerData.businessName || currentConv.other_user_name || 'Proveedor',
-                  category: providerData.category?.categoryName || 'Servicios',
-                  rating: providerData.rating || 0,
+                  providerId: cachedData.providerId,
+                  name: cachedData.businessName || currentConv.other_user_name || 'Proveedor',
+                  category: cachedData.category || 'Servicios',
+                  rating: cachedData.rating || 0,
                   avatar: currentConv.other_user_profile_image || `https://i.pravatar.cc/150?u=${providerUserId}`,
-                  verified: providerData.verified || providerData.isVerified || false,
-                  profileImageUrl: providerData.profileImageUrl,
+                  verified: cachedData.isVerified || false,
+                  profileImageUrl: cachedData.profileImageUrl,
                 });
-              } else {
-                console.log('Failed to load provider, status:', providerRes.status);
+              } catch (e) {
+                console.warn('Error parsing cached provider:', e);
               }
-            } catch (error) {
-              console.error('Error loading provider:', error);
+            } else {
+              // Try API if not in cache
+              try {
+                const providerRes = await fetch(`${API_BASE_URL}/api/v1/providers/user/${providerUserId}`);
+                console.log('Provider fetch response status:', providerRes.status);
+                
+                if (providerRes.ok) {
+                  const providerData = await providerRes.json();
+                  console.log('Provider data loaded:', providerData);
+                  setProvider({
+                    id: providerUserId.toString(),
+                    providerId: providerData.id || providerData.providerId,
+                    name: providerData.businessName || currentConv.other_user_name || 'Proveedor',
+                    category: providerData.category?.categoryName || 'Servicios',
+                    rating: providerData.rating || 0,
+                    avatar: currentConv.other_user_profile_image || `https://i.pravatar.cc/150?u=${providerUserId}`,
+                    verified: providerData.verified || providerData.isVerified || false,
+                    profileImageUrl: providerData.profileImageUrl,
+                  });
+                } else {
+                  console.log('Failed to load provider, status:', providerRes.status);
+                  // Create a minimal provider object with available info
+                  setProvider({
+                    id: providerUserId.toString(),
+                    providerId: providerUserId, // Use userId as fallback
+                    name: currentConv.other_user_name || 'Proveedor',
+                    category: 'Servicios',
+                    rating: 0,
+                    avatar: currentConv.other_user_profile_image || `https://i.pravatar.cc/150?u=${providerUserId}`,
+                    verified: false,
+                  });
+                }
+              } catch (error) {
+                console.error('Error loading provider:', error);
+                // Create a minimal provider object as fallback
+                setProvider({
+                  id: providerUserId.toString(),
+                  providerId: providerUserId, // Use userId as fallback
+                  name: currentConv.other_user_name || 'Proveedor',
+                  category: 'Servicios',
+                  rating: 0,
+                  avatar: currentConv.other_user_profile_image || `https://i.pravatar.cc/150?u=${providerUserId}`,
+                  verified: false,
+                });
+              }
             }
           }
         }
@@ -333,17 +375,13 @@ export default function ChatDetail() {
             console.log('Current user ID:', user?.userId);
             console.log('Provider user ID:', conversationInfo?.provider_user_id);
             
-            if (!provider?.providerId) {
-              alert('Este usuario no está registrado como proveedor. Solo puedes enviar solicitudes de servicio a proveedores.');
-              return;
-            }
-            
-            // Prevent providers from requesting services from themselves
+            // Prevent clients from requesting services from themselves
             if (user?.userId === conversationInfo?.provider_user_id) {
               alert('No puedes solicitarte servicios a ti mismo.');
               return;
             }
             
+            // Try to request service
             setShowRequestModal(true);
           }}
           title="Solicitar servicio"

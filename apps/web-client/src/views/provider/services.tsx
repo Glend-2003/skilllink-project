@@ -191,6 +191,13 @@ export default function ProviderServices() {
               <div className="text-5xl mb-4">📋</div>
               <h3 className="text-xl font-bold mb-2">No tienes servicios registrados</h3>
               <p className="text-slate-600 mb-6">Agrega tu primer servicio para empezar a recibir solicitudes</p>
+              <Button 
+                onClick={() => navigate('/provider/add-service')}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar Servicio
+              </Button>
             </CardContent>
           </Card>
         ) : (

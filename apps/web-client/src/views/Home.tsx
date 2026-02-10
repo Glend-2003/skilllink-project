@@ -151,16 +151,34 @@ export default function Home() {
 
   const handleViewProvider = (service: Provider) => {
     console.log('Home - handleViewProvider - service data:', service);
-    console.log('Home - provider.user.userId:', service.provider?.user?.userId);
+    console.log('Home - provider:', service.provider);
+    console.log('Home - provider.user:', service.provider?.user);
     
+    // First try to get userId from provider.user.userId
     const userId = service.provider?.user?.userId;
+    // Fallback to providerId if userId not available
+    const providerId = service.provider?.providerId;
     
-    console.log('Home - Final userId to navigate:', userId);
+    const idToUse = userId || providerId;
     
-    if (userId) {
-      navigate(`/provider/${userId}`);
+    console.log('Home - userId:', userId, 'providerId:', providerId, 'Using:', idToUse);
+    
+    if (idToUse) {
+      // Save provider data to localStorage to avoid backend API calls
+      const providerData = {
+        providerId: service.provider?.providerId,
+        businessName: service.provider?.businessName,
+        businessDescription: service.provider?.businessDescription,
+        yearsExperience: service.provider?.yearsExperience,
+        isVerified: service.provider?.isVerified,
+        email: service.provider?.user?.email,
+        profileImageUrl: service.provider?.user?.profileImageUrl,
+        rating: service.rating,
+      };
+      localStorage.setItem(`provider_${idToUse}`, JSON.stringify(providerData));
+      navigate(`/provider/${idToUse}`);
     } else {
-      console.error('Home - No user ID found in service.provider.user:', service);
+      console.error('Home - No valid ID found in service.provider:', service);
     }
   };
 

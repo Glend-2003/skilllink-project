@@ -15,6 +15,7 @@ import Chat from './views/chat';
 import ReviewRequest from './views/review/requestId';
 import RequestService from './views/request-service';
 import CompleteProfile from './views/profile/complete-profile'
+import EditClientProfile from './views/edit-client-profile'
 import AddService from './views/provider/add-service'
 import EditService from './views/provider/edit-service'
 import EditProviderProfile from './views/provider/edit-profile'
@@ -94,6 +95,7 @@ function App() {
           <Route path="/provider/services" element={<ProviderRoute><ProviderServices /></ProviderRoute>} />
           <Route path="/profile/become-provider" element={<ProtectedRoute><BecomeProvider /></ProtectedRoute>} />
           <Route path="/profile/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
+          <Route path="/client/edit-profile" element={<ProtectedRoute><EditClientProfile /></ProtectedRoute>} />
           {/* Rutas de Admin */}
           <Route path="/admin/categories-management" element={<AdminRoute><CategoriesManagement /></AdminRoute>} />
           <Route path="/admin/provider-requests" element={<AdminRoute><AdminProviderRequests /></AdminRoute>} />

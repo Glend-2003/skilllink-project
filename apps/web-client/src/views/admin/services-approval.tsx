@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './services-approval.css';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Badge } from '../../ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
+import { Check, X, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface PendingService {
   serviceId: number;
@@ -27,25 +32,21 @@ export default function ServicesApproval() {
   const navigate = useNavigate();
   const [services, setServices] = useState<PendingService[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'pending' | 'all'>('pending');
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     loadServices();
     // eslint-disable-next-line
-  }, [filter]);
+  }, []);
 
   const loadServices = async (refresh = false) => {
     try {
-      if (refresh) setIsRefreshing(true);
+      if (refresh) setRefreshing(true);
       else setLoading(true);
 
-      const endpoint = filter === 'pending'
-        ? '/api/v1/services/admin/pending'
-        : '/api/v1/services/admin/all';
-
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/services/admin/all`, {
         headers: { 'Authorization': `Bearer ${user?.token}` },
       });
       
@@ -53,15 +54,17 @@ export default function ServicesApproval() {
         const data = await response.json();
         setServices(data);
       } else if (response.status === 403) {
-        alert('Acceso denegado. No tienes permisos de admin istrador');
+        toast.error('No tienes permisos de administrador');
         navigate('/profile');
+      } else {
+        toast.error('Error al cargar servicios');
       }
     } catch (error) {
       console.error('Error loading services:', error);
-      alert('Error al cargar servicios');
+      toast.error('Error de conexión al cargar servicios');
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
+      setRefreshing(false);
     }
   };
 
@@ -86,14 +89,14 @@ export default function ServicesApproval() {
       });
 
       if (response.ok) {
-        alert('Servicio aprobado');
+        toast.success('Servicio aprobado');
         loadServices();
       } else {
-        alert('No se pudo aprobar el servicio');
+        toast.error('No se pudo aprobar el servicio');
       }
     } catch (error) {
       console.error('Error approving service:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setProcessingId(null);
     }
@@ -112,14 +115,14 @@ export default function ServicesApproval() {
       });
 
       if (response.ok) {
-        alert('Servicio rechazado');
+        toast.success('Servicio rechazado');
         loadServices();
       } else {
-        alert('No se pudo rechazar el servicio');
+        toast.error('No se pudo rechazar el servicio');
       }
     } catch (error) {
       console.error('Error rejecting service:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setProcessingId(null);
     }
@@ -148,130 +151,143 @@ export default function ServicesApproval() {
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'approved';
-      case 'pending': return 'pending';
-      case 'rejected': return 'rejected';
-      default: return 'default';
-    }
-  };
-
   if (loading) {
     return (
-      <div className="services-approval-container">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Cargando servicios...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando servicios...</p>
         </div>
       </div>
     );
   }
 
+  const filteredServices = selectedStatus
+    ? services.filter((s) => s.approvalStatus === selectedStatus)
+    : services;
+
+  const getApprovalBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'approved': return 'default';
+      case 'pending': return 'secondary';
+      case 'rejected': return 'destructive';
+      default: return 'default';
+    }
+  };
+
   return (
-    <div className="services-approval-container">
-      <div className="services-header">
-        <button onClick={() => navigate('/profile')} className="back-button">
-          ← Volver
-        </button>
-        <h1>Aprobación de Servicios</h1>
-        <button 
-          onClick={() => loadServices(true)} 
-          className="refresh-button"
-          disabled={isRefreshing}
-        >
-          🔄 {isRefreshing ? 'Actualizando...' : 'Actualizar'}
-        </button>
-      </div>
-
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${filter === 'pending' ? 'active' : ''}`}
-          onClick={() => setFilter('pending')}
-        >
-          Pendientes
-        </button>
-        <button
-          className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          Todos
-        </button>
-      </div>
-
-      <div className="services-content">
-        {services.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📋</div>
-            <h3>No hay servicios</h3>
-            <p>
-              {filter === 'pending' 
-                ? 'No hay servicios pendientes de aprobación'
-                : 'No se encontraron servicios'
-              }
-            </p>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Aprobación de Servicios</h1>
+              <p className="text-slate-600">Revisa y aprueba nuevos servicios enviados por proveedores</p>
+            </div>
+            <Button
+              onClick={() => loadServices(true)}
+              disabled={refreshing}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
           </div>
-        ) : (
-          <div className="services-grid">
-            {services.map((service) => (
-              <div key={service.serviceId} className="service-card">
-                <div className="service-header">
-                  <div className="header-top">
-                    <h3>{service.serviceTitle}</h3>
-                    <span className={`status-badge ${getStatusColor(service.approvalStatus)}`}>
-                      {service.approvalStatus === 'pending' && '⏳ Pendiente'}
-                      {service.approvalStatus === 'approved' && '✓ Aprobado'}
-                      {service.approvalStatus === 'rejected' && '✗ Rechazado'}
-                    </span>
-                  </div>
-                  <p className="provider-info">
-                    Proveedor: <strong>{service.providerBusinessName}</strong> ({service.providerEmail})
+        </div>
+
+        <Tabs value={selectedStatus || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : value)}>
+          <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-6">
+            <TabsTrigger value="all">Todos ({services.length})</TabsTrigger>
+            <TabsTrigger value="pending">Pendientes ({services.filter(s => s.approvalStatus === 'pending').length})</TabsTrigger>
+            <TabsTrigger value="approved">Aprobados ({services.filter(s => s.approvalStatus === 'approved').length})</TabsTrigger>
+            <TabsTrigger value="rejected">Rechazados ({services.filter(s => s.approvalStatus === 'rejected').length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={selectedStatus || 'all'}>
+            {filteredServices.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <div className="text-5xl mb-4">📋</div>
+                  <h3 className="text-xl font-bold mb-2">No hay servicios</h3>
+                  <p className="text-slate-600">
+                    {selectedStatus && selectedStatus !== 'all'
+                      ? `No hay servicios ${selectedStatus === 'pending' ? 'pendientes' : selectedStatus === 'approved' ? 'aprobados' : 'rechazados'}`
+                      : 'No hay servicios para revisar'}
                   </p>
-                </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredServices.map((service) => (
+                  <Card key={service.serviceId}>
+                    <CardContent className="p-6">
+                      <div className="flex flex-col md:flex-row gap-4 justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-start gap-3 mb-2">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold">{service.serviceTitle}</h3>
+                              <p className="text-sm text-slate-600">
+                                Proveedor: <strong>{service.providerBusinessName}</strong> ({service.providerEmail})
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Badge variant={getApprovalBadgeVariant(service.approvalStatus)}>
+                                {service.approvalStatus === 'approved' && '✓ Aprobado'}
+                                {service.approvalStatus === 'pending' && '⌛ Pendiente'}
+                                {service.approvalStatus === 'rejected' && '✗ Rechazado'}
+                              </Badge>
+                              <Badge variant="secondary">{service.categoryName}</Badge>
+                            </div>
+                          </div>
 
-                <div className="category-tag">{service.categoryName}</div>
+                          <p className="text-slate-700 mb-3">{service.serviceDescription}</p>
 
-                <p className="service-description">{service.serviceDescription}</p>
+                          <div className="flex flex-wrap gap-4 text-sm">
+                            <div>
+                              <span className="text-slate-600">Precio: </span>
+                              <span className="font-semibold">{getPriceDisplay(service)}</span>
+                            </div>
+                            {service.estimatedDurationMinutes && (
+                              <div>
+                                <span className="text-slate-600">Duración: </span>
+                                <span className="font-semibold">{getDurationDisplay(service.estimatedDurationMinutes)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                <div className="service-info">
-                  <div className="info-item">
-                    <span className="info-icon">💵</span>
-                    <span>{getPriceDisplay(service)}</span>
-                  </div>
-                  {service.estimatedDurationMinutes && (
-                    <div className="info-item">
-                      <span className="info-icon">🕒</span>
-                      <span>{getDurationDisplay(service.estimatedDurationMinutes)}</span>
-                    </div>
-                  )}
-                  <div className="info-item">
-                    <span className="info-icon">📦</span>
-                    <span>{service.priceType}</span>
-                  </div>
-                </div>
-
-                {service.approvalStatus === 'pending' && (
-                  <div className="service-actions">
-                    <button
-                      className="action-btn reject-btn"
-                      onClick={() => handleReject(service.serviceId, service.serviceTitle)}
-                      disabled={processingId === service.serviceId}
-                    >
-                      {processingId === service.serviceId ? '⏳' : '❌'} Rechazar
-                    </button>
-                    <button
-                      className="action-btn approve-btn"
-                      onClick={() => handleApprove(service.serviceId, service.serviceTitle)}
-                      disabled={processingId === service.serviceId}
-                    >
-                      {processingId === service.serviceId ? '⏳' : '✅'} Aprobar
-                    </button>
-                  </div>
-                )}
+                        {service.approvalStatus === 'pending' && (
+                          <div className="flex gap-2 md:flex-col md:min-w-[140px]">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 flex-1"
+                              onClick={() => handleReject(service.serviceId, service.serviceTitle)}
+                              disabled={processingId === service.serviceId}
+                            >
+                              <X className="w-4 h-4" />
+                              <span className="hidden md:inline">Rechazar</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="gap-2 flex-1"
+                              onClick={() => handleApprove(service.serviceId, service.serviceTitle)}
+                              disabled={processingId === service.serviceId}
+                            >
+                              <Check className="w-4 h-4" />
+                              <span className="hidden md:inline">Aprobar</span>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

@@ -77,6 +77,43 @@ export default function ProviderDetail() {
   useEffect(() => {
     if (id) {
       console.log('Loading provider with ID:', id);
+      // Try to load from localStorage first
+      const cachedProvider = localStorage.getItem(`provider_${id}`);
+      if (cachedProvider) {
+        console.log('Loading provider from localStorage');
+        try {
+          const providerData = JSON.parse(cachedProvider);
+          setProvider(providerData as Provider);
+          
+          // Load services and reviews
+          (async () => {
+            try {
+              const servicesRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/services`);
+              if (servicesRes.ok) {
+                const servicesData = await servicesRes.json();
+                setServices(Array.isArray(servicesData) ? servicesData.filter((s: Service) => s.isActive) : []);
+              }
+            } catch (e) {
+              console.error('Error loading services:', e);
+            }
+            
+            try {
+              const reviewsRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/reviews`);
+              if (reviewsRes.ok) {
+                const reviewsData = await reviewsRes.json();
+                setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+              }
+            } catch (e) {
+              console.error('Error loading reviews:', e);
+            }
+            
+            setLoading(false);
+          })();
+          return; // Don't call loadProviderDetails
+        } catch (e) {
+          console.warn('Error parsing cached provider data:', e);
+        }
+      }
       loadProviderDetails();
     }
   }, [id]);
@@ -86,15 +123,28 @@ export default function ProviderDetail() {
     console.log('Fetching provider details for ID:', id);
     
     try {
-      // Load provider data
-      const providerUrl = `${API_BASE_URL}/api/v1/providers/${id}`;
-      console.log('Provider URL:', providerUrl);
+      let providerData = null;
+      let providerRes = null;
       
-      const providerRes = await fetch(providerUrl);
+      // Intenta primero con el formato de userId (ya que probablemente es un userId)
+      let providerUrl = `${API_BASE_URL}/api/v1/providers/user/${id}`;
+      console.log('Trying provider URL (user format):', providerUrl);
+      
+      providerRes = await fetch(providerUrl);
       console.log('Provider response status:', providerRes.status);
       
+      // Si falla, intenta con providerId directo
+      if (!providerRes.ok) {
+        console.log('First attempt failed, trying with providerId format...');
+        providerUrl = `${API_BASE_URL}/api/v1/providers/${id}`;
+        console.log('Trying alternative URL:', providerUrl);
+        
+        providerRes = await fetch(providerUrl);
+        console.log('Alternative provider response status:', providerRes.status);
+      }
+      
       if (providerRes.ok) {
-        const providerData = await providerRes.json();
+        providerData = await providerRes.json();
         console.log('Provider data received:', providerData);
         setProvider(providerData);
         
@@ -237,11 +287,29 @@ export default function ProviderDetail() {
   if (!provider) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Card className="p-12 text-center">
-          <h2 className="text-xl font-bold mb-4">Proveedor no encontrado</h2>
-          <Button onClick={() => navigate('/search')}>
-            Volver a búsqueda
-          </Button>
+        <Card className="p-12 text-center max-w-md">
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-bold mb-4 text-slate-900">No se pudo cargar el perfil</h2>
+            <p className="text-slate-600 mb-6">
+              Parece que hay un problema al intentar cargar los detalles del proveedor (ID: {id}). 
+              Esto puede ser un error temporal en el servidor.
+            </p>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => window.location.reload()}
+                className="flex-1"
+              >
+                Reintentar
+              </Button>
+              <Button 
+                onClick={() => navigate('/search')}
+                variant="outline"
+                className="flex-1"
+              >
+                Volver a búsqueda
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
