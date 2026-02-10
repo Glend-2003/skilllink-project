@@ -116,7 +116,7 @@ services:
       - service-manager
       - provider-service
       - chat-service
-
+  
   notification-service:
     build: ./services/notification-service
     container_name: notification_service
@@ -127,11 +127,14 @@ services:
         condition: service_healthy
     environment:
       - PORT=3006
-      - NODE_ENV=development
-      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
+      - DB_HOST=mysql_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=465
+      - EMAIL_USER=skilllinkcompany@gmail.com
+      - EMAIL_PASS=wzml qccc uzil suyj
 
 
 volumes:

@@ -129,12 +129,12 @@ app.use('/api/v1/payments', createProxyMiddleware({
     changeOrigin: true
 }));
 
-// 6. Notification Service
+// 6. Notification Service (Node.js/Express)
 app.use('/api/v1/notifications', createProxyMiddleware({
-    target: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3006',
+    target: process.env.NOTIFICATION_SERVICE_URL || 'http://notification_service:3006',
     changeOrigin: true,
     pathRewrite: {
-        '^/api/v1/notifications': '/notifications'
+        '^/api/v1/notifications': '/api/notifications'
     }
 }));
 
