@@ -2,7 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
-import './provider-requests.css';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Badge } from '../../ui/badge';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 
 interface ServiceRequest {
   requestId: number;
@@ -63,18 +69,16 @@ export default function ProviderRequests() {
 
       if (response.ok) {
         const provider = await response.json();
-        const actualProviderId = provider.id || provider.providerId;
-        console.log('Provider ID found:', actualProviderId);
-        setProviderId(actualProviderId);
-        loadRequests(actualProviderId);
+        setProviderId(provider.id || provider.providerId);
+        await loadRequests(provider.id || provider.providerId);
       } else {
-        console.error('No se encontró el perfil de proveedor');
-        alert('No se encontró tu perfil de proveedor. Asegúrate de tener una cuenta de proveedor activa.');
+        console.error('Could not load provider profile');
+        toast.error('No se encontró tu perfil de proveedor');
         navigate('/profile');
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      alert('Error al cargar el perfil de proveedor');
+      toast.error('Error al cargar el perfil de proveedor');
       setLoading(false);
     }
   };
@@ -93,16 +97,14 @@ export default function ProviderRequests() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Provider requests loaded:', data);
         setRequests(data);
       } else {
-        const errorText = await response.text();
-        console.error('Error loading requests:', response.status, errorText);
-        alert('No se pudieron cargar las solicitudes');
+        console.error('Error loading requests:', response.status);
+        toast.error('No se pudieron cargar las solicitudes');
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      alert('Error al cargar las solicitudes');
+      toast.error('Error al cargar las solicitudes');
     } finally {
       setLoading(false);
     }
@@ -125,18 +127,18 @@ export default function ProviderRequests() {
       });
 
       if (response.ok) {
-        alert('Solicitud actualizada correctamente');
+        toast.success('Solicitud actualizada correctamente');
         if (providerId) {
           loadRequests(providerId);
         }
         return true;
       } else {
-        alert('Error al actualizar la solicitud');
+        toast.error('Error al actualizar la solicitud');
         return false;
       }
     } catch (error) {
       console.error('Error updating request:', error);
-      alert('Error al actualizar la solicitud');
+      toast.error('Error al actualizar la solicitud');
       return false;
     }
   };
@@ -146,7 +148,7 @@ export default function ProviderRequests() {
 
     const cost = parseFloat(finalCost);
     if (isNaN(cost) || cost <= 0) {
-      alert('Ingresa un costo válido');
+      toast.error('Ingresa un costo válido');
       return;
     }
 
@@ -180,199 +182,190 @@ export default function ProviderRequests() {
   }
 
   return (
-    <div className="provider-requests-container">
-      <div className="provider-requests-header">
-        <h1 className="provider-requests-title">Mis Solicitudes</h1>
-        <button onClick={() => navigate('/profile')} className="back-button">
-          ← Volver
-        </button>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Mis Solicitudes</h1>
+          <p className="text-slate-600">Gestiona las solicitudes de tus clientes</p>
+        </div>
+
+        <Tabs value={selectedStatus || 'all'} onValueChange={(value) => setSelectedStatus(value === 'all' ? null : value)}>
+          <TabsList className="grid grid-cols-2 md:grid-cols-6 mb-6">
+            <TabsTrigger value="all">Todas ({requests.length})</TabsTrigger>
+            {Object.entries(STATUS_LABELS).map(([status, label]) => {
+              const count = requests.filter((r) => r.status === status).length;
+              return (
+                <TabsTrigger key={status} value={status}>
+                  {label} ({count})
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          <TabsContent value={selectedStatus || 'all'}>
+            {filteredRequests.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <div className="text-5xl mb-4">📭</div>
+                  <h3 className="text-xl font-bold mb-2">No hay solicitudes</h3>
+                  <p className="text-slate-600">
+                    {selectedStatus
+                      ? `No tienes solicitudes con estado "${STATUS_LABELS[selectedStatus]}"`
+                      : 'Aún no has recibido solicitudes de clientes'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredRequests.map((request) => (
+                  <Card key={request.requestId}>
+                    <CardContent className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg mb-1">{request.requestTitle}</h3>
+                          <p className="text-sm text-slate-600 mb-2">{request.service?.serviceName || 'Servicio'}</p>
+                          {request.service?.category && (
+                            <p className="text-sm text-slate-600">{request.service.category.categoryName}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-slate-600 mb-1">Fecha preferida</p>
+                          <p className="font-semibold">{new Date(request.preferredDate).toLocaleDateString('es-ES')}</p>
+                          <p className="text-sm text-slate-600">Hora: {request.preferredTime}</p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-slate-600 mb-1">Dirección</p>
+                          <p className="text-sm">{request.serviceAddress}</p>
+                          {request.contactPhone && (
+                            <p className="text-sm text-slate-600 mt-2">📱 {request.contactPhone}</p>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-xs text-slate-600 mb-1">
+                            {request.finalCost ? 'Costo Final' : 'Costo Estimado'}
+                          </p>
+                          <p className="text-2xl font-bold text-blue-600">
+                            ₡{(request.finalCost || request.estimatedCost).toLocaleString()}
+                          </p>
+                          <Badge className="mt-2">
+                            {request.status === 'pending' && 'Pendiente'}
+                            {request.status === 'accepted' && 'Aceptada'}
+                            {request.status === 'in_progress' && 'En Progreso'}
+                            {request.status === 'completed' && 'Completada'}
+                            {request.status === 'cancelled' && 'Cancelada'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-4 mb-4">
+                        <p className="text-sm text-slate-700">{request.requestDescription}</p>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap">
+                        {request.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => openAcceptModal(request)}
+                            >
+                              ✓ Aceptar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (window.confirm('¿Deseas cancelar esta solicitud?')) {
+                                  updateRequestStatus(request.requestId, 'cancelled');
+                                }
+                              }}
+                            >
+                              ✕ Rechazar
+                            </Button>
+                          </>
+                        )}
+
+                        {request.status === 'accepted' && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm('¿Iniciar trabajo en esta solicitud?')) {
+                                updateRequestStatus(request.requestId, 'in_progress');
+                              }
+                            }}
+                          >
+                            ▶ Iniciar Trabajo
+                          </Button>
+                        )}
+
+                        {request.status === 'in_progress' && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm('¿Marcar esta solicitud como completada?')) {
+                                updateRequestStatus(request.requestId, 'completed');
+                              }
+                            }}
+                          >
+                            ✓ Completar
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${!selectedStatus ? 'active' : ''}`}
-          onClick={() => setSelectedStatus(null)}
-        >
-          Todas ({requests.length})
-        </button>
-        {Object.entries(STATUS_LABELS).map(([status, label]) => {
-          const count = requests.filter((r) => r.status === status).length;
-          return (
-            <button
-              key={status}
-              className={`filter-tab ${selectedStatus === status ? 'active' : ''}`}
-              onClick={() => setSelectedStatus(status)}
-            >
-              {label} ({count})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Requests Grid */}
-      {filteredRequests.length === 0 ? (
-        <div className="empty-state">
-          <h3>📭 No hay solicitudes</h3>
-          <p>
-            {selectedStatus
-              ? `No tienes solicitudes con estado "${STATUS_LABELS[selectedStatus]}"`
-              : 'Aún no has recibido solicitudes de clientes'}
-          </p>
-        </div>
-      ) : (
-        <div className="requests-grid">
-          {filteredRequests.map((request) => (
-            <div key={request.requestId} className={`request-card ${request.status}`}>
-              <div className="request-card-header">
-                <div style={{ flex: 1 }}>
-                  <h3 className="request-title">{request.requestTitle}</h3>
-                  <p className="request-service">
-                    🔧 {request.service?.serviceName || 'Servicio'}
-                  </p>
-                  <p className="request-category">
-                    📂 {request.service?.category?.categoryName || 'Sin categoría'}
-                  </p>
-                </div>
-                <span className={`status-badge ${request.status}`}>
-                  {STATUS_LABELS[request.status]}
-                </span>
-              </div>
-
-              <p className="request-description">{request.requestDescription}</p>
-
-              <div className="request-info-grid">
-                <div className="request-info-item">
-                  <span className="request-info-label">Fecha Preferida</span>
-                  <span className="request-info-value">
-                    {new Date(request.preferredDate).toLocaleDateString('es-ES')}
-                  </span>
-                </div>
-                <div className="request-info-item">
-                  <span className="request-info-label">Hora</span>
-                  <span className="request-info-value">{request.preferredTime}</span>
-                </div>
-                <div className="request-info-item">
-                  <span className="request-info-label">Dirección</span>
-                  <span className="request-info-value" style={{ fontSize: '13px' }}>
-                    {request.serviceAddress}
-                  </span>
-                </div>
-                <div className="request-info-item">
-                  <span className="request-info-label">
-                    {request.finalCost ? 'Costo Final' : 'Costo Estimado'}
-                  </span>
-                  <span className="request-info-value request-cost">
-                    ₡{(request.finalCost || request.estimatedCost).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {request.contactPhone && (
-                <div className="request-info-item" style={{ marginTop: '12px' }}>
-                  <span className="request-info-label">Teléfono</span>
-                  <span className="request-info-value">📱 {request.contactPhone}</span>
-                </div>
-              )}
-
-              <div className="request-actions">
-                {request.status === 'pending' && (
-                  <>
-                    <button
-                      className="action-button accept-button"
-                      onClick={() => openAcceptModal(request)}
-                    >
-                      ✓ Aceptar
-                    </button>
-                    <button
-                      className="action-button cancel-button"
-                      onClick={() => {
-                        if (window.confirm('¿Deseas cancelar esta solicitud?')) {
-                          updateRequestStatus(request.requestId, 'cancelled');
-                        }
-                      }}
-                    >
-                      ✕ Rechazar
-                    </button>
-                  </>
-                )}
-
-                {request.status === 'accepted' && (
-                  <button
-                    className="action-button progress-button"
-                    onClick={() => {
-                      if (window.confirm('¿Iniciar trabajo en esta solicitud?')) {
-                        updateRequestStatus(request.requestId, 'in_progress');
-                      }
-                    }}
-                  >
-                    ▶ Iniciar Trabajo
-                  </button>
-                )}
-
-                {request.status === 'in_progress' && (
-                  <button
-                    className="action-button complete-button"
-                    onClick={() => {
-                      if (window.confirm('¿Marcar esta solicitud como completada?')) {
-                        updateRequestStatus(request.requestId, 'completed');
-                      }
-                    }}
-                  >
-                    ✓ Completar
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Accept Modal */}
       {showAcceptModal && selectedRequest && (
-        <div className="modal-overlay" onClick={() => setShowAcceptModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Aceptar Solicitud</h2>
-              <button className="modal-close" onClick={() => setShowAcceptModal(false)}>
-                ×
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Aceptar Solicitud</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-slate-600 mb-2">
+                  Solicitud: <span className="font-bold text-slate-900">{selectedRequest.requestTitle}</span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  Costo estimado por el cliente: ₡{selectedRequest.estimatedCost.toLocaleString()}
+                </p>
+              </div>
 
-            <div className="modal-body">
-              <p style={{ marginBottom: '16px', color: '#6b7280' }}>
-                Solicitud: <strong>{selectedRequest.requestTitle}</strong>
-              </p>
-
-              <div className="form-group">
-                <label className="form-label">Costo Final del Servicio (₡)</label>
-                <input
+              <div>
+                <Label htmlFor="finalCost">Costo Final del Servicio (₡)</Label>
+                <Input
+                  id="finalCost"
                   type="number"
-                  className="form-input"
                   value={finalCost}
                   onChange={(e) => setFinalCost(e.target.value)}
                   placeholder="Ingresa el costo"
                   min="0"
                   step="0.01"
                 />
-                <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '8px' }}>
-                  Costo estimado por el cliente: ₡{selectedRequest.estimatedCost.toLocaleString()}
-                </p>
               </div>
-            </div>
 
-            <div className="modal-actions">
-              <button
-                className="modal-button secondary"
-                onClick={() => setShowAcceptModal(false)}
-              >
-                Cancelar
-              </button>
-              <button className="modal-button primary" onClick={handleAcceptRequest}>
-                Aceptar Solicitud
-              </button>
-            </div>
-          </div>
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowAcceptModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleAcceptRequest}
+                >
+                  Aceptar Solicitud
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

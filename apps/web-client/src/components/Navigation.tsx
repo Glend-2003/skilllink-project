@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from '../ui/sheet';
 import { useAuth } from '../context/AuthContext';
+import RoleSwitcher from './RoleSwitcher';
 
 export function Navigation() {
   const navigate = useNavigate();
@@ -74,6 +75,7 @@ export function Navigation() {
         </div>
 
         <div className="flex items-center gap-4">
+          <RoleSwitcher />
           <Button
             variant="ghost"
             size="icon"
@@ -140,6 +142,9 @@ export function Navigation() {
               </div>
 
               <div className="pt-4 border-t space-y-2">
+                <div className="mb-4">
+                  <RoleSwitcher />
+                </div>
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start gap-2 text-slate-600"

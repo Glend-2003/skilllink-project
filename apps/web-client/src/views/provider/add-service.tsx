@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './add-service.css';
+import { Save } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Textarea } from '../../ui/textarea';
+import { Label } from '../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { toast } from 'sonner';
 
 interface ServiceCategory {
   categoryId: number;
@@ -48,15 +55,14 @@ export default function AddService() {
       });
       if (response.ok) {
         const profile = await response.json();
-        console.log('Provider profile loaded:', profile);
         setProviderId(profile.providerId);
       } else {
         console.error('Failed to load provider profile');
-        alert('No se pudo cargar tu perfil de proveedor');
+        toast.error('No se pudo cargar tu perfil de proveedor');
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      alert('Error al cargar el perfil');
+      toast.error('Error al cargar el perfil');
     }
   };
 
@@ -70,15 +76,14 @@ export default function AddService() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Categories loaded:', data);
         setCategories(Array.isArray(data) ? data : []);
       } else {
         console.error('Failed to load categories:', response.status);
-        alert('No se pudieron cargar las categorías');
+        toast.error('No se pudieron cargar las categorías');
       }
     } catch (error) {
       console.error('Error loading categories:', error);
-      alert('Error de conexión al cargar categorías');
+      toast.error('Error de conexión al cargar categorías');
     }
   };
 
@@ -100,35 +105,34 @@ export default function AddService() {
     e.preventDefault();
 
     if (!formData.serviceTitle.trim()) {
-      alert('El título del servicio es requerido');
+      toast.error('El título del servicio es requerido');
       return;
     }
 
     if (!formData.serviceDescription.trim()) {
-      alert('La descripción es requerida');
+      toast.error('La descripción es requerida');
       return;
     }
 
     if (formData.categoryId === 0) {
-      alert('Selecciona una categoría');
+      toast.error('Selecciona una categoría');
       return;
     }
 
     if (!providerId) {
-      alert('No se pudo obtener tu ID de proveedor. Recarga la página.');
+      toast.error('No se pudo obtener tu ID de proveedor. Recarga la página.');
       return;
     }
 
     const basePrice = parseFloat(formData.basePrice);
     if (isNaN(basePrice) || basePrice < 0) {
-      alert('El precio base debe ser un número válido mayor o igual a 0');
+      toast.error('El precio base debe ser un número válido mayor o igual a 0');
       return;
     }
 
     setSaving(true);
 
     try {
-      // Payload con todos los campos requeridos por el backend
       const payload = {
         providerId: providerId,
         categoryId: formData.categoryId,
@@ -142,8 +146,6 @@ export default function AddService() {
         isActive: formData.isActive,
       };
 
-      console.log('Payload enviado:', payload);
-
       const response = await fetch(`${API_BASE_URL}/api/v1/services`, {
         method: 'POST',
         headers: {
@@ -153,26 +155,21 @@ export default function AddService() {
         body: JSON.stringify(payload),
       });
 
-      console.log('Response status:', response.status);
-
       if (response.ok) {
-        const data = await response.json();
-        console.log('Service created:', data);
-        alert('Servicio creado correctamente. Ahora estará pendiente de aprobación por un administrador.');
+        toast.success('Servicio creado correctamente. Estará pendiente de aprobación por un administrador.');
         navigate('/provider/services');
       } else {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
         try {
           const errorData = JSON.parse(errorText);
-          alert(errorData.message || 'No se pudo crear el servicio');
+          toast.error(errorData.message || 'No se pudo crear el servicio');
         } catch {
-          alert(`Error ${response.status}: ${errorText || 'No se pudo crear el servicio'}`);
+          toast.error(`Error ${response.status}: ${errorText || 'No se pudo crear el servicio'}`);
         }
       }
     } catch (error) {
       console.error('Error creating service:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setSaving(false);
     }
@@ -180,189 +177,164 @@ export default function AddService() {
 
   if (loading) {
     return (
-      <div className="add-service-container">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Cargando categorías...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando categorías...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="add-service-container">
-      <div className="service-header">
-        <button onClick={() => navigate('/provider/services')} className="back-button">
-          ← Volver
-        </button>
-        <h1>Agregar Servicio</h1>
-        <div></div>
-      </div>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-2xl mx-auto px-4 md:px-6 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Agregar Servicio</h1>
+          <p className="text-slate-600">Crea un nuevo servicio para tu negocio</p>
+        </div>
 
-      <div className="service-content">
-        <form onSubmit={handleSubmit} className="service-form">
-          <div className="form-section">
-            <h2>Información Básica</h2>
-            
-            <div className="form-group">
-              <label htmlFor="categoryId">
-                Categoría <span className="required">*</span>
-              </label>
-              <select
-                id="categoryId"
-                name="categoryId"
-                value={formData.categoryId}
-                onChange={handleChange}
-                required
-                className="form-select"
-              >
-                <option value={0}>Selecciona una categoría</option>
-                {categories.map((cat) => (
-                  <option key={cat.categoryId} value={cat.categoryId}>
-                    {cat.categoryName}
-                  </option>
-                ))}
-              </select>
-              {categories.length === 0 && (
-                <p className="form-hint error">No hay categorías disponibles. Contacta al administrador.</p>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="serviceTitle">
-                Título del Servicio <span className="required">*</span>
-              </label>
-              <input
-                id="serviceTitle"
-                name="serviceTitle"
-                type="text"
-                placeholder="Ej: Reparación de plomería"
-                value={formData.serviceTitle}
-                onChange={handleChange}
-                required
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="serviceDescription">
-                Descripción <span className="required">*</span>
-              </label>
-              <textarea
-                id="serviceDescription"
-                name="serviceDescription"
-                placeholder="Describe en detalle tu servicio, qué incluye, requisitos, etc."
-                value={formData.serviceDescription}
-                onChange={handleChange}
-                required
-                rows={5}
-                className="form-textarea"
-              />
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h2>Precio y Duración</h2>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="priceType">Tipo de Precio</label>
-                <select
-                  id="priceType"
-                  name="priceType"
-                  value={formData.priceType}
-                  onChange={handleChange}
-                  className="form-select"
-                >
-                  <option value="fixed">Precio Fijo</option>
-                  <option value="hourly">Por Hora</option>
-                  <option value="negotiable">Negociable</option>
-                </select>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Información Básica</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="categoryId">Categoría <span className="text-red-600">*</span></Label>
+                <Select value={formData.categoryId.toString()} onValueChange={(value) => setFormData({ ...formData, categoryId: parseInt(value) })}>
+                  <SelectTrigger id="categoryId">
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.categoryId} value={cat.categoryId.toString()}>
+                        {cat.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {categories.length === 0 && (
+                  <p className="text-sm text-red-600 mt-1">No hay categorías disponibles</p>
+                )}
               </div>
 
-              <div className="form-group">
-                <label htmlFor="basePrice">
-                  Precio Base ($) <span className="required">*</span>
-                </label>
-                <input
-                  id="basePrice"
-                  name="basePrice"
-                  type="number"
-                  placeholder="50.00"
-                  min="0"
-                  step="0.01"
-                  value={formData.basePrice}
+              <div>
+                <Label htmlFor="serviceTitle">Título del Servicio <span className="text-red-600">*</span></Label>
+                <Input
+                  id="serviceTitle"
+                  name="serviceTitle"
+                  placeholder="Ej: Reparación de plomería"
+                  value={formData.serviceTitle}
                   onChange={handleChange}
                   required
-                  className="form-input"
                 />
-                <p className="form-hint">Ingresa 0 si el precio es negociable</p>
               </div>
-            </div>
 
-            <div className="form-group">
-              <label htmlFor="estimatedDurationMinutes">Duración Estimada (minutos)</label>
-              <input
-                id="estimatedDurationMinutes"
-                name="estimatedDurationMinutes"
-                type="number"
-                placeholder="60"
-                min="1"
-                value={formData.estimatedDurationMinutes}
-                onChange={handleChange}
-                className="form-input"
-              />
-              <p className="form-hint">Tiempo aproximado que toma completar el servicio</p>
-            </div>
-          </div>
+              <div>
+                <Label htmlFor="serviceDescription">Descripción <span className="text-red-600">*</span></Label>
+                <Textarea
+                  id="serviceDescription"
+                  name="serviceDescription"
+                  placeholder="Describe en detalle tu servicio, qué incluye, requisitos, etc."
+                  value={formData.serviceDescription}
+                  onChange={handleChange}
+                  required
+                  rows={5}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-          <div className="form-section">
-            <h2>Estado del Servicio</h2>
-            
-            <label className="checkbox-container">
-              <input
-                type="checkbox"
-                name="isActive"
-                checked={formData.isActive}
-                onChange={handleChange}
-                className="checkbox-input"
-              />
-              <span className="checkbox-custom"></span>
-              <span className="checkbox-label">
-                Servicio activo (visible para clientes)
-              </span>
-            </label>
-            <p className="checkbox-description">
-              Si desactivas esta opción, el servicio no será visible para los clientes hasta que lo actives
-            </p>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Precio y Duración</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="priceType">Tipo de Precio</Label>
+                  <Select value={formData.priceType} onValueChange={(value) => setFormData({ ...formData, priceType: value as any })}>
+                    <SelectTrigger id="priceType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">Precio Fijo</SelectItem>
+                      <SelectItem value="hourly">Por Hora</SelectItem>
+                      <SelectItem value="negotiable">Negociable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="form-actions">
-            <button
+                <div>
+                  <Label htmlFor="basePrice">Precio Base <span className="text-red-600">*</span></Label>
+                  <Input
+                    id="basePrice"
+                    name="basePrice"
+                    type="number"
+                    placeholder="50.00"
+                    min="0"
+                    step="0.01"
+                    value={formData.basePrice}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="estimatedDurationMinutes">Duración Estimada (minutos)</Label>
+                <Input
+                  id="estimatedDurationMinutes"
+                  name="estimatedDurationMinutes"
+                  type="number"
+                  placeholder="60"
+                  min="1"
+                  value={formData.estimatedDurationMinutes}
+                  onChange={handleChange}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Estado del Servicio</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  name="isActive"
+                  checked={formData.isActive}
+                  onChange={handleChange}
+                  className="w-5 h-5 rounded"
+                />
+                <Label htmlFor="isActive" className="mb-0">Servicio activo (visible para clientes)</Label>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end gap-3">
+            <Button 
               type="button"
+              variant="outline" 
               onClick={() => navigate('/provider/services')}
-              className="cancel-btn"
               disabled={saving}
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button 
               type="submit"
-              className="save-btn"
               disabled={saving || categories.length === 0}
+              className="gap-2"
             >
-              {saving ? '⏳ Creando...' : '✓ Crear Servicio'}
-            </button>
+              <Save className="w-4 h-4" />
+              {saving ? 'Creando...' : 'Crear Servicio'}
+            </Button>
           </div>
-
-          {categories.length === 0 && (
-            <div className="warning-box">
-              <span className="warning-icon">⚠️</span>
-              <p>No puedes crear servicios hasta que haya categorías disponibles.</p>
-            </div>
-          )}
         </form>
       </div>
     </div>
-  );
-}
+  );}

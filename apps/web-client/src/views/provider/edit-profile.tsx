@@ -2,7 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './edit-profile.css';
+import { Camera, MapPin, Clock, Save } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Textarea } from '../../ui/textarea';
+import { Label } from '../../ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
+import { Switch } from '../../ui/switch';
+import { toast } from 'sonner';
 
 interface ProviderProfile {
   providerId: number;
@@ -80,7 +88,7 @@ export default function EditProviderProfile() {
     e.preventDefault();
 
     if (!formData.businessName.trim()) {
-      alert('El nombre del negocio es requerido');
+      toast.error('El nombre del negocio es requerido');
       return;
     }
 
@@ -105,15 +113,15 @@ export default function EditProviderProfile() {
       });
 
       if (response.ok) {
-        alert('Perfil actualizado correctamente');
+        toast.success('Perfil actualizado correctamente');
         navigate('/profile');
       } else {
         const data = await response.json();
-        alert(data.message || 'No se pudo actualizar el perfil');
+        toast.error(data.message || 'No se pudo actualizar el perfil');
       }
     } catch (error) {
       console.error('Error updating provider profile:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setSaving(false);
     }
@@ -121,171 +129,178 @@ export default function EditProviderProfile() {
 
   if (loading) {
     return (
-      <div className="edit-profile-container">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Cargando perfil...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando perfil...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="edit-profile-container">
-      <div className="profile-header">
-        <button onClick={() => navigate('/profile')} className="back-button">
-          ← Volver
-        </button>
-        <h1>Editar Perfil de Proveedor</h1>
-        <div></div>
-      </div>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Mi Perfil Profesional</h1>
+          <p className="text-slate-600">Administra tu información y servicios</p>
+        </div>
 
-      <div className="profile-content">
-        <form onSubmit={handleSubmit} className="profile-form">
-          <div className="form-section">
-            <h2>Información del Negocio</h2>
-            
-            <div className="form-group">
-              <label htmlFor="businessName">
-                Nombre del Negocio <span className="required">*</span>
-              </label>
-              <input
-                id="businessName"
-                name="businessName"
-                type="text"
-                placeholder="Ej: Plomería García"
-                value={formData.businessName}
-                onChange={handleChange}
-                required
-                className="form-input"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Profile Info Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Información personal</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col md:flex-row gap-6 items-start">
+                <div className="relative">
+                  <Avatar className="w-24 h-24">
+                    <AvatarImage src="https://i.pravatar.cc/150" alt="Avatar" />
+                    <AvatarFallback>{formData.businessName.charAt(0) || 'P'}</AvatarFallback>
+                  </Avatar>
+                  <Button 
+                    size="icon" 
+                    className="absolute bottom-0 right-0 rounded-full"
+                    variant="secondary"
+                    type="button"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </Button>
+                </div>
 
-            <div className="form-group">
-              <label htmlFor="businessDescription">Descripción</label>
-              <textarea
-                id="businessDescription"
-                name="businessDescription"
-                placeholder="Describe tus servicios, experiencia y especialidades..."
-                value={formData.businessDescription}
-                onChange={handleChange}
-                rows={4}
-                className="form-textarea"
-              />
-            </div>
+                <div className="flex-1 space-y-4 w-full">
+                  <div>
+                    <Label htmlFor="businessName">Nombre del Negocio</Label>
+                    <Input
+                      id="businessName"
+                      name="businessName"
+                      type="text"
+                      placeholder="Ej: Plomería García"
+                      value={formData.businessName}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="yearsExperience">Años de Experiencia</label>
-                <input
-                  id="yearsExperience"
-                  name="yearsExperience"
-                  type="number"
-                  placeholder="0"
-                  min="0"
-                  max="80"
-                  value={formData.yearsExperience}
-                  onChange={handleChange}
-                  className="form-input"
-                />
+                  <div>
+                    <Label htmlFor="businessDescription">Descripción profesional</Label>
+                    <Textarea 
+                      id="businessDescription"
+                      name="businessDescription"
+                      placeholder="Describe tu experiencia y especialidades..."
+                      value={formData.businessDescription}
+                      onChange={handleChange}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="yearsExperience">Años de experiencia</Label>
+                      <Input 
+                        id="yearsExperience"
+                        name="yearsExperience"
+                        type="number"
+                        min="0"
+                        max="80"
+                        value={formData.yearsExperience}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="serviceRadiusKm">Radio de servicio (km)</Label>
+                      <Input 
+                        id="serviceRadiusKm"
+                        name="serviceRadiusKm"
+                        type="number"
+                        min="1"
+                        max="500"
+                        value={formData.serviceRadiusKm}
+                        onChange={handleChange}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="serviceRadiusKm">Radio de Servicio (km)</label>
-                <input
-                  id="serviceRadiusKm"
-                  name="serviceRadiusKm"
-                  type="number"
-                  placeholder="10"
-                  min="1"
-                  max="500"
-                  value={formData.serviceRadiusKm}
-                  onChange={handleChange}
-                  className="form-input"
+              <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <Label className="text-sm font-medium">Estado de disponibilidad</Label>
+                    <p className="text-sm text-slate-600">
+                      {formData.availableForWork ? 'Aceptando nuevos clientes' : 'No disponible actualmente'}
+                    </p>
+                  </div>
+                </div>
+                <Switch 
+                  checked={formData.availableForWork}
+                  onCheckedChange={(checked) => setFormData({ ...formData, availableForWork: checked })}
                 />
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="form-section">
-            <h2>Ubicación</h2>
-            <p className="section-description">
-              Proporciona tu ubicación para que los clientes puedan encontrarte más fácilmente
-            </p>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="latitude">Latitud</label>
-                <input
-                  id="latitude"
-                  name="latitude"
-                  type="text"
-                  placeholder="14.6349"
-                  value={formData.latitude}
-                  onChange={handleChange}
-                  className="form-input"
-                />
+          {/* Location Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Ubicación
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="latitude">Latitud</Label>
+                  <Input
+                    id="latitude"
+                    name="latitude"
+                    type="text"
+                    placeholder="14.6349"
+                    value={formData.latitude}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="longitude">Longitud</Label>
+                  <Input
+                    id="longitude"
+                    name="longitude"
+                    type="text"
+                    placeholder="-90.5069"
+                    value={formData.longitude}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
-
-              <div className="form-group">
-                <label htmlFor="longitude">Longitud</label>
-                <input
-                  id="longitude"
-                  name="longitude"
-                  type="text"
-                  placeholder="-90.5069"
-                  value={formData.longitude}
-                  onChange={handleChange}
-                  className="form-input"
-                />
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm text-blue-700">
+                  💡 Obtén tus coordenadas desde Google Maps: Click derecho en el mapa → "¿Qué hay aquí?"
+                </p>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="location-help">
-              <span className="help-icon">💡</span>
-              <span>
-                Puedes obtener tus coordenadas desde Google Maps: Click derecho en el mapa → "¿Qué hay aquí?"
-              </span>
-            </div>
-          </div>
-
-          <div className="form-section">
-            <h2>Disponibilidad</h2>
-            
-            <label className="checkbox-container">
-              <input
-                type="checkbox"
-                name="availableForWork"
-                checked={formData.availableForWork}
-                onChange={handleChange}
-                className="checkbox-input"
-              />
-              <span className="checkbox-custom"></span>
-              <span className="checkbox-label">
-                Disponible para recibir nuevas solicitudes
-              </span>
-            </label>
-            <p className="checkbox-description">
-              Si desactivas esta opción, los clientes no podrán enviarte nuevas solicitudes
-            </p>
-          </div>
-
-          <div className="form-actions">
-            <button
+          {/* Actions */}
+          <div className="flex justify-end gap-3">
+            <Button 
               type="button"
+              variant="outline" 
               onClick={() => navigate('/profile')}
-              className="cancel-btn"
               disabled={saving}
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button 
               type="submit"
-              className="save-btn"
               disabled={saving}
+              className="gap-2"
             >
-              {saving ? '⏳ Guardando...' : '💾 Guardar Cambios'}
-            </button>
+              <Save className="w-4 h-4" />
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
           </div>
         </form>
       </div>

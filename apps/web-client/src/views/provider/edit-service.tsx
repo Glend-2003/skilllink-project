@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ServiceGalleryUpload from '../../components/ServiceGalleryUpload';
 import ServiceGalleryView from '../../components/ServiceGalleryView';
-import './add-service.css';
+import { toast } from 'sonner';
 
 interface ServiceCategory {
   categoryId: number;
@@ -45,7 +45,7 @@ export default function EditService() {
 
   useEffect(() => {
     if (!serviceId) {
-      alert('ID de servicio no proporcionado');
+      toast.error('ID de servicio no proporcionado');
       navigate('/provider/services');
       return;
     }
@@ -108,12 +108,12 @@ export default function EditService() {
           isActive: service.isActive,
         });
       } else {
-        alert('No se pudo cargar el servicio');
+        toast.error('No se pudo cargar el servicio');
         navigate('/provider/services');
       }
     } catch (error) {
       console.error('Error loading service:', error);
-      alert('Error al cargar el servicio');
+      toast.error('Error al cargar el servicio');
       navigate('/provider/services');
     }
   };
@@ -135,12 +135,12 @@ export default function EditService() {
     e.preventDefault();
 
     if (!formData.serviceTitle.trim()) {
-      alert('El título del servicio es requerido');
+      toast.error('El título del servicio es requerido');
       return;
     }
 
     if (!formData.serviceDescription.trim()) {
-      alert('La descripción es requerida');
+      toast.error('La descripción es requerida');
       return;
     }
 
@@ -159,8 +159,6 @@ export default function EditService() {
         isActive: formData.isActive,
       };
 
-      console.log('Updating service with payload:', payload);
-
       const response = await fetch(`${API_BASE_URL}/api/v1/services/${serviceId}`, {
         method: 'PATCH',
         headers: {
@@ -171,16 +169,15 @@ export default function EditService() {
       });
 
       if (response.ok) {
-        alert('Servicio actualizado correctamente');
+        toast.success('Servicio actualizado correctamente');
         navigate('/provider/services');
       } else {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
-        alert(errorData.message || 'No se pudo actualizar el servicio');
+        toast.error(errorData.message || 'No se pudo actualizar el servicio');
       }
     } catch (error) {
       console.error('Error updating service:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setSaving(false);
     }
@@ -317,9 +314,7 @@ export default function EditService() {
                 serviceId={parseInt(serviceId)}
                 providerId={providerId}
                 onUploadComplete={(images) => {
-                  console.log('Upload complete:', images);
-                  alert('Fotos agregadas correctamente. Recargando galería...');
-                  // Recargar solo la galería en lugar de toda la página
+                  toast.success('Fotos agregadas correctamente');
                   loadService();
                 }}
               />

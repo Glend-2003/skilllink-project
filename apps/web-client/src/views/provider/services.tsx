@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './services.css';
+import { Trash2, Edit, Plus, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui//button';
+import { Badge } from '../../ui/badge';
+import { toast } from 'sonner';
 
 interface Service {
   serviceId: number;
@@ -44,17 +48,14 @@ export default function ProviderServices() {
 
       if (profileResponse.ok) {
         const profile = await profileResponse.json();
-        console.log('Provider profile loaded:', profile);
         setProviderId(profile.providerId);
-        // Ahora cargar los servicios con el providerId
         await loadServicesWithProviderId(profile.providerId);
       } else if (profileResponse.status === 404) {
-        // El proveedor aún no existe
         console.log('Provider profile not found');
         setServices([]);
       } else {
         console.error('Error loading provider profile');
-        alert('No se pudo cargar tu perfil de proveedor');
+        toast.error('No se pudo cargar tu perfil de proveedor');
       }
     } catch (error) {
       console.error('Error:', error);
@@ -116,14 +117,14 @@ export default function ProviderServices() {
       });
 
       if (response.ok) {
-        alert('Servicio eliminado');
+        toast.success('Servicio eliminado');
         loadServices();
       } else {
-        alert('No se pudo eliminar el servicio');
+        toast.error('No se pudo eliminar el servicio');
       }
     } catch (error) {
       console.error('Error deleting service:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setDeletingId(null);
     }
@@ -163,124 +164,142 @@ export default function ProviderServices() {
 
   if (loading) {
     return (
-      <div className="services-container">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Cargando servicios...</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando servicios...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="services-container">
-      <div className="services-header">
-        <button onClick={() => navigate('/profile')} className="back-button">
-          ← Volver
-        </button>
-        <h1>Mis Servicios</h1>
-        <div className="header-actions">
-          <button 
-            onClick={() => loadServices(true)} 
-            className="refresh-button"
-            disabled={refreshing}
-          >
-            🔄 {refreshing ? 'Actualizando...' : 'Actualizar'}
-          </button>
-          {services.length > 0 && (
-            <button 
-              className="add-service-header-btn"
-              onClick={() => navigate('/provider/add-service')}
-            >
-              ➕ Agregar Servicio
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="services-content">
-        {services.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">📋</div>
-            <h3>No tienes servicios registrados</h3>
-            <p>Agrega tu primer servicio para empezar a recibir solicitudes</p>
-            <button 
-              className="add-service-btn"
-              onClick={() => navigate('/provider/add-service')}
-            >
-              ➕ Agregar Servicio
-            </button>
+    <div className="min-h-screen bg-slate-50 pb-20 md:pb-8">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 py-6">
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Mis Servicios</h1>
+            <p className="text-slate-600">Gestiona y administra todos tus servicios</p>
           </div>
+          <Button 
+            onClick={() => navigate('/provider/add-service')}
+            className="gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar Servicio
+          </Button>
+        </div>
+
+        {services.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="text-5xl mb-4">📋</div>
+              <h3 className="text-xl font-bold mb-2">No tienes servicios registrados</h3>
+              <p className="text-slate-600 mb-6">Agrega tu primer servicio para empezar a recibir solicitudes</p>
+              <Button 
+                onClick={() => navigate('/provider/add-service')}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar Servicio
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
-          <>
-            <div className="services-grid">
-              {services.map((service) => (
-                <div key={service.serviceId} className="service-card">
-                  <div className="service-header">
-                    <div className="title-row">
-                      <h3>{service.serviceTitle}</h3>
-                      <div className="badges">
-                        {service.isVerified && (
-                          <span className="verified-badge">✓</span>
-                        )}
-                        <span className={`approval-badge ${getApprovalColor(service.approvalStatus)}`}>
-                          {service.approvalStatus === 'approved' && '✓ Aprobado'}
-                          {service.approvalStatus === 'pending' && '⌛ Pendiente'}
-                          {service.approvalStatus === 'rejected' && '✗ Rechazado'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="category-tag">{service.categoryName}</div>
-
-                  <p className="service-description">{service.serviceDescription}</p>
-
-                  <div className="service-info">
-                    <div className="info-item">
-                      <span className="info-icon">💵</span>
-                      <span>{getPriceDisplay(service)}</span>
-                    </div>
-                    {service.estimatedDurationMinutes && (
-                      <div className="info-item">
-                        <span className="info-icon">🕒</span>
-                        <span>{getDurationDisplay(service.estimatedDurationMinutes)}</span>
-                      </div>
-                    )}
-                    <div className="info-item">
-                      <span className={`status-indicator ${service.isActive ? 'active' : 'inactive'}`}>
-                        {service.isActive ? '● Activo' : '○ Inactivo'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="service-actions">
-                    <button
-                      className="action-btn edit-btn"
-                      onClick={() => navigate(`/provider/edit-service?id=${service.serviceId}`)}
-                    >
-                      ✏️ Editar
-                    </button>
-                    <button
-                      className="action-btn delete-btn"
-                      onClick={() => handleDelete(service.serviceId, service.serviceTitle)}
-                      disabled={deletingId === service.serviceId}
-                    >
-                      {deletingId === service.serviceId ? '⏳' : '🗑️'} Eliminar
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-slate-600">{services.length} {services.length === 1 ? 'servicio' : 'servicios'}</p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => loadServices(true)}
+                disabled={refreshing}
+                className="gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                {refreshing ? 'Actualizando...' : 'Actualizar'}
+              </Button>
             </div>
 
-            <button 
-              className="fab"
-              onClick={() => navigate('/provider/add-service')}
-              title="Agregar servicio"
-            >
-              ➕
-            </button>
-          </>
+            <div className="grid grid-cols-1 gap-4">
+              {services.map((service) => (
+                <Card key={service.serviceId}>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-start gap-3 mb-2">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold">{service.serviceTitle}</h3>
+                            <p className="text-sm text-slate-600">{service.categoryName}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            {service.isVerified && (
+                              <Badge>✓ Verificado</Badge>
+                            )}
+                            <Badge 
+                              variant={
+                                service.approvalStatus === 'approved' ? 'default' : 
+                                service.approvalStatus === 'pending' ? 'secondary' : 
+                                'destructive'
+                              }
+                            >
+                              {service.approvalStatus === 'approved' && '✓ Aprobado'}
+                              {service.approvalStatus === 'pending' && '⌛ Pendiente'}
+                              {service.approvalStatus === 'rejected' && '✗ Rechazado'}
+                            </Badge>
+                            <Badge 
+                              variant={service.isActive ? 'default' : 'secondary'}
+                            >
+                              {service.isActive ? '● Activo' : '● Inactivo'}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <p className="text-slate-700 mb-3">{service.serviceDescription}</p>
+
+                        <div className="flex flex-wrap gap-4 text-sm">
+                          <div>
+                            <span className="text-slate-600">Precio: </span>
+                            <span className="font-semibold">{getPriceDisplay(service)}</span>
+                          </div>
+                          {service.estimatedDurationMinutes && (
+                            <div>
+                              <span className="text-slate-600">Duración: </span>
+                              <span className="font-semibold">{getDurationDisplay(service.estimatedDurationMinutes)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 md:flex-col">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => navigate(`/provider/edit-service?id=${service.serviceId}`)}
+                        >
+                          <Edit className="w-4 h-4" />
+                          <span className="hidden md:inline">Editar</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => handleDelete(service.serviceId, service.serviceTitle)}
+                          disabled={deletingId === service.serviceId}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="hidden md:inline">
+                            {deletingId === service.serviceId ? 'Eliminando...' : 'Eliminar'}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

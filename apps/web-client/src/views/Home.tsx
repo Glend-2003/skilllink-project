@@ -4,7 +4,6 @@ import { Search as SearchIcon, Wrench, Zap, Scissors, Car, Palette, Home as Home
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../context/RoleContext';
-import RoleSwitcher from '../components/RoleSwitcher';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -79,7 +78,6 @@ export default function Home() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Intentar múltiples endpoints para categorías
         let categoriesData = [];
         try {
           console.log('Intentando cargar categorías desde:', `${API_BASE_URL}/categories`);
@@ -89,7 +87,6 @@ export default function Home() {
             console.log('Categorías cargadas exitosamente:', categoriesData);
           } else {
             console.warn('Error en /categories:', categoriesResponse.status);
-            // Intentar endpoint alternativo
             const altResponse = await fetch(`${API_BASE_URL}/api/v1/categories`);
             if (altResponse.ok) {
               categoriesData = await altResponse.json();
@@ -156,7 +153,6 @@ export default function Home() {
     console.log('Home - handleViewProvider - service data:', service);
     console.log('Home - provider.user.userId:', service.provider?.user?.userId);
     
-    // Use userId (not providerId) because backend expects user_id
     const userId = service.provider?.user?.userId;
     
     console.log('Home - Final userId to navigate:', userId);
@@ -229,25 +225,7 @@ export default function Home() {
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white px-4 md:px-6 py-8 md:py-12">
         <div className="max-w-6xl mx-auto">
-          {/* Navigation */}
-          <header className="flex items-center justify-between mb-8">
-            <Link to="/" className="text-2xl font-bold">
-              🔗 SkillLink
-            </Link>
-            <div className="flex items-center gap-4">
-              <RoleSwitcher />
-              <div 
-                className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors"
-                onClick={() => navigate('/profile')}
-              >
-                {user ? (
-                  <span className="text-lg">👤</span>
-                ) : (
-                  <span className="text-lg">👤</span>
-                )}
-              </div>
-            </div>
-          </header>
+          
 
           <h1 className="text-3xl md:text-5xl font-bold mb-4">
             {activeRole === 'provider' ? (
