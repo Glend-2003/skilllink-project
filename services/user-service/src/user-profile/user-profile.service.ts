@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { UserProfile } from './user-profile.entity';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { SavedSearch } from './entities/saved-search.entity';
@@ -13,6 +13,7 @@ export class UserProfileService {
     private profileRepository: Repository<UserProfile>,
     @InjectRepository(SavedSearch)
     private savedSearchRepository: Repository<SavedSearch>,
+    private dataSource: DataSource,
   ) {}
 
   // 1. Create or Update Profile
@@ -20,6 +21,13 @@ export class UserProfileService {
     userId: number,
     createProfileDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
+    // Format date_of_birth if present (convert ISO to YYYY-MM-DD)
+    const formattedDto = { ...createProfileDto };
+    if (formattedDto.date_of_birth) {
+      const date = new Date(formattedDto.date_of_birth);
+      formattedDto.date_of_birth = date.toISOString().split('T')[0]; // Extract YYYY-MM-DD only
+    }
+
     // Check if a profile already exists for this user
     const existingProfile = await this.profileRepository.findOne({
       where: { user_id: userId },
@@ -27,23 +35,63 @@ export class UserProfileService {
 
     if (existingProfile) {
       // If it exists, update the fields
-      this.profileRepository.merge(existingProfile, createProfileDto);
+      this.profileRepository.merge(existingProfile, formattedDto);
       return this.profileRepository.save(existingProfile);
     } else {
       // If it doesn't exist, create a new one linked to the userId
       const newProfile = this.profileRepository.create({
-        ...createProfileDto,
+        ...formattedDto,
         user_id: userId, // Here we link with the ID that comes from the Token
       });
       return this.profileRepository.save(newProfile);
     }
   }
 
-  // 2. Get Profile by User ID
-  async findOne(userId: number): Promise<UserProfile | null> {
-    return this.profileRepository.findOne({
-      where: { user_id: userId },
-    });
+  // 2. Get Profile by User ID (includes email from users table)
+  async findOne(userId: number): Promise<any | null> {
+    const profile = await this.profileRepository
+      .createQueryBuilder('profile')
+      .leftJoin('users', 'user', 'user.user_id = profile.user_id')
+      .select([
+        'profile.profile_id AS profile_id',
+        'profile.user_id AS user_id',
+        'profile.first_name AS first_name',
+        'profile.last_name AS last_name',
+        'profile.date_of_birth AS date_of_birth',
+        'profile.gender AS gender',
+        'profile.bio AS bio',
+        'profile.address_line1 AS address_line1',
+        'profile.address_line2 AS address_line2',
+        'profile.city AS city',
+        'profile.state_province AS state_province',
+        'profile.postal_code AS postal_code',
+        'profile.country AS country',
+        'profile.latitude AS latitude',
+        'profile.longitude AS longitude',
+        'user.email AS email',
+        'user.profile_image_url AS profile_image_url',
+      ])
+      .where('profile.user_id = :userId', { userId })
+      .getRawOne();
+
+    return profile;
+  }
+
+  // Get basic user info from users table (for users without complete profile)
+  async findBasicUserInfo(userId: number): Promise<any | null> {
+    const user = await this.dataSource.query(
+      `SELECT 
+        user_id, 
+        email, 
+        profile_image_url,
+        user_type,
+        created_at
+      FROM users 
+      WHERE user_id = ?`,
+      [userId]
+    );
+
+    return user && user.length > 0 ? user[0] : null;
   }
 
   async findAll(): Promise<UserProfile[]> {
@@ -56,8 +104,15 @@ export class UserProfileService {
     userId: number,
     updateDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
+    // Format date_of_birth if present (convert ISO to YYYY-MM-DD)
+    const formattedDto = { ...updateDto };
+    if (formattedDto.date_of_birth) {
+      const date = new Date(formattedDto.date_of_birth);
+      formattedDto.date_of_birth = date.toISOString().split('T')[0]; // Extract YYYY-MM-DD only
+    }
+
     // TypeORM's .update() is very efficient, it looks for the ID and changes only what you send
-    await this.profileRepository.update({ user_id: userId }, updateDto);
+    await this.profileRepository.update({ user_id: userId }, formattedDto);
 
     const updatedProfile = await this.findOne(userId);
     if (!updatedProfile) {

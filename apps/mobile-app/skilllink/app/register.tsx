@@ -1,9 +1,11 @@
-import { View, Text, StyleSheet, Pressable, TextInput, Alert, ScrollView, TouchableOpacity, Image} from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, TouchableOpacity, Image} from "react-native";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Config } from '@/constants/Config';
 import { useAuth } from './context/AuthContext';
+import CustomAlert from '../components/CustomAlert';
 
 export default function RegisterScreen() {
   const { login } = useAuth();
@@ -24,6 +26,18 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -32,7 +46,12 @@ export default function RegisterScreen() {
   const handleNextStep = () => {
     if (step === 1) {
       if (!userType) {
-        Alert.alert("Error", "Selecciona el tipo de cuenta");
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Selección Requerida',
+          message: 'Por favor, selecciona el tipo de cuenta que deseas crear.',
+        });
         return;
       }
       setStep(2);
@@ -41,35 +60,60 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!formData.name || !formData.email || !formData.password) {
-      Alert.alert("Error", "Por favor completa todos los campos obligatorios");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Campos Requeridos',
+        message: 'Por favor completa todos los campos obligatorios: nombre, email y contraseña.',
+      });
       return;
     }
 
     if (userType === 'provider') {
       if (!formData.businessName || !formData.description || !formData.location) {
-        Alert.alert("Error", "Por favor completa todos los campos de proveedor");
+        setAlert({
+          visible: true,
+          type: 'warning',
+          title: 'Campos de Proveedor Requeridos',
+          message: 'Por favor completa todos los campos: nombre del negocio, descripción y ubicación.',
+        });
         return;
       }
     }
 
     if (formData.password !== formData.confirmPassword) {
-      Alert.alert("Error", "Las contraseñas no coinciden");
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Contraseñas No Coinciden',
+        message: 'Las contraseñas ingresadas no coinciden. Por favor, verifica e inténtalo de nuevo.',
+      });
       return;
     }
 
     if (formData.password.length < 6) {
-      Alert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Contraseña Muy Corta',
+        message: 'La contraseña debe tener al menos 6 caracteres para mayor seguridad.',
+      });
       return;
     }
 
     if (!acceptTerms) {
-      Alert.alert("Error", "Debes aceptar los términos y condiciones");
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Términos y Condiciones',
+        message: 'Debes aceptar los términos y condiciones para continuar.',
+      });
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch(`${Config.AUTH_SERVICE_URL}/register`, {
+      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -78,7 +122,8 @@ export default function RegisterScreen() {
           email: formData.email,
           password: formData.password,
           phoneNumber: formData.phone || null,
-          userType: userType, 
+          userType: userType,
+          fullName: formData.name,
         }),
       });
 
@@ -97,7 +142,7 @@ export default function RegisterScreen() {
         // If user registered as provider, create provider request
         if (userType === 'provider') {
           try {
-            const providerResponse = await fetch(`${Config.AUTH_SERVICE_URL}/provider-request`, {
+            const providerResponse = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider-request`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -112,60 +157,84 @@ export default function RegisterScreen() {
             });
 
             if (providerResponse.ok) {
-              Alert.alert(
-                "Registro Exitoso",
-                "Tu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente. Te notificaremos cuando sea aprobada.",
-                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-              );
+              setAlert({
+                visible: true,
+                type: 'success',
+                title: 'Registro Exitoso',
+                message: 'Tu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente.',
+                onConfirm: () => router.replace("/(tabs)"),
+              });
             } else {
               const errorData = await providerResponse.json();
               console.error('Provider request error:', errorData);
-              Alert.alert(
-                "Cuenta Creada",
-                "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
-                [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-              );
+              setAlert({
+                visible: true,
+                type: 'warning',
+                title: 'Cuenta Creada',
+                message: 'Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil.',
+                onConfirm: () => router.replace("/(tabs)"),
+              });
             }
           } catch (error) {
             console.error('Provider request exception:', error);
-            Alert.alert(
-              "Cuenta Creada",
-              "Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.",
-              [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
-            );
+            setAlert({
+              visible: true,
+              type: 'warning',
+              title: 'Cuenta Creada',
+              message: 'Tu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil.',
+              onConfirm: () => router.replace("/(tabs)"),
+            });
           }
         } else {
-          Alert.alert("Éxito", "Tu cuenta ha sido creada exitosamente", [
-            { text: "OK", onPress: () => router.replace("/(tabs)") },
-          ]);
+          setAlert({
+            visible: true,
+            type: 'success',
+            title: '¡Bienvenido!',
+            message: 'Tu cuenta ha sido creada exitosamente. Ahora puedes comenzar a usar SkillLink.',
+            onConfirm: () => router.replace("/(tabs)"),
+          });
         }
       } else {
-        Alert.alert("Error", data.message || "Error al registrar.");
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error de Registro',
+          message: data.message || 'No se pudo completar el registro. Intenta nuevamente.',
+        });
       }
     } catch (error) {
-      Alert.alert("Error", "No se pudo conectar al servidor.");
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Sin Conexión',
+        message: 'No se pudo conectar al servidor. Verifica tu conexión a internet.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialRegister = (provider: string) => {
-    Alert.alert("Info", `Registrándose con ${provider}... (Funcionalidad próximamente)`);
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Próximamente',
+      message: `El registro con ${provider} estará disponible pronto.`,
+    });
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Logo */}
-      <View style={styles.logoContainer}>
-        <View style={styles.logo}>
-        <Image
-          source={require("../assets/images/skilllink.png")}
-          style={styles.logoImage}
-          resizeMode="contain"
-        />
+    <LinearGradient
+      colors={['#2563eb', '#1e40af', '#10b981']}
+      style={styles.gradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Text style={styles.subtitle}>Crea tu cuenta y comienza hoy</Text>
         </View>
-        <Text style={styles.subtitle}>Crea tu cuenta y comienza hoy</Text>
-      </View>
 
       {/* Progress Indicator */}
       <View style={styles.progressContainer}>
@@ -229,9 +298,20 @@ export default function RegisterScreen() {
                 </View>
               </TouchableOpacity>
 
-              <Pressable style={styles.buttonPrimary} onPress={handleNextStep}>
-                <Text style={styles.buttonPrimaryText}>Continuar</Text>
-              </Pressable>
+              <TouchableOpacity
+                style={styles.buttonWrapper}
+                onPress={handleNextStep}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={['#2563eb', '#10b981']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.buttonPrimary}
+                >
+                  <Text style={styles.buttonPrimaryText}>Continuar</Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
               <View style={styles.loginLink}>
                 <Text style={styles.loginText}>¿Ya tienes una cuenta? </Text>
@@ -390,9 +470,21 @@ export default function RegisterScreen() {
                 <Pressable style={styles.buttonSecondary} onPress={() => setStep(1)}>
                   <Text style={styles.buttonSecondaryText}>Atrás</Text>
                 </Pressable>
-                <Pressable style={[styles.buttonPrimary, loading && styles.buttonDisabled]} onPress={handleRegister} disabled={loading}>
-                  <Text style={styles.buttonPrimaryText}>{loading ? "Creando..." : "Crear cuenta"}</Text>
-                </Pressable>
+                <TouchableOpacity
+                  style={[styles.buttonWrapper, styles.buttonWrapperFlex, loading && styles.buttonDisabled]}
+                  onPress={handleRegister}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#2563eb', '#10b981']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.buttonPrimary}
+                  >
+                    <Text style={styles.buttonPrimaryText}>{loading ? "Creando..." : "Crear cuenta"}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.separator}>
@@ -423,15 +515,31 @@ export default function RegisterScreen() {
         )}
       </View>
 
-      <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
-    </ScrollView>
+        <Text style={styles.footer}>© 2026 SkillLink. Todos los derechos reservados.</Text>
+      </ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+      />
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
-    backgroundColor: '#f0f9ff',
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -440,26 +548,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
   },
-  logo: {
-    width: 64,
-  height: 64,
-  alignItems: 'center',
-  justifyContent: 'center',
-  marginBottom: 16,
-  },
-    logoImage: {
-    width: '200%',
-    height: '200%',
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   title: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#1e40af',
+    color: '#fff',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748b',
+    color: '#e0f2fe',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   progressContainer: {
     flexDirection: 'row',
@@ -496,12 +611,12 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     width: '100%',
     maxWidth: 400,
   },
@@ -565,12 +680,17 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 4,
   },
-  buttonPrimary: {
-    backgroundColor: '#2563eb',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+  buttonWrapper: {
     marginTop: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  buttonWrapperFlex: {
+    flex: 1,
+  },
+  buttonPrimary: {
+    padding: 16,
+    alignItems: 'center',
   },
   buttonPrimaryText: {
     color: '#fff',
@@ -600,17 +720,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: '600',
+    color: '#1f2937',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
   },
   inputIcon: {
     marginRight: 8,
@@ -658,12 +779,13 @@ const styles = StyleSheet.create({
   },
   buttonSecondary: {
     flex: 1,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#d1d5db',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 24,
+    backgroundColor: '#fff',
   },
   buttonSecondaryText: {
     color: '#374151',
@@ -708,7 +830,7 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 32,
     fontSize: 12,
-    color: '#64748b',
+    color: '#e0f2fe',
     textAlign: 'center',
   },
 });

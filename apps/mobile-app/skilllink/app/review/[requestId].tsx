@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Config } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ServiceRequest {
   requestId: number;
@@ -34,6 +34,19 @@ export default function ReviewScreen() {
   const [reviewText, setReviewText] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadRequest();
@@ -55,12 +68,22 @@ export default function ReviewScreen() {
         const data = await response.json();
         setRequest(data);
       } else {
-        Alert.alert('Error', 'No se pudo cargar la solicitud');
-        router.back();
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo cargar la solicitud',
+          onConfirm: () => router.back(),
+        });
       }
     } catch (error) {
       console.error('Error loading request:', error);
-      Alert.alert('Error', 'Error al cargar solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar solicitud',
+      });
     } finally {
       setLoading(false);
     }
@@ -68,17 +91,32 @@ export default function ReviewScreen() {
 
   const handleSubmitReview = async () => {
     if (rating === 0) {
-      Alert.alert('Error', 'Por favor selecciona una calificación');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Por favor selecciona una calificación',
+      });
       return;
     }
 
     if (!reviewText.trim()) {
-      Alert.alert('Error', 'Por favor escribe un comentario');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Por favor escribe un comentario',
+      });
       return;
     }
 
     if (!reviewTitle.trim()) {
-      Alert.alert('Error', 'Por favor escribe un título');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Por favor escribe un título',
+      });
       return;
     }
 
@@ -103,23 +141,30 @@ export default function ReviewScreen() {
       );
 
       if (response.ok) {
-        Alert.alert(
-          'Éxito',
-          '¡Gracias por tu calificación!',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back(),
-            },
-          ]
-        );
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: '¡Gracias por tu calificación!',
+          onConfirm: () => router.back(),
+        });
       } else {
         const error = await response.json();
-        Alert.alert('Error', error.message || 'No se pudo enviar la calificación');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: error.message || 'No se pudo enviar la calificación',
+        });
       }
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Error', 'Error al enviar calificación');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al enviar calificación',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -225,7 +270,22 @@ export default function ReviewScreen() {
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
+    </ScrollView>
     </View>
   );
 }

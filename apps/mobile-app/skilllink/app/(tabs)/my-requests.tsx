@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Config } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ServiceRequest {
   requestId: number;
@@ -29,10 +32,10 @@ interface ServiceRequest {
     reviewId: number;
     rating: number;
   };
-  service: {
-    serviceName: string;
-    category: {
-      categoryName: string;
+  service?: {
+    serviceTitle?: string;
+    category?: {
+      categoryName?: string;
     };
   };
   provider: {
@@ -69,6 +72,21 @@ export default function MyRequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadRequests();
@@ -93,11 +111,21 @@ export default function MyRequestsScreen() {
         const data = await response.json();
         setRequests(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar las solicitudes');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar las solicitudes. Intenta nuevamente.',
+        });
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      Alert.alert('Error', 'Error al cargar solicitudes');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar solicitudes.',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -109,46 +137,67 @@ export default function MyRequestsScreen() {
   }, []);
 
   const cancelRequest = async (requestId: number) => {
-    Alert.alert(
-      'Cancelar Solicitud',
-      '¿Estás seguro de que deseas cancelar esta solicitud?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sí, cancelar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const token = user?.token;
-              const response = await fetch(
-                `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
-                {
-                  method: 'DELETE',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                  },
-                }
-              );
-
-              if (response.ok) {
-                Alert.alert('Éxito', 'Solicitud cancelada');
-                loadRequests();
-              } else {
-                Alert.alert('Error', 'No se pudo cancelar la solicitud');
-              }
-            } catch (error) {
-              console.error('Error cancelling request:', error);
-              Alert.alert('Error', 'Error al cancelar la solicitud');
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Cancelar Solicitud',
+      message: '¿Estás seguro de que deseas cancelar esta solicitud?',
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          const token = user?.token;
+          const response = await fetch(
+            `${Config.API_GATEWAY_URL}/api/v1/requests/${requestId}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
             }
-          },
-        },
-      ]
-    );
+          );
+
+          if (response.ok) {
+            setAlert({
+              visible: true,
+              type: 'success',
+              title: '¡Listo!',
+              message: 'La solicitud ha sido cancelada.',
+            });
+            loadRequests();
+          } else {
+            setAlert({
+              visible: true,
+              type: 'error',
+              title: 'Error',
+              message: 'No se pudo cancelar la solicitud. Intenta nuevamente.',
+            });
+          }
+        } catch (error) {
+          console.error('Error cancelling request:', error);
+          setAlert({
+            visible: true,
+            type: 'error',
+            title: 'Error',
+            message: 'Error al cancelar la solicitud.',
+          });
+        }
+      },
+    });
   };
 
   const filteredRequests = selectedStatus
     ? requests.filter((r) => r.status === selectedStatus)
     : requests;
+
+  const openDetailsModal = (item: ServiceRequest) => {
+    setSelectedRequest(item);
+    setModalVisible(true);
+  };
+
+  const closeDetailsModal = () => {
+    setModalVisible(false);
+    setTimeout(() => setSelectedRequest(null), 300);
+  };
 
   const renderStatusFilter = () => (
     <View style={styles.filterContainer}>
@@ -210,7 +259,7 @@ export default function MyRequestsScreen() {
         <View style={styles.infoRow}>
           <Ionicons name="construct-outline" size={16} color="#6B7280" />
           <Text style={styles.infoText}>
-            {item.service.serviceName} - {item.service.category.categoryName}
+            {item.service?.serviceTitle || 'Servicio no especificado'}{item.service?.category?.categoryName ? ` - ${item.service.category.categoryName}` : ''}
           </Text>
         </View>
 
@@ -247,13 +296,7 @@ export default function MyRequestsScreen() {
       <View style={styles.requestActions}>
         <TouchableOpacity
           style={styles.detailsButton}
-          onPress={() => {
-            Alert.alert(
-              item.requestTitle,
-              item.requestDescription,
-              [{ text: 'Cerrar' }]
-            );
-          }}
+          onPress={() => openDetailsModal(item)}
         >
           <Text style={styles.detailsButtonText}>Ver Detalles</Text>
         </TouchableOpacity>
@@ -301,8 +344,192 @@ export default function MyRequestsScreen() {
     );
   }
 
+  const renderDetailsModal = () => {
+    if (!selectedRequest) return null;
+
+    return (
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeDetailsModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <LinearGradient
+              colors={['#1e3a8a', '#3b82f6']}
+              style={styles.modalHeader}
+            >
+              <Text style={styles.modalTitle}>Detalles de la Solicitud</Text>
+              <TouchableOpacity onPress={closeDetailsModal} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={28} color="#FFF" />
+              </TouchableOpacity>
+            </LinearGradient>
+
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.modalSection}>
+                <View style={styles.modalTitleRow}>
+                  <Text style={styles.modalRequestTitle}>{selectedRequest.requestTitle}</Text>
+                  <View
+                    style={[
+                      styles.modalStatusBadge,
+                      { backgroundColor: STATUS_COLORS[selectedRequest.status] },
+                    ]}
+                  >
+                    <Text style={styles.modalStatusText}>
+                      {STATUS_LABELS[selectedRequest.status]}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="information-circle" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Descripción</Text>
+                </View>
+                <Text style={styles.modalDescription}>{selectedRequest.requestDescription}</Text>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="construct" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Servicio</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Servicio:</Text>
+                    <Text style={styles.modalValue}>{selectedRequest.service?.serviceTitle || 'No especificado'}</Text>
+                  </View>
+                  {selectedRequest.service?.category && (
+                    <View style={styles.modalInfoRow}>
+                      <Text style={styles.modalLabel}>Categoría:</Text>
+                      <Text style={styles.modalValue}>{selectedRequest.service.category.categoryName}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="business" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Proveedor</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Nombre:</Text>
+                    <Text style={styles.modalValue}>{selectedRequest.provider.businessName}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="location" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Ubicación</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <Text style={styles.modalAddressText}>{selectedRequest.serviceAddress}</Text>
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="calendar" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Fecha y Hora</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Fecha:</Text>
+                    <Text style={styles.modalValue}>
+                      {new Date(selectedRequest.preferredDate).toLocaleDateString('es-ES', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Hora:</Text>
+                    <Text style={styles.modalValue}>{selectedRequest.preferredTime}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="cash" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Costos</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Costo Estimado:</Text>
+                    <Text style={styles.modalValuePrice}>${selectedRequest.estimatedCost}</Text>
+                  </View>
+                  {selectedRequest.finalCost && (
+                    <View style={styles.modalInfoRow}>
+                      <Text style={styles.modalLabel}>Costo Final:</Text>
+                      <Text style={[styles.modalValuePrice, styles.modalFinalPrice]}>
+                        ${selectedRequest.finalCost}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.modalSection}>
+                <View style={styles.modalSectionHeader}>
+                  <Ionicons name="time" size={20} color="#3B82F6" />
+                  <Text style={styles.modalSectionTitle}>Fechas</Text>
+                </View>
+                <View style={styles.modalInfoCard}>
+                  <View style={styles.modalInfoRow}>
+                    <Text style={styles.modalLabel}>Creada:</Text>
+                    <Text style={styles.modalValue}>
+                      {new Date(selectedRequest.createdAt).toLocaleString('es-ES')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {selectedRequest.review && (
+                <View style={styles.modalSection}>
+                  <View style={styles.modalSectionHeader}>
+                    <Ionicons name="star" size={20} color="#F59E0B" />
+                    <Text style={styles.modalSectionTitle}>Calificación</Text>
+                  </View>
+                  <View style={styles.modalInfoCard}>
+                    <View style={styles.ratingDisplay}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Ionicons
+                          key={star}
+                          name={star <= selectedRequest.review!.rating ? 'star' : 'star-outline'}
+                          size={28}
+                          color="#F59E0B"
+                        />
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.modalButton} onPress={closeDetailsModal}>
+                <Text style={styles.modalButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <View style={styles.container}>
+      {renderDetailsModal()}
+      
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
@@ -336,6 +563,20 @@ export default function MyRequestsScreen() {
           }
         />
       )}
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }
@@ -551,5 +792,155 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: -0.3,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  modalSection: {
+    marginBottom: 24,
+  },
+  modalTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  modalRequestTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    flex: 1,
+    marginRight: 12,
+    letterSpacing: -0.3,
+  },
+  modalStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  modalStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  modalSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  modalDescription: {
+    fontSize: 15,
+    color: '#4B5563',
+    lineHeight: 22,
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+  },
+  modalInfoCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  modalInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  modalValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'right',
+  },
+  modalValuePrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  modalFinalPrice: {
+    color: '#3B82F6',
+  },
+  modalAddressText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  ratingDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  modalFooter: {
+    padding: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  modalButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
 });

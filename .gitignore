@@ -44,13 +44,11 @@ obj/
 *.pdb
 appsettings.Development.json
 
-# --- Directorios de Compilación (Basura) ---
 bin/
 obj/
 .vs/
 .vscode/
 
-# --- Archivos de Usuario ---
 *.user
 *.suo
 

@@ -30,7 +30,7 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
   const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const API_URL = Config.SERVICE_MANAGER_URL; // Puerto 3005
+  const API_URL = `${Config.API_GATEWAY_URL}/api/v1`;
 
   // Solicitar permisos
   const requestPermissions = async () => {
@@ -146,7 +146,6 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
     }
   };
 
-  // Remover imagen seleccionada
   const removeImage = (index: number) => {
     setSelectedImages(selectedImages.filter((_, i) => i !== index));
   };
@@ -213,7 +212,7 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
             </View>
           ) : (
             <Text style={styles.uploadButtonText}>
-              ⬆️ Subir {selectedImages.length} imagen(es)
+              Subir {selectedImages.length} imagen(es)
             </Text>
           )}
         </TouchableOpacity>

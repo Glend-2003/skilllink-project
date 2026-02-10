@@ -129,12 +129,28 @@ app.use('/api/v1/payments', createProxyMiddleware({
     changeOrigin: true
 }));
 
-// 6. Notification Service
+// 6. Notification Service (Node.js/Express)
 app.use('/api/v1/notifications', createProxyMiddleware({
-    target: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:3006',
+    target: process.env.NOTIFICATION_SERVICE_URL || 'http://notification_service:3006',
     changeOrigin: true,
     pathRewrite: {
-        '^/api/v1/notifications': '/notifications'
+        '^/api/v1/notifications': '/api/notifications'
+    }
+}));
+
+// 6.5 AI Service (Python FastAPI) - Recommendations
+app.use('/api/v1/recommendations', createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL || 'http://ai-service:8000',
+    changeOrigin: true,
+    pathRewrite: function(path, req) {
+        // Express strips /api/v1/recommendations, so we need to add /recommendations back
+        const newPath = '/recommendations' + path;
+        console.log(`[AI Service] Proxying ${req.originalUrl} -> ${newPath}`);
+        return newPath;
+    },
+    onError: (err, req, res) => {
+        console.error(`[AI Service Error] ${err.message}`);
+        res.status(500).json({ error: 'AI service error', message: err.message });
     }
 }));
 

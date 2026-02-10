@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -230,7 +231,7 @@ app.get('/api/providers/:providerId/services', async (req, res) => {
         ) as duration
       FROM services s
       JOIN provider_profiles pp ON s.provider_id = pp.provider_id
-      WHERE pp.user_id = ? AND s.is_active = 1
+      WHERE pp.user_id = ? AND s.is_active = 1 AND s.approval_status = 'approved'
       ORDER BY s.service_title
     `;
 
@@ -413,6 +414,18 @@ app.put('/api/provider-requests/review', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status. Must be approved or rejected' });
     }
     
+    // Get request details first to send notification
+    const [requests] = await db.execute(
+      'SELECT pr.*, u.email FROM provider_requests pr JOIN users u ON pr.user_id = u.user_id WHERE pr.request_id = ?',
+      [requestId]
+    );
+    
+    if (requests.length === 0) {
+      return res.status(404).json({ error: 'Provider request not found' });
+    }
+    
+    const request = requests[0];
+    
     // Update request status
     await db.execute(
       `UPDATE provider_requests 
@@ -423,46 +436,155 @@ app.put('/api/provider-requests/review', async (req, res) => {
     
     // If approved, create provider profile
     if (status === 'approved') {
-      // Get request details
-      const [requests] = await db.execute(
-        'SELECT * FROM provider_requests WHERE request_id = ?',
-        [requestId]
+      // Check if provider profile already exists
+      const [existing] = await db.execute(
+        'SELECT provider_id FROM provider_profiles WHERE user_id = ?',
+        [request.user_id]
       );
       
-      if (requests.length > 0) {
-        const request = requests[0];
+      if (existing.length === 0) {
+        // Create provider profile with only available columns
+        await db.execute(
+          `INSERT INTO provider_profiles 
+           (user_id, business_name, business_description) 
+           VALUES (?, ?, ?)`,
+          [
+            request.user_id,
+            request.business_name,
+            request.description
+          ]
+        );
         
-        // Check if provider profile already exists
-        const [existing] = await db.execute(
-          'SELECT provider_id FROM provider_profiles WHERE user_id = ?',
+        // Update user_type to 'provider' in users table
+        await db.execute(
+          `UPDATE users SET user_type = 'provider' WHERE user_id = ?`,
           [request.user_id]
         );
         
-        if (existing.length === 0) {
-          // Create provider profile with only available columns
-          await db.execute(
-            `INSERT INTO provider_profiles 
-             (user_id, business_name, business_description) 
-             VALUES (?, ?, ?)`,
-            [
-              request.user_id,
-              request.business_name,
-              request.description
-            ]
-          );
-          
-          // Update user_type to 'provider' in users table
-          await db.execute(
-            `UPDATE users SET user_type = 'provider' WHERE user_id = ?`,
-            [request.user_id]
-          );
-          
-          // Add provider role (role_id = 2) to user_roles table
-          await db.execute(
-            `INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 2)`,
-            [request.user_id]
-          );
-        }
+        // Add provider role (role_id = 2) to user_roles table
+        await db.execute(
+          `INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (?, 2)`,
+          [request.user_id]
+        );
+      }
+      
+      // Send approval notification to the user (not admin)
+      try {
+        const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
+        
+        await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send-email`, {
+          to: request.email,
+          subject: '¡Tu solicitud de proveedor ha sido aprobada! - SkillLink',
+          type: 'provider-approval',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Solicitud Aprobada - SkillLink</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+                <tr>
+                  <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      <tr>
+                        <td style="background: linear-gradient(135deg, #10b981 0%, #2563eb 100%); padding: 40px 20px; text-align: center;">
+                          <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🎉 SkillLink</h1>
+                          <p style="color: #e0f2fe; margin: 10px 0 0 0; font-size: 14px;">Conecta con los mejores profesionales</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 40px 30px;">
+                          <h2 style="color: #10b981; margin: 0 0 20px 0; font-size: 24px;">¡Felicitaciones! Ahora eres un Proveedor</h2>
+                          <p style="color: #1f2937; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
+                            Tu solicitud para ser proveedor ha sido <strong>aprobada</strong>.
+                          </p>
+                          <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">
+                            <strong>Negocio:</strong> ${request.business_name}
+                          </p>
+                          <table width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
+                            <tr>
+                              <td align="center" style="padding: 15px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #10b981;">
+                                <p style="color: #059669; font-weight: bold; margin: 0;">✅ Ya puedes ofrecer tus servicios en la plataforma</p>
+                              </td>
+                            </tr>
+                          </table>
+                          <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0;">
+                            Inicia sesión para comenzar a crear y publicar tus servicios.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                          <p style="color: #9ca3af; font-size: 12px; margin: 0;">© 2026 SkillLink. Todos los derechos reservados.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `
+        });
+      } catch (error) {
+        console.error('Error sending provider approval notification:', error.message);
+      }
+    } else if (status === 'rejected') {
+      // Send rejection notification to the user (not admin)
+      try {
+        const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
+        
+        await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send-email`, {
+          to: request.email,
+          subject: 'Actualización sobre tu solicitud de proveedor - SkillLink',
+          type: 'provider-rejection',
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Solicitud No Aprobada - SkillLink</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+                <tr>
+                  <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                      <tr>
+                        <td style="background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%); padding: 40px 20px; text-align: center;">
+                          <h1 style="color: #ffffff; margin: 0; font-size: 28px;">SkillLink</h1>
+                          <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 14px;">Conecta con los mejores profesionales</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 40px 30px;">
+                          <h2 style="color: #dc2626; margin: 0 0 20px 0; font-size: 24px;">Actualización sobre tu Solicitud</h2>
+                          <p style="color: #1f2937; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
+                            Tu solicitud para ser proveedor no ha sido aprobada en este momento.
+                          </p>
+                          ${reviewNotes ? `<p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;"><strong>Motivo:</strong> ${reviewNotes}</p>` : ''}
+                          <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0;">
+                            Si tienes preguntas o deseas más información, por favor contacta al equipo de soporte.
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                          <p style="color: #9ca3af; font-size: 12px; margin: 0;">© 2026 SkillLink. Todos los derechos reservados.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `
+        });
+      } catch (error) {
+        console.error('Error sending provider rejection notification:', error.message);
       }
     }
     

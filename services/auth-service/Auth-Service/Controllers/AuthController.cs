@@ -17,26 +17,27 @@ namespace AuthController.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<User> _userManager;
-        private readonly ApplicationDbContext _context; 
+        private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly IPasswordHasher<User> _passwordHasher;
-
-        public AuthController(UserManager<User> userManager, ApplicationDbContext context, IConfiguration configuration, IPasswordHasher<User> passwordHasher)
+        private readonly IHttpClientFactory _httpClientFactory;
+        public AuthController(UserManager<User> userManager, ApplicationDbContext context, IConfiguration configuration, IPasswordHasher<User> passwordHasher, IHttpClientFactory httpClientFactory)
         {
             _userManager = userManager;
             _context = context;
             _configuration = configuration;
             _passwordHasher = passwordHasher;
+            _httpClientFactory = httpClientFactory;
         }
 
         [HttpPost("register")]
-       public async Task<IActionResult> Register([FromBody] RegisterDto model)
+        public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
             var userExists = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
             if (userExists != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new { Status = "Error", Message = "El usuario ya existe!" });
 
- 
+
             User user = new User()
             {
                 UserName = model.email,
@@ -49,20 +50,26 @@ namespace AuthController.Controllers
 
             user.PasswordHash = _passwordHasher.HashPassword(user, model.password);
 
-            try 
+            try
             {
-    
+
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
 
+
+                await SendNotificationAsync(user.Id, user.Email, "WELCOME",
+    "¡Bienvenido a SkillLink!",
+    "Gracias por registrarte. Estamos felices de tenerte con nosotros.",
+    "User", user.Id);
+
                 int roleId = (model.userType == "Provider") ? 2 : 1;
 
-                var userRole = new UserRole 
-                { 
-                    UserId = user.Id, 
-                    RoleId = 1 
+                var userRole = new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = 1
                 };
-                
+
                 _context.UserRoles.Add(userRole);
                 await _context.SaveChangesAsync();
 
@@ -70,14 +77,25 @@ namespace AuthController.Controllers
                 try
                 {
                     using var httpClient = new HttpClient();
+
+                    // Split full name into first and last name
+                    string firstName = "";
+                    string lastName = "";
+                    if (!string.IsNullOrWhiteSpace(model.fullName))
+                    {
+                        var nameParts = model.fullName.Trim().Split(' ', 2);
+                        firstName = nameParts[0];
+                        lastName = nameParts.Length > 1 ? nameParts[1] : "";
+                    }
+
                     var userProfileData = new
                     {
                         user_id = user.Id,
-                        first_name = "",
-                        last_name = "",
+                        first_name = firstName,
+                        last_name = lastName,
                         bio = ""
                     };
-                    
+
                     var jsonContent = new StringContent(
                         System.Text.Json.JsonSerializer.Serialize(userProfileData),
                         Encoding.UTF8,
@@ -85,6 +103,9 @@ namespace AuthController.Controllers
                     );
 
                     var userServiceUrl = _configuration["Services:UserService"] ?? "http://localhost:3004";
+                    Console.WriteLine($"Creating user profile for userId: {user.Id}, firstName: {firstName}, lastName: {lastName}");
+                    Console.WriteLine($"User service URL: {userServiceUrl}/user-profile");
+
                     var response = await httpClient.PostAsync(
                         $"{userServiceUrl}/user-profile",
                         jsonContent
@@ -92,7 +113,12 @@ namespace AuthController.Controllers
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}");
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Warning: Failed to create user profile. Status: {response.StatusCode}, Error: {errorContent}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"User profile created successfully for userId: {user.Id}");
                     }
                 }
                 catch (Exception profileEx)
@@ -106,7 +132,7 @@ namespace AuthController.Controllers
                     new Claim(ClaimTypes.Name, user.Email),
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(ClaimTypes.Role, "Client") 
+                    new Claim(ClaimTypes.Role, "Client")
                 };
 
                 var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
@@ -118,9 +144,9 @@ namespace AuthController.Controllers
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
 
-                return Ok(new 
-                { 
-                    Status = "Success", 
+                return Ok(new
+                {
+                    Status = "Success",
                     Message = "Usuario creado exitosamente!",
                     token = new JwtSecurityTokenHandler().WriteToken(token),
                     userId = user.Id,
@@ -129,17 +155,17 @@ namespace AuthController.Controllers
             }
             catch (Exception ex)
             {
-                 return StatusCode(500, new { Status = "Error", Message = "Error guardando en BD", Detail = ex.Message });
+                return StatusCode(500, new { Status = "Error", Message = "Error guardando en BD", Detail = ex.Message });
             }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto model)
         {
-          
+
             var user = await _context.Users
                 .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role) 
+                .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Email == model.email);
 
             if (user != null && await _userManager.CheckPasswordAsync(user, model.password))
@@ -151,10 +177,10 @@ namespace AuthController.Controllers
                     new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 };
 
-        
+
                 foreach (var ur in user.UserRoles)
                 {
-                    if(ur.Role != null) 
+                    if (ur.Role != null)
                     {
                         authClaims.Add(new Claim(ClaimTypes.Role, ur.Role.Name));
                     }
@@ -169,7 +195,13 @@ namespace AuthController.Controllers
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                 );
 
-                return Ok(new { 
+                await SendNotificationAsync(user.Id, user.Email, "LOGIN_SECURITY",
+    "Nuevo inicio de sesión detectado",
+    $"Hola, se ha detectado un inicio de sesión en tu cuenta el {DateTime.Now:dd/MM/yyyy HH:mm}. Si no fuiste tú, contacta a soporte.",
+    "User", user.Id);
+
+                return Ok(new
+                {
                     token = new JwtSecurityTokenHandler().WriteToken(token),
                     userId = user.Id,
                     email = user.Email,
@@ -184,7 +216,7 @@ namespace AuthController.Controllers
         public async Task<IActionResult> GetProfile()
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            
+
             var user = await _context.Users
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
@@ -199,8 +231,8 @@ namespace AuthController.Controllers
                 .FirstOrDefaultAsync();
 
             var roles = user.UserRoles.Select(ur => ur.Role?.Name?.ToLower()).Where(r => r != null).ToList();
-            var userType = roles.Contains("admin") ? "admin" : 
-                          roles.Contains("provider") ? "provider" : 
+            var userType = roles.Contains("admin") ? "admin" :
+                          roles.Contains("provider") ? "provider" :
                           roles.FirstOrDefault() ?? "client";
 
             return Ok(new
@@ -220,7 +252,7 @@ namespace AuthController.Controllers
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            
+
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
                 return NotFound(new { Status = "Error", Message = "Usuario no encontrado" });
@@ -253,7 +285,7 @@ namespace AuthController.Controllers
         public async Task<IActionResult> CreateProviderRequest([FromBody] ProviderRequestDto model)
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            
+
             var user = await _context.Users
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
@@ -344,7 +376,7 @@ namespace AuthController.Controllers
         public async Task<IActionResult> ReviewProviderRequest([FromBody] ReviewProviderRequestDto model)
         {
             var adminId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-            
+
             var request = await _context.ProviderRequests
                 .Include(pr => pr.User)
                 .FirstOrDefaultAsync(pr => pr.RequestId == model.RequestId);
@@ -365,7 +397,7 @@ namespace AuthController.Controllers
                 if (model.Status == "approved" && request.User != null)
                 {
                     var providerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Provider");
-                    
+
                     if (providerRole != null)
                     {
                         var hasRole = await _context.UserRoles
@@ -385,28 +417,15 @@ namespace AuthController.Controllers
                     // Send push notification to user
                     try
                     {
-                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
-                        using var httpClient = new HttpClient();
-                        
-                        var notificationData = new
-                        {
-                            userId = request.UserId,
-                            title = "¡Solicitud Aprobada!",
-                            body = "Tu solicitud para ser proveedor ha sido aprobada. Ya puedes ofrecer tus servicios.",
-                            data = new
-                            {
-                                type = "provider_approved",
-                                requestId = request.RequestId
-                            }
-                        };
-
-                        var content = new StringContent(
-                            System.Text.Json.JsonSerializer.Serialize(notificationData),
-                            Encoding.UTF8,
-                            "application/json"
-                        );
-
-                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                        await SendNotificationAsync(
+    request.UserId,
+    request.User.Email,
+    "PROVIDER_APPROVAL",
+    "¡Solicitud Aprobada!",
+    "Tu solicitud para ser proveedor en SkillLink ha sido aprobada. ¡Bienvenido a bordo!",
+    "ProviderRequest",
+    request.RequestId
+);
                     }
                     catch (Exception notifEx)
                     {
@@ -419,28 +438,15 @@ namespace AuthController.Controllers
                     // Send rejection notification
                     try
                     {
-                        var notificationServiceUrl = _configuration["NotificationService:Url"] ?? "http://localhost:3006";
-                        using var httpClient = new HttpClient();
-                        
-                        var notificationData = new
-                        {
-                            userId = request.UserId,
-                            title = "Solicitud Rechazada",
-                            body = model.ReviewNotes ?? "Tu solicitud para ser proveedor ha sido rechazada. Contacta al soporte para más información.",
-                            data = new
-                            {
-                                type = "provider_rejected",
-                                requestId = request.RequestId
-                            }
-                        };
-
-                        var content = new StringContent(
-                            System.Text.Json.JsonSerializer.Serialize(notificationData),
-                            Encoding.UTF8,
-                            "application/json"
-                        );
-
-                        await httpClient.PostAsync($"{notificationServiceUrl}/api/notifications/send", content);
+                        await SendNotificationAsync(
+    request.UserId,
+    request.User.Email,
+    "PROVIDER_REJECTION",
+    "Solicitud de Proveedor",
+    "Tu solicitud ha sido rechazada. Notas: " + model.ReviewNotes,
+    "ProviderRequest",
+    request.RequestId
+);
                     }
                     catch (Exception notifEx)
                     {
@@ -456,6 +462,119 @@ namespace AuthController.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Status = "Error", Message = "Error revisando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
+
+            if (user == null)
+            {
+                // Don't reveal that the user doesn't exist for security reasons
+                return Ok(new { Status = "Success", Message = "Si el correo existe, recibirás un código de recuperación" });
+            }
+
+            // Generate a 6-digit code
+            var random = new Random();
+            var code = random.Next(100000, 999999).ToString();
+
+            // Store the code and set expiration (15 minutes)
+            user.ResetPasswordCode = code;
+            user.ResetCodeExpiration = DateTime.UtcNow.AddMinutes(15);
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                // Send email with the code via notification service
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    var notificationServiceUrl = _configuration["Services:NotificationService"] ?? "http://localhost:3006";
+
+                    var emailData = new
+                    {
+                        to = user.Email,
+                        subject = "Recuperar Contraseña - SkillLink",
+                        code = code,
+                        type = "password-reset"
+                    };
+
+                    var jsonContent = new StringContent(
+                        System.Text.Json.JsonSerializer.Serialize(emailData),
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+
+                    var response = await httpClient.PostAsync(
+                        $"{notificationServiceUrl}/api/notifications/send-email",
+                        jsonContent
+                    );
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        Console.WriteLine($"✅ Recovery email sent to {user.Email}");
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Console.WriteLine($"⚠️ Failed to send email: {errorContent}");
+                        Console.WriteLine($"📧 Recovery code for {user.Email}: {code}");
+                    }
+                }
+                catch (Exception emailEx)
+                {
+                    // Log but don't fail - user can still recover if we log the code
+                    Console.WriteLine($"⚠️ Error sending email: {emailEx.Message}");
+                    Console.WriteLine($"📧 Recovery code for {user.Email}: {code}");
+                }
+
+                return Ok(new { Status = "Success", Message = "Si el correo existe, recibirás un código de recuperación" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error procesando solicitud", Detail = ex.Message });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == model.email);
+
+            if (user == null)
+            {
+                return BadRequest(new { Status = "Error", Message = "Código inválido o expirado" });
+            }
+
+            // Check if code matches and is not expired
+            if (string.IsNullOrEmpty(user.ResetPasswordCode) ||
+                user.ResetPasswordCode != model.code ||
+                user.ResetCodeExpiration == null ||
+                user.ResetCodeExpiration < DateTime.UtcNow)
+            {
+                return BadRequest(new { Status = "Error", Message = "Código inválido o expirado" });
+            }
+
+            // Update password
+            user.PasswordHash = _passwordHasher.HashPassword(user, model.newPassword);
+            user.ResetPasswordCode = null;
+            user.ResetCodeExpiration = null;
+            user.SecurityStamp = Guid.NewGuid().ToString();
+
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { Status = "Success", Message = "Contraseña actualizada exitosamente" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Status = "Error", Message = "Error actualizando contraseña", Detail = ex.Message });
             }
         }
 
@@ -486,6 +605,93 @@ namespace AuthController.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { Status = "Error", Message = "Error obteniendo categorías", Detail = ex.Message });
+            }
+        }
+
+        private async Task SendNotificationAsync(int userId, string email, string type, string title, string message, string entityType, int entityId)
+        {
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                
+                // Send push notification
+                var pushPayload = new
+                {
+                    userId = userId,
+                    userEmail = email,
+                    type = type,
+                    title = title,
+                    message = message,
+                    entityType = entityType,
+                    entityId = entityId
+                };
+
+                await client.PostAsJsonAsync("http://notification_service:3006/api/notifications/send", pushPayload);
+
+                // Send email notification
+                var notificationServiceUrl = _configuration["Services:NotificationService"] ?? "http://notification_service:3006";
+                
+                var emailPayload = new
+                {
+                    to = email,
+                    subject = title,
+                    html = $@"
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset='utf-8'>
+                            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                        </head>
+                        <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'>
+                            <table width='100%' cellpadding='0' cellspacing='0' style='background-color: #f4f4f4; padding: 20px;'>
+                                <tr>
+                                    <td align='center'>
+                                        <table width='600' cellpadding='0' cellspacing='0' style='background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+                                            <tr>
+                                                <td style='background: linear-gradient(135deg, #2563eb 0%, #10b981 100%); padding: 40px 20px; text-align: center;'>
+                                                    <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>SkillLink</h1>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style='padding: 40px 30px;'>
+                                                    <h2 style='color: #1f2937; margin: 0 0 20px 0; font-size: 24px;'>{title}</h2>
+                                                    <p style='color: #6b7280; font-size: 16px; line-height: 1.6; margin: 0;'>{message}</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style='background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;'>
+                                                    <p style='color: #9ca3af; font-size: 12px; margin: 0;'>© 2026 SkillLink. Todos los derechos reservados.</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </body>
+                        </html>
+                    "
+                };
+
+                var emailJson = new StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(emailPayload),
+                    Encoding.UTF8,
+                    "application/json"
+                );
+
+                var emailResponse = await client.PostAsync($"{notificationServiceUrl}/api/notifications/send-email", emailJson);
+                
+                if (emailResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"✅ Email notification sent to {email}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ Failed to send email notification to {email}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error enviando notificación: {ex.Message}");
             }
         }
     }

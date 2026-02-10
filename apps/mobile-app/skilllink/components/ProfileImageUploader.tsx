@@ -5,12 +5,14 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   StyleSheet,
+  Alert,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, ImageIcon, User } from 'lucide-react-native';
 import { Config } from '@/constants/Config';
+import CustomAlert from './CustomAlert';
 
 interface ProfileImageUploaderProps {
   userId: number;
@@ -27,11 +29,29 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
   const [imageUrl, setImageUrl] = useState(currentImageUrl);
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería de fotos');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Permiso requerido',
+        message: 'Necesitamos acceso a tu galería de fotos',
+      });
       return false;
     }
     return true;
@@ -54,14 +74,24 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo seleccionar la imagen',
+      });
     }
   };
 
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu cámara');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Permiso requerido',
+        message: 'Necesitamos acceso a tu cámara',
+      });
       return;
     }
 
@@ -77,7 +107,12 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Error', 'No se pudo tomar la foto');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo tomar la foto',
+      });
     }
   };
 
@@ -136,7 +171,12 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
         if (updateResponse.ok) {
           setImageUrl(newImageUrl);
           onUploadComplete(newImageUrl);
-          Alert.alert('Éxito', 'Foto de perfil actualizada');
+          setAlert({
+            visible: true,
+            type: 'success',
+            title: 'Éxito',
+            message: 'Foto de perfil actualizada',
+          });
         } else {
           console.error('Error actualizando perfil:', updateResult);
           throw new Error(updateResult.message || updateResult.Message || 'Error actualizando perfil');
@@ -146,7 +186,12 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
       }
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error', 'No se pudo subir la imagen. Verifica tu conexión.');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'No se pudo subir la imagen. Verifica tu conexión.',
+      });
     } finally {
       setUploading(false);
     }
@@ -199,6 +244,21 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
           <Camera size={16} color="#fff" />
         </View>
       </TouchableOpacity>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 };

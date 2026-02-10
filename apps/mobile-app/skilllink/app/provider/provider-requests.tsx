@@ -7,15 +7,19 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Modal,
   TextInput,
   ScrollView,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Config } from '@/constants/Config';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from '../../components/CustomAlert';
 
 interface ServiceRequest {
   requestId: number;
@@ -24,6 +28,8 @@ interface ServiceRequest {
   serviceAddress: string;
   addressDetails?: string;
   contactPhone?: string;
+  serviceLatitude?: number;
+  serviceLongitude?: number;
   status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
   estimatedCost: number;
   finalCost: number | null;
@@ -31,10 +37,10 @@ interface ServiceRequest {
   preferredTime: string;
   createdAt: string;
   clientUserId: number;
-  service: {
-    serviceName: string;
-    category: {
-      categoryName: string;
+  service?: {
+    serviceTitle?: string;
+    category?: {
+      categoryName?: string;
     };
   };
 }
@@ -69,7 +75,21 @@ export default function ProviderRequestsScreen() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
   const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
   const [finalCost, setFinalCost] = useState('');
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    showCancel?: boolean;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
     loadProviderProfile();
@@ -95,12 +115,22 @@ export default function ProviderRequestsScreen() {
         setProviderId(actualProviderId);
         loadRequests(actualProviderId);
       } else {
-        Alert.alert('Error', 'No se encontró el perfil de proveedor');
-        router.back();
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se encontró el perfil de proveedor',
+          onConfirm: () => router.back(),
+        });
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      Alert.alert('Error', 'Error al cargar perfil');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar perfil',
+      });
     }
   };
 
@@ -123,11 +153,21 @@ export default function ProviderRequestsScreen() {
         const data = await response.json();
         setRequests(data);
       } else {
-        Alert.alert('Error', 'No se pudieron cargar las solicitudes');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudieron cargar las solicitudes',
+        });
       }
     } catch (error) {
       console.error('Error loading requests:', error);
-      Alert.alert('Error', 'Error al cargar solicitudes');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al cargar solicitudes',
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -165,18 +205,33 @@ export default function ProviderRequestsScreen() {
       );
 
       if (response.ok) {
-        Alert.alert('Éxito', 'Solicitud actualizada');
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: 'Éxito',
+          message: 'Solicitud actualizada',
+        });
         if (providerId) {
           loadRequests(providerId);
         }
         return true;
       } else {
-        Alert.alert('Error', 'No se pudo actualizar la solicitud');
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Error',
+          message: 'No se pudo actualizar la solicitud',
+        });
         return false;
       }
     } catch (error) {
       console.error('Error updating request:', error);
-      Alert.alert('Error', 'Error al actualizar la solicitud');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Error al actualizar la solicitud',
+      });
       return false;
     }
   };
@@ -186,80 +241,95 @@ export default function ProviderRequestsScreen() {
 
     const cost = parseFloat(finalCost);
     if (isNaN(cost) || cost <= 0) {
-      Alert.alert('Error', 'Ingresa un costo válido');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Ingresa un costo válido',
+      });
       return;
     }
 
-    Alert.alert(
-      'Aceptar Solicitud',
-      `¿Deseas aceptar esta solicitud por $${cost}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Aceptar',
-          onPress: async () => {
-            const success = await updateRequestStatus(
-              selectedRequest.requestId,
-              'accepted',
-              cost
-            );
-            if (success) {
-              setShowAcceptModal(false);
-              setFinalCost('');
-              setSelectedRequest(null);
-            }
-          },
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Aceptar Solicitud',
+      message: `¿Deseas aceptar esta solicitud por $${cost}?`,
+      showCancel: true,
+      onConfirm: async () => {
+        const success = await updateRequestStatus(
+          selectedRequest.requestId,
+          'accepted',
+          cost
+        );
+        if (success) {
+          setShowAcceptModal(false);
+          setFinalCost('');
+          setSelectedRequest(null);
+        }
+      },
+    });
   };
 
   const handleRejectRequest = (requestId: number) => {
-    Alert.alert(
-      'Rechazar Solicitud',
-      '¿Estás seguro de que deseas rechazar esta solicitud?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Rechazar',
-          style: 'destructive',
-          onPress: () => updateRequestStatus(requestId, 'cancelled'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'warning',
+      title: 'Rechazar Solicitud',
+      message: '¿Estás seguro de que deseas rechazar esta solicitud?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'cancelled'),
+    });
   };
 
   const handleCompleteRequest = (requestId: number) => {
-    Alert.alert(
-      'Completar Servicio',
-      '¿El servicio ha sido completado?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Completar',
-          onPress: () => updateRequestStatus(requestId, 'completed'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Completar Servicio',
+      message: '¿El servicio ha sido completado?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'completed'),
+    });
   };
 
   const handleStartProgress = (requestId: number) => {
-    Alert.alert(
-      'Iniciar Servicio',
-      '¿Deseas marcar este servicio como en progreso?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Iniciar',
-          onPress: () => updateRequestStatus(requestId, 'in_progress'),
-        },
-      ]
-    );
+    setAlert({
+      visible: true,
+      type: 'info',
+      title: 'Iniciar Servicio',
+      message: '¿Deseas marcar este servicio como en progreso?',
+      showCancel: true,
+      onConfirm: () => updateRequestStatus(requestId, 'in_progress'),
+    });
   };
 
   const filteredRequests = selectedStatus
     ? requests.filter((r) => r.status === selectedStatus)
     : requests;
+
+  const openInMaps = (latitude: number, longitude: number, address: string) => {
+    const scheme = Platform.select({
+      ios: 'maps:',
+      android: 'geo:',
+    });
+    const url = Platform.select({
+      ios: `${scheme}?q=${address}&ll=${latitude},${longitude}`,
+      android: `${scheme}${latitude},${longitude}?q=${address}`,
+    });
+
+    if (url) {
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          // Fallback to Google Maps web
+          const webUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+          Linking.openURL(webUrl);
+        }
+      });
+    }
+  };
 
   const renderStatusFilter = () => (
     <View style={styles.filterContainer}>
@@ -371,7 +441,7 @@ export default function ProviderRequestsScreen() {
         <View style={styles.infoRow}>
           <Ionicons name="construct-outline" size={16} color="#6B7280" />
           <Text style={styles.infoText}>
-            {item.service.serviceName} - {item.service.category.categoryName}
+            {item.service?.serviceTitle || 'Servicio no especificado'}{item.service?.category?.categoryName ? ` - ${item.service.category.categoryName}` : ''}
           </Text>
         </View>
 
@@ -486,7 +556,7 @@ export default function ProviderRequestsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={styles.modalScrollView}
               showsVerticalScrollIndicator={true}
             >
@@ -494,125 +564,161 @@ export default function ProviderRequestsScreen() {
                 <View style={styles.modalBody}>
                   {/* Status Badge */}
                   <View style={styles.detailStatusContainer}>
-                  <View
-                    style={[
-                      styles.detailStatusBadge,
-                      { backgroundColor: STATUS_COLORS[selectedRequest.status] },
-                    ]}
-                  >
-                    <Text style={styles.detailStatusText}>
-                      {STATUS_LABELS[selectedRequest.status]}
-                    </Text>
+                    <View
+                      style={[
+                        styles.detailStatusBadge,
+                        { backgroundColor: STATUS_COLORS[selectedRequest.status] },
+                      ]}
+                    >
+                      <Text style={styles.detailStatusText}>
+                        {STATUS_LABELS[selectedRequest.status]}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="document-text" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Título</Text>
-                  </View>
-                  <Text style={styles.modalText}>{selectedRequest.requestTitle}</Text>
-                </View>
-
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="construct" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Servicio Solicitado</Text>
-                  </View>
-                  <Text style={styles.modalText}>{selectedRequest.service.serviceName}</Text>
-                  <Text style={styles.modalSubText}>Categoría: {selectedRequest.service.category.categoryName}</Text>
-                </View>
-
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="information-circle" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Descripción</Text>
-                  </View>
-                  <Text style={styles.modalText}>{selectedRequest.requestDescription}</Text>
-                </View>
-
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="location" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Ubicación del Servicio</Text>
-                  </View>
-                  <Text style={styles.modalText}>{selectedRequest.serviceAddress}</Text>
-                  {selectedRequest.addressDetails && (
-                    <Text style={styles.modalSubText}>Detalles: {selectedRequest.addressDetails}</Text>
-                  )}
-                </View>
-
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="calendar" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Fecha y Hora Preferida</Text>
-                  </View>
-                  <Text style={styles.modalText}>
-                    📅 {new Date(selectedRequest.preferredDate).toLocaleDateString('es-ES', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </Text>
-                  <Text style={styles.modalSubText}>🕐 {selectedRequest.preferredTime}</Text>
-                </View>
-
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="cash" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Información de Costos</Text>
-                  </View>
-                  {selectedRequest.estimatedCost != null && (
-                    <Text style={styles.modalText}>
-                      Costo Estimado: ${Number(selectedRequest.estimatedCost).toFixed(2)}
-                    </Text>
-                  )}
-                  {selectedRequest.finalCost != null && (
-                    <Text style={styles.modalHighlightText}>
-                      💰 Costo Acordado: ${Number(selectedRequest.finalCost).toFixed(2)}
-                    </Text>
-                  )}
-                  {selectedRequest.estimatedCost == null && selectedRequest.finalCost == null && (
-                    <Text style={styles.modalText}>No se especificó costo</Text>
-                  )}
-                </View>
-
-                {selectedRequest.contactPhone && (
                   <View style={styles.detailSection}>
                     <View style={styles.detailSectionHeader}>
-                      <Ionicons name="call" size={20} color="#3B82F6" />
-                      <Text style={styles.modalSectionTitle}>Teléfono de Contacto</Text>
+                      <Ionicons name="document-text" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Título</Text>
                     </View>
-                    <Text style={styles.modalText}>{selectedRequest.contactPhone}</Text>
+                    <Text style={styles.modalText}>{selectedRequest.requestTitle}</Text>
                   </View>
-                                )}
 
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="person" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Cliente</Text>
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="construct" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Servicio Solicitado</Text>
+                    </View>
+                    {selectedRequest.service ? (
+                      <>
+                        <Text style={styles.modalText}>{selectedRequest.service.serviceTitle || 'No especificado'}</Text>
+                        {selectedRequest.service.category && (
+                          <Text style={styles.modalSubText}>Categoría: {selectedRequest.service.category.categoryName}</Text>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.modalText}>No se especificó un servicio</Text>
+                    )}
                   </View>
-                  <Text style={styles.modalText}>ID de Cliente: {selectedRequest.clientUserId}</Text>
-                </View>
 
-                <View style={styles.detailSection}>
-                  <View style={styles.detailSectionHeader}>
-                    <Ionicons name="time" size={20} color="#3B82F6" />
-                    <Text style={styles.modalSectionTitle}>Solicitud Recibida</Text>
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="information-circle" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Descripción</Text>
+                    </View>
+                    <Text style={styles.modalText}>{selectedRequest.requestDescription}</Text>
                   </View>
-                  <Text style={styles.modalText}>
-                    {new Date(selectedRequest.createdAt).toLocaleString('es-ES', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </Text>
+
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="location" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Ubicación del Servicio</Text>
+                    </View>
+                    <Text style={styles.modalText}>{selectedRequest.serviceAddress}</Text>
+                    {selectedRequest.addressDetails && (
+                      <Text style={styles.modalSubText}>Detalles: {selectedRequest.addressDetails}</Text>
+                    )}
+                    {selectedRequest.serviceLatitude != null && selectedRequest.serviceLongitude != null && (
+                      <View style={styles.locationActionsContainer}>
+                        <TouchableOpacity
+                          style={styles.viewMapButton}
+                          onPress={() => setShowMapModal(true)}
+                        >
+                          <LinearGradient
+                            colors={['#3B82F6', '#25d4eb']}
+                            style={styles.mapButtonGradient}
+                          >
+                            <Ionicons name="map" size={18} color="white" />
+                            <Text style={styles.mapButtonText}>Ver en Mapa</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.navigateButton}
+                          onPress={() => openInMaps(
+                            Number(selectedRequest.serviceLatitude),
+                            Number(selectedRequest.serviceLongitude),
+                            selectedRequest.serviceAddress
+                          )}
+                        >
+                          <LinearGradient
+                            colors={['#10B981', '#18b2ea']}
+                            style={styles.mapButtonGradient}
+                          >
+                            <Ionicons name="navigate" size={18} color="white" />
+                            <Text style={styles.mapButtonText}>Navegar</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {selectedRequest.serviceLatitude != null && selectedRequest.serviceLongitude != null && (
+                      <Text style={styles.coordinatesText}>
+                        {Number(selectedRequest.serviceLatitude).toFixed(6)}, {Number(selectedRequest.serviceLongitude).toFixed(6)}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="calendar" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Fecha y Hora Preferida</Text>
+                    </View>
+                    <Text style={styles.modalText}>
+                      {new Date(selectedRequest.preferredDate).toLocaleDateString('es-ES', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </Text>
+                    <Text style={styles.modalSubText}>{selectedRequest.preferredTime}</Text>
+                  </View>
+
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="cash" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Información de Costos</Text>
+                    </View>
+                    {selectedRequest.estimatedCost != null && (
+                      <Text style={styles.modalText}>
+                        Costo Estimado: ${Number(selectedRequest.estimatedCost).toFixed(2)}
+                      </Text>
+                    )}
+                    {selectedRequest.finalCost != null && (
+                      <Text style={styles.modalHighlightText}>
+                        Costo Acordado: ${Number(selectedRequest.finalCost).toFixed(2)}
+                      </Text>
+                    )}
+                    {selectedRequest.estimatedCost == null && selectedRequest.finalCost == null && (
+                      <Text style={styles.modalText}>No se especificó costo</Text>
+                    )}
+                  </View>
+
+                  {selectedRequest.contactPhone && (
+                    <View style={styles.detailSection}>
+                      <View style={styles.detailSectionHeader}>
+                        <Ionicons name="call" size={20} color="#3B82F6" />
+                        <Text style={styles.modalSectionTitle}>Teléfono de Contacto</Text>
+                      </View>
+                      <Text style={styles.modalText}>{selectedRequest.contactPhone}</Text>
+                    </View>
+                  )}
+                  <View style={styles.detailSection}>
+                    <View style={styles.detailSectionHeader}>
+                      <Ionicons name="time" size={20} color="#3B82F6" />
+                      <Text style={styles.modalSectionTitle}>Solicitud Recibida</Text>
+                    </View>
+                    <Text style={styles.modalText}>
+                      {new Date(selectedRequest.createdAt).toLocaleString('es-ES', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
                 </View>
-              </View>
               )}
             </ScrollView>
 
@@ -623,6 +729,80 @@ export default function ProviderRequestsScreen() {
               <Text style={styles.closeModalButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Map Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={styles.mapModalContainer}>
+          <View style={styles.mapModalHeader}>
+            <Text style={styles.mapModalTitle}>Ubicación del Servicio</Text>
+            <TouchableOpacity onPress={() => setShowMapModal(false)} style={styles.mapCloseButton}>
+              <Ionicons name="close" size={28} color="#1F2937" />
+            </TouchableOpacity>
+          </View>
+
+          {selectedRequest?.serviceLatitude != null && selectedRequest?.serviceLongitude != null && (
+            <>
+              <MapView
+                style={styles.fullMap}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={{
+                  latitude: Number(selectedRequest.serviceLatitude),
+                  longitude: Number(selectedRequest.serviceLongitude),
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+                showsUserLocation={true}
+                showsMyLocationButton={true}
+                loadingEnabled={true}
+                loadingIndicatorColor="#3B82F6"
+              >
+                <Marker
+                  coordinate={{
+                    latitude: Number(selectedRequest.serviceLatitude),
+                    longitude: Number(selectedRequest.serviceLongitude),
+                  }}
+                  title={selectedRequest.requestTitle}
+                  description={selectedRequest.serviceAddress}
+                  pinColor="#EF4444"
+                />
+              </MapView>
+
+              <View style={styles.mapModalFooter}>
+                <View style={styles.mapAddressContainer}>
+                  <Text style={styles.mapAddressTitle}>Dirección:</Text>
+                  <Text style={styles.mapAddressText}>{selectedRequest.serviceAddress}</Text>
+                  {selectedRequest.addressDetails && (
+                    <Text style={styles.mapAddressDetails}>📝 {selectedRequest.addressDetails}</Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.navigateFromMapButton}
+                  onPress={() => {
+                    openInMaps(
+                      Number(selectedRequest.serviceLatitude),
+                      Number(selectedRequest.serviceLongitude),
+                      selectedRequest.serviceAddress
+                    );
+                  }}
+                >
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    style={styles.navigateGradient}
+                  >
+                    <Ionicons name="navigate" size={24} color="white" />
+                    <Text style={styles.navigateFromMapText}>Abrir en Navegación</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
       </Modal>
 
@@ -673,6 +853,21 @@ export default function ProviderRequestsScreen() {
           </View>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        showCancel={alert.showCancel}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+        onCancel={() => setAlert({ ...alert, visible: false })}
+      />
     </View>
   );
 }
@@ -976,7 +1171,7 @@ const styles = StyleSheet.create({
   },
   detailSection: {
     marginBottom: 20,
-    paddingBottom: 16,
+    paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
@@ -1042,5 +1237,115 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  locationActionsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  viewMapButton: {
+    flex: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  navigateButton: {
+    flex: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  mapButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  mapButtonText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  coordinatesText: {
+    fontSize: 11,
+    color: '#10B981',
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  mapModalContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  mapModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  mapCloseButton: {
+    padding: 4,
+  },
+  fullMap: {
+    flex: 1,
+  },
+  mapModalFooter: {
+    backgroundColor: 'white',
+    padding: 20,
+    paddingBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  mapAddressContainer: {
+    marginBottom: 16,
+  },
+  mapAddressTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  mapAddressText: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  mapAddressDetails: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  navigateFromMapButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  navigateGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    padding: 16,
+  },
+  navigateFromMapText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

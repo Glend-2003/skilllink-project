@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { Config } from '../../constants/Config';
 import { ChevronLeft, User, MapPin, Calendar } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import CustomAlert from '../../components/CustomAlert';
 
 export default function CompleteProfileScreen() {
   const { user } = useAuth();
@@ -24,6 +24,19 @@ export default function CompleteProfileScreen() {
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [existingProfile, setExistingProfile] = useState<any>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  const [alert, setAlert] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    visible: false,
+    type: 'info',
+    title: '',
+    message: '',
+  });
   
   const [formData, setFormData] = useState({
     first_name: '',
@@ -78,31 +91,56 @@ export default function CompleteProfileScreen() {
       });
       
       if (response.status === 401) {
-        Alert.alert(
-          'Session Expired',
-          'Your session has expired. Please log in again.',
-          [{ text: 'OK' }]
-        );
+        setAlert({
+          visible: true,
+          type: 'error',
+          title: 'Sesión Expirada',
+          message: 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
+        });
+        return;
+      }
+
+      // Handle 404 - no profile exists yet
+      if (response.status === 404) {
+        console.log('No profile found, starting fresh');
         return;
       }
 
       if (response.ok) {
-        const profile = await response.json();
-        if (profile) {
-          setExistingProfile(profile);
-          setFormData({
-            first_name: profile.first_name || '',
-            last_name: profile.last_name || '',
-            date_of_birth: profile.date_of_birth || '',
-            gender: profile.gender || '',
-            bio: profile.bio || '',
-            address_line1: profile.address_line1 || '',
-            city: profile.city || '',
-            state_province: profile.state_province || '',
-            country: profile.country || '',
-            latitude: profile.latitude || '',
-            longitude: profile.longitude || '',
-          });
+        const text = await response.text();
+        
+        // Check if response has content
+        if (!text || text.trim() === '') {
+          console.log('Empty response, no profile data');
+          return;
+        }
+
+        try {
+          const profile = JSON.parse(text);
+          if (profile) {
+            setExistingProfile(profile);
+            
+            let formattedDate = profile.date_of_birth || '';
+            if (formattedDate && formattedDate.includes('T')) {
+              formattedDate = formattedDate.split('T')[0];
+            }
+            
+            setFormData({
+              first_name: profile.first_name || '',
+              last_name: profile.last_name || '',
+              date_of_birth: formattedDate,
+              gender: profile.gender || '',
+              bio: profile.bio || '',
+              address_line1: profile.address_line1 || '',
+              city: profile.city || '',
+              state_province: profile.state_province || '',
+              country: profile.country || '',
+              latitude: profile.latitude || '',
+              longitude: profile.longitude || '',
+            });
+          }
+        } catch (parseError) {
+          console.error('Error parsing profile JSON:', parseError);
         }
       }
     } catch (error) {
@@ -127,7 +165,12 @@ export default function CompleteProfileScreen() {
 
   const handleSave = async () => {
     if (!formData.first_name || !formData.last_name) {
-      Alert.alert('Error', 'First name and last name are required');
+      setAlert({
+        visible: true,
+        type: 'warning',
+        title: 'Campos Requeridos',
+        message: 'El nombre y apellido son obligatorios para continuar.',
+      });
       return;
     }
 
@@ -145,20 +188,39 @@ export default function CompleteProfileScreen() {
       const responseText = await response.text();
 
       if (response.ok) {
-        Alert.alert('Success', 'Profile updated successfully', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
+        setAlert({
+          visible: true,
+          type: 'success',
+          title: '¡Perfecto!',
+          message: 'Tu perfil ha sido actualizado exitosamente.',
+          onConfirm: () => router.back(),
+        });
       } else {
         try {
           const errorData = JSON.parse(responseText);
-          Alert.alert('Error', errorData.message || 'Could not update profile');
+          setAlert({
+            visible: true,
+            type: 'error',
+            title: 'Error',
+            message: errorData.message || 'No se pudo actualizar el perfil. Intenta nuevamente.',
+          });
         } catch {
-          Alert.alert('Error', `Server error (${response.status})`);
+          setAlert({
+            visible: true,
+            type: 'error',
+            title: 'Error del Servidor',
+            message: `Ocurrió un error en el servidor (${response.status}). Por favor, intenta más tarde.`,
+          });
         }
       }
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Could not connect to server');
+      setAlert({
+        visible: true,
+        type: 'error',
+        title: 'Sin Conexión',
+        message: 'No se pudo conectar al servidor. Verifica tu conexión a internet.',
+      });
     } finally {
       setLoading(false);
     }
@@ -216,7 +278,7 @@ export default function CompleteProfileScreen() {
             >
               <Calendar color="#6b7280" size={20} />
               <Text style={styles.datePickerText}>
-                {formData.date_of_birth || 'Selecciona tu fecha de nacimiento'}
+                {formData.date_of_birth ? formData.date_of_birth.split('T')[0] : 'Selecciona tu fecha de nacimiento'}
               </Text>
             </TouchableOpacity>
             {showDatePicker && (
@@ -282,7 +344,7 @@ export default function CompleteProfileScreen() {
           {formData.latitude && formData.longitude && (
             <View style={styles.locationInfo}>
               <Text style={styles.locationText}>
-                📍 Ubicación detectada: {parseFloat(formData.latitude).toFixed(6)}, {parseFloat(formData.longitude).toFixed(6)}
+                Ubicación detectada: {parseFloat(formData.latitude).toFixed(6)}, {parseFloat(formData.longitude).toFixed(6)}
               </Text>
               <TouchableOpacity onPress={getCurrentLocation} style={styles.refreshLocationButton}>
                 <Text style={styles.refreshLocationText}>Actualizar ubicación</Text>
@@ -349,6 +411,19 @@ export default function CompleteProfileScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      <CustomAlert
+        visible={alert.visible}
+        type={alert.type}
+        title={alert.title}
+        message={alert.message}
+        onConfirm={() => {
+          if (alert.onConfirm) {
+            alert.onConfirm();
+          }
+          setAlert({ ...alert, visible: false });
+        }}
+      />
     </View>
   );
 }

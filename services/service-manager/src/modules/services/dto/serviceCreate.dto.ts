@@ -28,10 +28,10 @@ export class CreateServiceDto {
   @IsString()
   serviceDescription!: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
-  basePrice!: number;
+  basePrice?: number;
 
   @IsEnum(['fixed', 'hourly', 'negotiable'])
   priceType!: string;

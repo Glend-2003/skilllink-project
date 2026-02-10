@@ -1,5 +1,4 @@
 services:
-  # Servicio de Base de Datos
   mysql_db:
     image: mysql:8.0
     container_name: skilllink_db
@@ -17,7 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Servicio de Autenticación
   auth-service:
     build:
       context: ./services/auth-service/Auth-Service
@@ -31,7 +29,6 @@ services:
     depends_on:
       - mysql_db
 
-  # Servicio de Usuarios
   user-service:
     build: ./services/user-service
     ports:
@@ -40,7 +37,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Gestor de Servicios
   service-manager:
     build: ./services/service-manager
     ports:
@@ -51,6 +47,7 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=root
       - DB_DATABASE=skilllink_db
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
       - CLOUDINARY_CLOUD_NAME=dsr4zuujv
       - CLOUDINARY_API_KEY=812532711416188
       - CLOUDINARY_API_SECRET=FScVr1OfILG0oBXDAmd-TRGOH84
@@ -58,7 +55,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Proveedores
   provider-service:
     build: ./services/provider-service
     ports:
@@ -69,11 +65,11 @@ services:
       - DB_PASSWORD=root
       - DB_NAME=skilllink_db
       - PORT=3000
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
     depends_on:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Chat
   chat-service:
     build: ./services/chat-service
     ports:
@@ -89,7 +85,6 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # Servicio de Pagos
   payment-service:
     build: ./services/payment-service
     ports:
@@ -103,7 +98,21 @@ services:
       mysql_db:
         condition: service_healthy
 
-  # API Gateway 
+  ai-service:
+    build: ./services/AI-service
+    container_name: ai_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
   api-gateway:
     build: ./services/api-gateway
     container_name: api_gateway
@@ -118,14 +127,15 @@ services:
       - CHAT_SERVICE_URL=http://chat-service:3000
       - PAYMENT_SERVICE_URL=http://payment-service:8081
       - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+      - AI_SERVICE_URL=http://ai-service:8000
     depends_on:
       - auth-service
       - user-service
       - service-manager
       - provider-service
       - chat-service
-
-# Servicio de notificaciones
+      - ai-service
+  
   notification-service:
     build: ./services/notification-service
     container_name: notification_service
@@ -135,8 +145,15 @@ services:
       mysql_db:
         condition: service_healthy
     environment:
-      DB_HOST: mysql_db
-      PORT: 3006
+      - PORT=3006
+      - DB_HOST=mysql_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_PORT=465
+      - EMAIL_USER=skilllinkcompany@gmail.com
+      - EMAIL_PASS=wzml qccc uzil suyj
 
 
 volumes:
