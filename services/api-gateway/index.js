@@ -138,6 +138,22 @@ app.use('/api/v1/notifications', createProxyMiddleware({
     }
 }));
 
+// 6.5 AI Service (Python FastAPI) - Recommendations
+app.use('/api/v1/recommendations', createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL || 'http://ai-service:8000',
+    changeOrigin: true,
+    pathRewrite: function(path, req) {
+        // Express strips /api/v1/recommendations, so we need to add /recommendations back
+        const newPath = '/recommendations' + path;
+        console.log(`[AI Service] Proxying ${req.originalUrl} -> ${newPath}`);
+        return newPath;
+    },
+    onError: (err, req, res) => {
+        console.error(`[AI Service Error] ${err.message}`);
+        res.status(500).json({ error: 'AI service error', message: err.message });
+    }
+}));
+
 // 7. Provider Service (Node.js/Express)
 // 7.1 Providers (general route)
 // Express strips /api/v1/providers, we need to add /api/providers prefix

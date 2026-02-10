@@ -652,7 +652,7 @@ export default function ProviderRequestsScreen() {
                     )}
                     {selectedRequest.serviceLatitude != null && selectedRequest.serviceLongitude != null && (
                       <Text style={styles.coordinatesText}>
-                        📍 {Number(selectedRequest.serviceLatitude).toFixed(6)}, {Number(selectedRequest.serviceLongitude).toFixed(6)}
+                        {Number(selectedRequest.serviceLatitude).toFixed(6)}, {Number(selectedRequest.serviceLongitude).toFixed(6)}
                       </Text>
                     )}
                   </View>

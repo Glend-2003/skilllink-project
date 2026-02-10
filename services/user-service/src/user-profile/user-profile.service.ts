@@ -21,6 +21,13 @@ export class UserProfileService {
     userId: number,
     createProfileDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
+    // Format date_of_birth if present (convert ISO to YYYY-MM-DD)
+    const formattedDto = { ...createProfileDto };
+    if (formattedDto.date_of_birth) {
+      const date = new Date(formattedDto.date_of_birth);
+      formattedDto.date_of_birth = date.toISOString().split('T')[0]; // Extract YYYY-MM-DD only
+    }
+
     // Check if a profile already exists for this user
     const existingProfile = await this.profileRepository.findOne({
       where: { user_id: userId },
@@ -28,12 +35,12 @@ export class UserProfileService {
 
     if (existingProfile) {
       // If it exists, update the fields
-      this.profileRepository.merge(existingProfile, createProfileDto);
+      this.profileRepository.merge(existingProfile, formattedDto);
       return this.profileRepository.save(existingProfile);
     } else {
       // If it doesn't exist, create a new one linked to the userId
       const newProfile = this.profileRepository.create({
-        ...createProfileDto,
+        ...formattedDto,
         user_id: userId, // Here we link with the ID that comes from the Token
       });
       return this.profileRepository.save(newProfile);
@@ -97,8 +104,15 @@ export class UserProfileService {
     userId: number,
     updateDto: CreateUserProfileDto,
   ): Promise<UserProfile> {
+    // Format date_of_birth if present (convert ISO to YYYY-MM-DD)
+    const formattedDto = { ...updateDto };
+    if (formattedDto.date_of_birth) {
+      const date = new Date(formattedDto.date_of_birth);
+      formattedDto.date_of_birth = date.toISOString().split('T')[0]; // Extract YYYY-MM-DD only
+    }
+
     // TypeORM's .update() is very efficient, it looks for the ID and changes only what you send
-    await this.profileRepository.update({ user_id: userId }, updateDto);
+    await this.profileRepository.update({ user_id: userId }, formattedDto);
 
     const updatedProfile = await this.findOne(userId);
     if (!updatedProfile) {

@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-require('dotenv').config();
 
 const app = express();
 app.use(cors());
@@ -11,12 +10,12 @@ const PORT = process.env.PORT || 3006;
 
 // Configure email transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: false, // true for 465, false for other ports
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 465,
+  secure: true, // true for 465, false for other ports
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
   },
 });
 
@@ -105,7 +104,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     service: 'notification-service',
-    emailConfigured: !!process.env.SMTP_USER 
+    emailConfigured: !!process.env.EMAIL_USER 
   });
 });
 
@@ -132,41 +131,55 @@ app.post('/api/notifications/send', async (req, res) => {
 // Send email endpoint
 app.post('/api/notifications/send-email', async (req, res) => {
   try {
-    const { to, subject, code, type } = req.body;
+    const { to, subject, code, type, html } = req.body;
 
-    if (!to || !subject || !code) {
+    if (!to || !subject) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: to, subject, code'
+        error: 'Missing required fields: to, subject'
+      });
+    }
+
+    // Must have either code or html
+    if (!code && !html) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either code or html must be provided'
       });
     }
 
     // Check if SMTP is configured
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.log(`📧 Email would be sent to ${to} with code: ${code}`);
-      console.log('⚠️  SMTP not configured - code logged instead');
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.log(`📧 Email would be sent to ${to}`);
+      if (code) console.log(`   Code: ${code}`);
+      console.log('⚠️  SMTP not configured - email logged instead');
       
       return res.json({
         success: true,
-        message: 'Email service not configured - code logged',
+        message: 'Email service not configured - email logged',
         code: process.env.NODE_ENV === 'development' ? code : undefined
       });
     }
 
-    // Generate email HTML based on type
-    let html;
-    if (type === 'password-reset') {
-      html = getPasswordResetEmailTemplate(code);
-    } else {
-      html = `<p>Tu código de verificación es: <strong>${code}</strong></p>`;
+    // Generate email HTML based on what's provided
+    let emailHtml;
+    if (html) {
+      // Use provided HTML directly (for login, register, etc.)
+      emailHtml = html;
+    } else if (code && type === 'password-reset') {
+      // Use password reset template
+      emailHtml = getPasswordResetEmailTemplate(code);
+    } else if (code) {
+      // Simple code template
+      emailHtml = `<p>Tu código de verificación es: <strong>${code}</strong></p>`;
     }
 
     // Send email
     const info = await transporter.sendMail({
-      from: `"SkillLink" <${process.env.SMTP_USER}>`,
+      from: `"SkillLink" <${process.env.EMAIL_USER}>`,
       to: to,
       subject: subject,
-      html: html,
+      html: emailHtml,
     });
 
     console.log(`✅ Email sent to ${to}: ${info.messageId}`);
@@ -199,5 +212,5 @@ app.post('/api/notifications/send-email', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Notification Service running on port ${PORT}`);
-  console.log(`📧 SMTP configured: ${!!process.env.SMTP_USER}`);
+  console.log(`📧 SMTP configured: ${!!process.env.EMAIL_USER}`);
 });

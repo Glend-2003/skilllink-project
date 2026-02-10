@@ -109,20 +109,23 @@ export default function ProviderRequestsScreen() {
     try {
       setProcessingId(requestId);
 
-      const response = await fetch(`${Config.API_GATEWAY_URL}/api/v1/provider-requests/review`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.token}`,
-        },
-        body: JSON.stringify({
-          requestId,
-          status,
-          reviewNotes: status === 'approved' 
-            ? 'Solicitud aprobada. ¡Bienvenido como proveedor!'
-            : 'Solicitud rechazada. Por favor revisa los requisitos.',
-        }),
-      });
+      const response = await fetch(
+        `${Config.API_GATEWAY_URL}/api/v1/provider-requests/review`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user?.token}`,
+          },
+          body: JSON.stringify({
+            requestId,
+            status,
+            reviewNotes: status === 'approved' 
+              ? 'Solicitud aprobada. ¡Bienvenido como proveedor!'
+              : 'Solicitud rechazada por el administrador',
+          }),
+        }
+      );
 
       if (response.ok) {
         Alert.alert(
@@ -135,7 +138,7 @@ export default function ProviderRequestsScreen() {
       }
     } catch (error) {
       console.error('Error processing review:', error);
-      Alert.alert('Error', 'No se pudo procesar la solicitud');
+      Alert.alert('Error', 'Error de conexión');
     } finally {
       setProcessingId(null);
     }

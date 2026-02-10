@@ -119,10 +119,16 @@ export default function CompleteProfileScreen() {
           const profile = JSON.parse(text);
           if (profile) {
             setExistingProfile(profile);
+            
+            let formattedDate = profile.date_of_birth || '';
+            if (formattedDate && formattedDate.includes('T')) {
+              formattedDate = formattedDate.split('T')[0];
+            }
+            
             setFormData({
               first_name: profile.first_name || '',
               last_name: profile.last_name || '',
-              date_of_birth: profile.date_of_birth || '',
+              date_of_birth: formattedDate,
               gender: profile.gender || '',
               bio: profile.bio || '',
               address_line1: profile.address_line1 || '',
@@ -272,7 +278,7 @@ export default function CompleteProfileScreen() {
             >
               <Calendar color="#6b7280" size={20} />
               <Text style={styles.datePickerText}>
-                {formData.date_of_birth || 'Selecciona tu fecha de nacimiento'}
+                {formData.date_of_birth ? formData.date_of_birth.split('T')[0] : 'Selecciona tu fecha de nacimiento'}
               </Text>
             </TouchableOpacity>
             {showDatePicker && (

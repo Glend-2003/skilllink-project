@@ -47,9 +47,10 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=root
       - DB_DATABASE=skilllink_db
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+      - CLOUDINARY_CLOUD_NAME=dsr4zuujv
+      - CLOUDINARY_API_KEY=812532711416188
+      - CLOUDINARY_API_SECRET=FScVr1OfILG0oBXDAmd-TRGOH84
     depends_on:
       mysql_db:
         condition: service_healthy
@@ -64,6 +65,7 @@ services:
       - DB_PASSWORD=root
       - DB_NAME=skilllink_db
       - PORT=3000
+      - NOTIFICATION_SERVICE_URL=http://notification-service:3006
     depends_on:
       mysql_db:
         condition: service_healthy
@@ -96,6 +98,21 @@ services:
       mysql_db:
         condition: service_healthy
 
+  ai-service:
+    build: ./services/AI-service
+    container_name: ai_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=mysql_db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=skilllink_db
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
   api-gateway:
     build: ./services/api-gateway
     container_name: api_gateway
@@ -110,12 +127,14 @@ services:
       - CHAT_SERVICE_URL=http://chat-service:3000
       - PAYMENT_SERVICE_URL=http://payment-service:8081
       - NOTIFICATION_SERVICE_URL=http://notification-service:3006
+      - AI_SERVICE_URL=http://ai-service:8000
     depends_on:
       - auth-service
       - user-service
       - service-manager
       - provider-service
       - chat-service
+      - ai-service
   
   notification-service:
     build: ./services/notification-service

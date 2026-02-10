@@ -7,6 +7,7 @@ import { UpdateServiceDto } from './dto/serviceUpdate.dto';
 
 import { ProviderProfile } from '../providers/entities/provider.entity';
 import { Category } from '../categories/entities/category.entity';
+import axios from 'axios';
 
 @Injectable()
 export class ServicesService {
@@ -407,6 +408,68 @@ export class ServicesService {
     service.isVerified = true;
     service.verificationDate = new Date();
     await this.serviceRepository.save(service);
+
+    // Send notification to the provider (not to admin)
+    try {
+      const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
+      
+      await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send-email`, {
+        to: service.provider?.user?.email,
+        subject: '¡Tu servicio ha sido aprobado! - SkillLink',
+        type: 'service-approval',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Servicio Aprobado - SkillLink</title>
+          </head>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                      <td style="background: linear-gradient(135deg, #10b981 0%, #2563eb 100%); padding: 40px 20px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🎉 SkillLink</h1>
+                        <p style="color: #e0f2fe; margin: 10px 0 0 0; font-size: 14px;">Conecta con los mejores profesionales</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 40px 30px;">
+                        <h2 style="color: #10b981; margin: 0 0 20px 0; font-size: 24px;">¡Servicio Aprobado!</h2>
+                        <p style="color: #1f2937; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
+                          Tu servicio <strong>${service.serviceTitle}</strong> ha sido aprobado y ya está visible para los usuarios.
+                        </p>
+                        <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;">
+                          Los clientes ahora pueden encontrar y solicitar tu servicio en la plataforma.
+                        </p>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0;">
+                          <tr>
+                            <td align="center" style="padding: 15px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #10b981;">
+                              <p style="color: #059669; font-weight: bold; margin: 0;">✅ Estado: Aprobado y Activo</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #9ca3af; font-size: 12px; margin: 0;">© 2026 SkillLink. Todos los derechos reservados.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `
+      });
+    } catch (error) {
+      console.error('Error sending service approval notification:', error.message);
+    }
+
     return this.findOne(id);
   }
 
@@ -415,6 +478,62 @@ export class ServicesService {
     service.approvalStatus = 'rejected';
     service.isActive = false;
     await this.serviceRepository.save(service);
+
+    // Send notification to the provider (not to admin)
+    try {
+      const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006';
+      
+      await axios.post(`${NOTIFICATION_SERVICE_URL}/api/notifications/send-email`, {
+        to: service.provider?.user?.email,
+        subject: 'Actualización sobre tu servicio - SkillLink',
+        type: 'service-rejection',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Servicio No Aprobado - SkillLink</title>
+          </head>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <tr>
+                      <td style="background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%); padding: 40px 20px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px;">SkillLink</h1>
+                        <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 14px;">Conecta con los mejores profesionales</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 40px 30px;">
+                        <h2 style="color: #dc2626; margin: 0 0 20px 0; font-size: 24px;">Actualización sobre tu Servicio</h2>
+                        <p style="color: #1f2937; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
+                          Tu servicio <strong>${service.serviceTitle}</strong> no ha sido aprobado en este momento.
+                        </p>
+                        ${reason ? `<p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 20px 0;"><strong>Motivo:</strong> ${reason}</p>` : ''}
+                        <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0;">
+                          Si tienes preguntas, por favor contacta al equipo de soporte.
+                        </p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="background-color: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                        <p style="color: #9ca3af; font-size: 12px; margin: 0;">© 2026 SkillLink. Todos los derechos reservados.</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `
+      });
+    } catch (error) {
+      console.error('Error sending service rejection notification:', error.message);
+    }
+
     return this.findOne(id);
   }
 }
