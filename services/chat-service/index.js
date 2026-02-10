@@ -71,12 +71,19 @@ let io;
     
     // Configure Socket.IO
     io.on("connection", (socket) => {
+      console.log('New socket connection:', socket.id);
 
       socket.on("join_chat", ({ conversationId }) => {
-        socket.join(conversationId);
+        const roomId = String(conversationId);
+        console.log(`Socket ${socket.id} joining room: ${roomId}`);
+        socket.join(roomId);
+        console.log(`Socket ${socket.id} joined room ${roomId}. Current rooms:`, Array.from(socket.rooms));
       });
 
       socket.on("send_message", async ({ conversationId, sender_user_id, message_text }) => {
+        const roomId = String(conversationId);
+        console.log(`Message received for room ${roomId} from user ${sender_user_id}: "${message_text.substring(0, 30)}..."`);
+        
         const [result] = await db.execute(
           "INSERT INTO messages (conversation_id, sender_user_id, message_text) VALUES (?, ?, ?)",
           [conversationId, sender_user_id, message_text]
@@ -95,7 +102,12 @@ let io;
           created_at: new Date()
         };
 
-        io.to(conversationId).emit("receive_message", message);
+        // Get list of sockets in the room
+        const socketsInRoom = await io.in(roomId).fetchSockets();
+        console.log(`Broadcasting to room ${roomId}. Sockets in room: ${socketsInRoom.length}`, socketsInRoom.map(s => s.id));
+        
+        io.to(roomId).emit("receive_message", message);
+        console.log(`Message broadcast to room ${roomId}`);
 
         // Send push notification to receiver
         try {

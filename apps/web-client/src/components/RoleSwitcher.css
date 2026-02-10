@@ -1,0 +1,43 @@
+.role-switcher {
+  display: flex;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border-radius: 25px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.role-button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: transparent;
+  color: #2564eb62;
+  white-space: nowrap;
+}
+
+.role-button:hover {
+  color: #2564eb62;
+}
+
+.role-button.active {
+  background: white;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .role-switcher {
+    width: 100%;
+  }
+  
+  .role-button {
+    flex: 1;
+    padding: 10px 16px;
+  }
+}
