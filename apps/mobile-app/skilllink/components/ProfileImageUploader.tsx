@@ -6,6 +6,8 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  Alert,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, ImageIcon, User } from 'lucide-react-native';
@@ -195,10 +197,26 @@ export const ProfileImageUploader: React.FC<ProfileImageUploaderProps> = ({
     }
   };
 
-  const showImageOptions = async () => {
-    const hasCamera = await ImagePicker.getCameraPermissionsAsync();
-    
-    await pickImage();
+  const showImageOptions = () => {
+    Alert.alert(
+      'Foto de perfil',
+      'Elige una opción',
+      [
+        {
+          text: 'Tomar foto',
+          onPress: takePhoto,
+        },
+        {
+          text: 'Elegir de galería',
+          onPress: pickImage,
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (

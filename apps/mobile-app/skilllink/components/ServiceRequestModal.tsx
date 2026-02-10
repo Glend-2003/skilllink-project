@@ -417,7 +417,7 @@ export default function ServiceRequestModal({
             <View style={styles.mapCoordinatesInfo}>
               {tempLocation && (
                 <Text style={styles.mapCoordinatesText}>
-                  📍 Lat: {tempLocation.latitude.toFixed(6)}, Lng: {tempLocation.longitude.toFixed(6)}
+                  Lat: {tempLocation.latitude.toFixed(6)}, Lng: {tempLocation.longitude.toFixed(6)}
                 </Text>
               )}
             </View>

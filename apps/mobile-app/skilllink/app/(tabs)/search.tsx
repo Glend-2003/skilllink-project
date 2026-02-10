@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,18 @@ import {
   Image,
   RefreshControl,
   Alert,
+  Switch,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { Search as SearchIcon, X, DollarSign, Clock } from 'lucide-react-native';
+import { Search as SearchIcon, X, DollarSign, Clock, MapPin, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { Config } from '@/constants/Config';
+import { useAuth } from '@/app/context/AuthContext';
 
 const CATEGORY_COLORS: { [key: string]: { bg: string; text: string; border: string } } = {
   'Plomería': { bg: '#EFF6FF', text: '#3B82F6', border: '#3B82F6' },
@@ -77,9 +83,11 @@ interface Service {
   }>;
   rating?: number;
   reviewCount?: number;
+  distance_km?: number; // Added for location-based search
 }
 
 export default function SearchScreen() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -88,27 +96,149 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Location states
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState(10);
+  const [gettingLocation, setGettingLocation] = useState(false);
+  
+  const MIN_RADIUS = 1;
+  const MAX_RADIUS = 50;
+  const DISPLAY_MARKS = [5, 10, 15, 20, 30, 40, 50];
+  const SLIDER_WIDTH = Dimensions.get('window').width - 80;
+  const pan = useRef(new Animated.Value(0)).current;
+  const initialPositionRef = useRef(0);
+  const isDraggingRef = useRef(false);
+
+  const getRadiusFromPosition = (position: number) => {
+    const percentage = Math.max(0, Math.min(1, position / SLIDER_WIDTH));
+    const radius = Math.round(MIN_RADIUS + percentage * (MAX_RADIUS - MIN_RADIUS));
+    return Math.max(MIN_RADIUS, Math.min(MAX_RADIUS, radius));
+  };
+
+  const getPositionForRadius = (radius: number) => {
+    const percentage = (radius - MIN_RADIUS) / (MAX_RADIUS - MIN_RADIUS);
+    return percentage * SLIDER_WIDTH;
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (_, gestureState) => {
+        isDraggingRef.current = true;
+        initialPositionRef.current = (pan as any).__getValue();
+        pan.setOffset(initialPositionRef.current);
+        pan.setValue(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const newPosition = initialPositionRef.current + gestureState.dx;
+        const clampedPosition = Math.max(0, Math.min(SLIDER_WIDTH, newPosition));
+        const clampedDx = clampedPosition - initialPositionRef.current;
+        pan.setValue(clampedDx);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        pan.flattenOffset();
+        
+        const finalPosition = Math.max(0, Math.min(SLIDER_WIDTH, initialPositionRef.current + gestureState.dx));
+        const newRadius = getRadiusFromPosition(finalPosition);
+        
+        const targetPosition = getPositionForRadius(newRadius);
+        Animated.timing(pan, {
+          toValue: targetPosition,
+          duration: 100,
+          useNativeDriver: false,
+        }).start(() => {
+          isDraggingRef.current = false;
+        });
+        
+        setRadiusKm(newRadius);
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      const targetPosition = getPositionForRadius(radiusKm);
+      Animated.timing(pan, {
+        toValue: targetPosition,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [radiusKm]);
 
   useEffect(() => {
     loadInitialData();
   }, []);
 
   useEffect(() => {
-    filterServices();
-  }, [searchQuery, selectedCategory, services]);
+    if (locationEnabled && userLocation) {
+      loadLocationBasedServices();
+    } else if (!loading) {
+      filterServices();
+    }
+  }, [searchQuery, selectedCategory, locationEnabled, radiusKm]);
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permisos requeridos',
+          'Se necesitan permisos de ubicación para buscar servicios cercanos.'
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error requesting location:', error);
+      return false;
+    }
+  };
+
+  const getUserLocation = async () => {
+    setGettingLocation(true);
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        setLocationEnabled(false);
+        setGettingLocation(false);
+        return null;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        lat: location.coords.latitude,
+        lon: location.coords.longitude,
+      };
+      setUserLocation(coords);
+      setGettingLocation(false);
+      return coords;
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert('Error', 'No se pudo obtener tu ubicación');
+      setGettingLocation(false);
+      setLocationEnabled(false);
+      return null;
+    }
+  };
 
   const loadInitialData = async () => {
     try {
-      const [categoriesRes, servicesRes] = await Promise.all([
-        fetch(`${Config.API_GATEWAY_URL}/api/v1/categories`).catch(() => null),
-        fetch(`${Config.API_GATEWAY_URL}/api/v1/services`).catch(() => null),
-      ]);
-
+      // Load categories
+      const categoriesRes = await fetch(`${Config.API_GATEWAY_URL}/api/v1/categories`).catch(() => null);
       if (categoriesRes?.ok) {
         const categoriesData = await categoriesRes.json();
         setCategories(categoriesData.filter((cat: Category) => cat.isActive));
       }
 
+      // Load all services normally
+      const servicesRes = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`).catch(() => null);
       if (servicesRes?.ok) {
         const servicesData = await servicesRes.json();
         setServices(servicesData);
@@ -121,9 +251,65 @@ export default function SearchScreen() {
     }
   };
 
+  const loadLocationBasedServices = async () => {
+    if (!userLocation || !user?.userId) return;
+    
+    setSearching(true);
+    try {
+      const url = `${Config.API_GATEWAY_URL}/api/v1/recommendations/${user.userId}?radius_km=${radiusKm}&lat=${userLocation.lat}&lon=${userLocation.lon}`;
+      const recommendationsRes = await fetch(url);
+      
+      if (recommendationsRes.ok) {
+        const data = await recommendationsRes.json();
+        const transformedServices = await transformRecommendationsToServices(data.providers);
+        setServices(transformedServices);
+        setFilteredServices(transformedServices);
+      }
+    } catch (error) {
+      console.error('Error loading location services:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const transformRecommendationsToServices = async (providers: any[]) => {
+    // Fetch all services to map provider services to full service objects
+    try {
+      const servicesRes = await fetch(`${Config.API_GATEWAY_URL}/api/v1/services`);
+      const allServices = await servicesRes.json();
+      
+      // Create a map of provider IDs to distance
+      const providerDistances = new Map(
+        providers.map((p: any) => [p.provider_id, p.distance_km])
+      );
+      
+      // Filter services that belong to recommended providers and add distance
+      const recommendedServices = allServices
+        .filter((service: Service) => providerDistances.has(service.providerId))
+        .map((service: Service) => {
+          const distance = providerDistances.get(service.providerId);
+          return {
+            ...service,
+            distance_km: distance || 0,
+          };
+        })
+        .filter((service: any) => service.distance_km <= radiusKm)
+        .sort((a: any, b: any) => a.distance_km - b.distance_km);
+      
+      return recommendedServices;
+    } catch (error) {
+      console.error('Error transforming recommendations:', error);
+      return [];
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadInitialData();
+    if (locationEnabled && userLocation) {
+      await loadLocationBasedServices();
+    } else {
+      await loadInitialData();
+    }
     setRefreshing(false);
   };
 
@@ -157,6 +343,23 @@ export default function SearchScreen() {
 
   const handleCategoryPress = (categoryId: number) => {
     setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
+  };
+
+  const handleLocationToggle = async (value: boolean) => {
+    if (value) {
+      const location = await getUserLocation();
+      if (location) {
+        setLocationEnabled(true);
+        // Load services with location after getting GPS
+        await loadLocationBasedServices();
+      }
+    } else {
+      setLocationEnabled(false);
+      setUserLocation(null);
+      // Reload all services without location filter
+      setLoading(true);
+      await loadInitialData();
+    }
   };
 
   const handleServicePress = (service: Service) => {
@@ -218,10 +421,12 @@ export default function SearchScreen() {
     );
   };
 
-  const renderService = ({ item }: { item: Service }) => {
+  const renderService = ({ item }: { item: any }) => {
     const serviceImage = item.gallery && item.gallery.length > 0 
-      ? item.gallery.sort((a, b) => a.displayOrder - b.displayOrder)[0].imageUrl 
+      ? item.gallery.sort((a: any, b: any) => a.displayOrder - b.displayOrder)[0].imageUrl 
       : null;
+    
+    const hasDistance = item.distance_km !== undefined && item.distance_km !== null;
     
     return (
       <TouchableOpacity style={styles.serviceCard} onPress={() => handleServicePress(item)}>
@@ -280,6 +485,17 @@ export default function SearchScreen() {
               <Text style={styles.priceLabel}>Desde</Text>
               <Text style={styles.priceText}>{getPriceDisplay(item)}</Text>
             </View>
+            {hasDistance && (
+              <View style={styles.distanceContainer}>
+                <MapPin size={14} color="#3B82F6" />
+                <Text style={styles.distanceText}>
+                  {item.distance_km < 1 
+                    ? `${Math.round(item.distance_km * 1000)}m`
+                    : `${item.distance_km.toFixed(1)}km`
+                  }
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -332,6 +548,109 @@ export default function SearchScreen() {
         ) : null}
       </View>
 
+      {/* Location Filter Section */}
+      <View style={styles.locationSection}>
+        <View style={styles.locationHeader}>
+          <View style={styles.locationTitleRow}>
+            <Navigation size={20} color="#3B82F6" />
+            <Text style={styles.locationTitle}>Buscar por ubicación</Text>
+          </View>
+          {gettingLocation ? (
+            <ActivityIndicator size="small" color="#3B82F6" />
+          ) : (
+            <Switch
+              value={locationEnabled}
+              onValueChange={handleLocationToggle}
+              trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
+              thumbColor={locationEnabled ? '#3B82F6' : '#F3F4F6'}
+            />
+          )}
+        </View>
+        
+        {locationEnabled && userLocation && (
+          <View style={styles.radiusContainer}>
+            <View style={styles.radiusHeader}>
+              <View>
+                <Text style={styles.radiusLabel}>Radio de búsqueda</Text>
+                <Text style={styles.radiusSubLabel}>Desliza para ajustar</Text>
+              </View>
+              <View style={styles.radiusValueContainer}>
+                <Text style={styles.radiusValue}>{radiusKm}</Text>
+                <Text style={styles.radiusUnit}>km</Text>
+              </View>
+            </View>
+            
+            <View style={styles.sliderWrapper}>
+              <View style={styles.sliderTrack}>
+                <Animated.View 
+                  style={[
+                    styles.sliderFill,
+                    {
+                      width: pan.interpolate({
+                        inputRange: [0, SLIDER_WIDTH],
+                        outputRange: ['0%', '100%'],
+                        extrapolate: 'clamp',
+                      }),
+                    }
+                  ]} 
+                />
+                {/* Mini ticks para referencia visual */}
+                <View style={styles.ticksContainer}>
+                  {Array.from({ length: 10 }, (_, i) => (
+                    <View key={i} style={styles.miniTick} />
+                  ))}
+                </View>
+                <Animated.View
+                  {...panResponder.panHandlers}
+                  style={[
+                    styles.sliderThumb,
+                    {
+                      transform: [
+                        {
+                          translateX: pan.interpolate({
+                            inputRange: [0, SLIDER_WIDTH],
+                            outputRange: [0, SLIDER_WIDTH],
+                            extrapolate: 'clamp',
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <View style={styles.thumbInner}>
+                    <View style={styles.thumbRipple} />
+                  </View>
+                </Animated.View>
+              </View>
+              
+              <View style={styles.sliderMarks}>
+                {DISPLAY_MARKS.map((km) => (
+                  <TouchableOpacity
+                    key={km}
+                    style={styles.sliderMark}
+                    onPress={() => {
+                      setRadiusKm(km);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
+                  >
+                    <View style={[
+                      styles.markDot,
+                      radiusKm === km && styles.markDotActive
+                    ]} />
+                    <Text style={[
+                      styles.markLabel,
+                      radiusKm === km && styles.markLabelActive
+                    ]}>
+                      {km}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* Categories Section */}
       <View style={styles.categoriesSection}>
         <View style={styles.sectionHeader}>
@@ -363,9 +682,16 @@ export default function SearchScreen() {
       {/* Results Section */}
       <View style={styles.resultsSection}>
         <View style={styles.resultsHeader}>
-          <Text style={styles.resultsTitle}>
-            {searchQuery || selectedCategory ? 'Resultados' : 'Todos los servicios'}
-          </Text>
+          <View>
+            <Text style={styles.resultsTitle}>
+              {searchQuery || selectedCategory ? 'Resultados' : locationEnabled ? 'Servicios cercanos' : 'Todos los servicios'}
+            </Text>
+            {locationEnabled && userLocation && (
+              <Text style={styles.resultsSubtitle}>
+                Dentro de {radiusKm} km de tu ubicación
+              </Text>
+            )}
+          </View>
           <Text style={styles.resultsCount}>
             {filteredServices.length} resultado{filteredServices.length !== 1 ? 's' : ''}
           </Text>
@@ -519,6 +845,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  resultsSubtitle: {
+    fontSize: 12,
+    color: '#3B82F6',
+    marginTop: 2,
+    fontWeight: '500',
   },
   resultsCount: {
     fontSize: 14,
@@ -691,5 +1023,183 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  locationSection: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    borderRadius: 12,
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  locationTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  locationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  radiusContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  radiusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  radiusLabel: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  radiusSubLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  radiusValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  radiusValue: {
+    fontSize: 24,
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  radiusUnit: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontWeight: '600',
+    marginLeft: 2,
+  },
+  sliderWrapper: {
+    paddingHorizontal: 4,
+  },
+  sliderTrack: {
+    height: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 4,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  ticksContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+  },
+  miniTick: {
+    width: 2,
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  sliderFill: {
+    position: 'absolute',
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
+    left: 0,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    top: -12,
+    marginLeft: -16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    borderWidth: 4,
+    borderColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbRipple: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#3B82F6',
+  },
+  sliderMarks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingHorizontal: 2,
+  },
+  sliderMark: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  markDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E5E7EB',
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
+  },
+  markDotActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#93C5FD',
+    transform: [{ scale: 1.4 }],
+  },
+  markLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  markLabelActive: {
+    color: '#3B82F6',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  distanceText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
   },
 });

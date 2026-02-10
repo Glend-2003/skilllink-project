@@ -212,7 +212,7 @@ export const ServiceGalleryUpload: React.FC<ServiceGalleryUploadProps> = ({
             </View>
           ) : (
             <Text style={styles.uploadButtonText}>
-              ⬆Subir {selectedImages.length} imagen(es)
+              Subir {selectedImages.length} imagen(es)
             </Text>
           )}
         </TouchableOpacity>
