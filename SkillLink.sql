@@ -24,11 +24,6 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 --
 
 SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '8ba6c684-dd5d-11f0-b2f8-00155d24608c:1-165';
-
---
--- Table structure for table `__EFMigrationsHistory`
---
-
 -- MySQL dump 10.13  Distrib 8.0.43, for macos15 (arm64)
 --
 -- Host: localhost    Database: skilllink_db
