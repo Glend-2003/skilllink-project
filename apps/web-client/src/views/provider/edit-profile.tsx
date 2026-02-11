@@ -107,11 +107,11 @@ export default function EditProviderProfile() {
         // El proveedor aún no existe, dejar formulario vacío
         console.log('Provider profile not found, will create new one');
       } else {
-        alert('No se pudo cargar el perfil de proveedor');
+        toast.error('No se pudo cargar el perfil de proveedor');
       }
     } catch (error) {
       console.error('Error loading provider profile:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     }
   };
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui//button';
 import { Badge } from '../../ui/badge';
 import { toast } from 'sonner';
+import { confirmToast } from '../../utils/confirmToast';
 
 interface Service {
   serviceId: number;
@@ -59,7 +60,7 @@ export default function ProviderServices() {
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -96,14 +97,15 @@ export default function ProviderServices() {
       await loadServicesWithProviderId(providerId);
     } catch (error) {
       console.error('Error loading services:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setRefreshing(false);
     }
   };
 
-  const handleDelete = (serviceId: number, title: string) => {
-    if (window.confirm(`¿Estás seguro de eliminar "${title}"?`)) {
+  const handleDelete = async (serviceId: number, title: string) => {
+    const confirmed = await confirmToast(`¿Estás seguro de eliminar "${title}"?`);
+    if (confirmed) {
       deleteService(serviceId);
     }
   };

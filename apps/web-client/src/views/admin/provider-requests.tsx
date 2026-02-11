@@ -7,6 +7,7 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { toast } from 'sonner';
+import { confirmToast } from '../../utils/confirmToast';
 import { RefreshCw } from 'lucide-react';
 
 interface ProviderRequest {
@@ -97,7 +98,10 @@ export default function AdminProviderRequests() {
   const handleReview = async (requestId: number, status: 'approved' | 'rejected') => {
     const statusText = status === 'approved' ? 'aprobar' : 'rechazar';
     
-    if (!window.confirm(`¿Estás seguro de que quieres ${statusText} esta solicitud?`)) {
+    const confirmed = await confirmToast(
+      `¿Estás seguro de que quieres ${statusText} esta solicitud?`
+    );
+    if (!confirmed) {
       return;
     }
 

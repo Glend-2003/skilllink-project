@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Config } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import './auth.css';
 
 export default function LoginScreen() {
@@ -19,7 +20,7 @@ export default function LoginScreen() {
     e.preventDefault();
     
     if (!email || !password) {
-      alert('Por favor, ingresa email y contraseña.');
+      toast.warning('Por favor, ingresa email y contraseña.');
       return;
     }
 
@@ -58,21 +59,21 @@ export default function LoginScreen() {
         
         navigate('/');
       } else {
-        alert(data.message || 'Credenciales incorrectas.');
+        toast.error(data.message || 'Credenciales incorrectas.');
       }
     } catch (error) {
-      alert('No se pudo conectar al servidor.');
+      toast.error('No se pudo conectar al servidor.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialLogin = (provider: string) => {
-    alert(`Iniciando sesión con ${provider}... (Funcionalidad próximamente)`);
+    toast.info(`Iniciando sesión con ${provider}... (Funcionalidad próximamente)`);
   };
 
   const handleForgotPassword = () => {
-    alert('Funcionalidad de recuperación próximamente');
+    toast.info('Funcionalidad de recuperación próximamente');
   };
 
   return (

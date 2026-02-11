@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import { Config, API_BASE_URL } from '../../constants/Config';
 import ServiceRequestModal from '../../components/ServiceRequestModal';
+import { toast } from 'sonner';
 import '../chat.css';
 
 interface Message {
@@ -267,7 +268,7 @@ export default function ChatDetail() {
 
     if (!socketRef.current || !socketRef.current.connected) {
       console.error('Socket not connected');
-      alert('No hay conexión con el servidor de chat. Por favor recarga la página.');
+      toast.error('No hay conexión con el servidor de chat. Por favor recarga la página.');
       return;
     }
 
@@ -292,7 +293,7 @@ export default function ChatDetail() {
       console.error('Error sending message:', error);
       // Restore input if send failed
       setInput(messageText);
-      alert('Error al enviar el mensaje. Por favor intenta de nuevo.');
+      toast.error('Error al enviar el mensaje. Por favor intenta de nuevo.');
     }
   };
 
@@ -377,7 +378,7 @@ export default function ChatDetail() {
             
             // Prevent clients from requesting services from themselves
             if (user?.userId === conversationInfo?.provider_user_id) {
-              alert('No puedes solicitarte servicios a ti mismo.');
+              toast.warning('No puedes solicitarte servicios a ti mismo.');
               return;
             }
             
@@ -422,7 +423,7 @@ export default function ChatDetail() {
           providerId={provider.providerId}
           providerName={provider.name}
           onSuccess={() => {
-            alert('Tu solicitud ha sido enviada al proveedor');
+            toast.success('Tu solicitud ha sido enviada al proveedor');
           }}
         />
       )}

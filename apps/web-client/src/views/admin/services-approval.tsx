@@ -8,6 +8,7 @@ import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { Check, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmToast } from '../../utils/confirmToast';
 
 interface PendingService {
   serviceId: number;
@@ -68,14 +69,16 @@ export default function ServicesApproval() {
     }
   };
 
-  const handleApprove = (serviceId: number, title: string) => {
-    if (window.confirm(`¿Aprobar "${title}"?`)) {
+  const handleApprove = async (serviceId: number, title: string) => {
+    const confirmed = await confirmToast(`¿Aprobar "${title}"?`);
+    if (confirmed) {
       approveService(serviceId);
     }
   };
 
-  const handleReject = (serviceId: number, title: string) => {
-    if (window.confirm(`¿Rechazar "${title}"?`)) {
+  const handleReject = async (serviceId: number, title: string) => {
+    const confirmed = await confirmToast(`¿Rechazar "${title}"?`);
+    if (confirmed) {
       rejectService(serviceId);
     }
   };

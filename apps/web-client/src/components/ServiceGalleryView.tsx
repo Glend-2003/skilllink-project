@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Config } from '../constants/Config';
+import { toast } from 'sonner';
+import { confirmToast } from '../utils/confirmToast';
 import './ServiceGalleryView.css';
 
 interface GalleryImage {
@@ -56,7 +58,8 @@ export default function ServiceGalleryView({
   };
 
   const deleteImage = async (galleryId: number) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar esta imagen?')) {
+    const confirmed = await confirmToast('¿Estás seguro de que deseas eliminar esta imagen?');
+    if (!confirmed) {
       return;
     }
 
@@ -71,13 +74,13 @@ export default function ServiceGalleryView({
         setImages(images.filter((img) => img.galleryId !== galleryId));
         onImageDeleted?.();
         onImagesChange?.();
-        alert('Imagen eliminada correctamente');
+        toast.success('Imagen eliminada correctamente');
       } else {
-        alert('No se pudo eliminar la imagen');
+        toast.error('No se pudo eliminar la imagen');
       }
     } catch (error) {
       console.error('Error deleting image:', error);
-      alert('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setDeleting(null);
     }

@@ -7,6 +7,8 @@ import { Card, CardContent } from '../ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
+import { toast } from 'sonner';
+import { confirmToast } from '../utils/confirmToast';
 import './chat.css';
 
 interface ConversationItemUI {
@@ -85,7 +87,10 @@ export default function Chat() {
   const handleDeleteConversation = async (conversationId: string, providerName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar la conversación con ${providerName}?`)) {
+    const confirmed = await confirmToast(
+      `¿Estás seguro de que deseas eliminar la conversación con ${providerName}?`
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -97,11 +102,11 @@ export default function Chat() {
       if (response.ok) {
         setItems(prevItems => prevItems.filter(item => item.id !== conversationId));
       } else {
-        alert('No se pudo eliminar la conversación');
+        toast.error('No se pudo eliminar la conversación');
       }
     } catch (error) {
       console.error('Error deleting conversation:', error);
-      alert('Error al eliminar la conversación');
+      toast.error('Error al eliminar la conversación');
     }
   };
 

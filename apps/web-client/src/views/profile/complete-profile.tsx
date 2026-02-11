@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 export default function CompleteProfile() {
   const { user } = useAuth();
@@ -40,12 +41,12 @@ export default function CompleteProfile() {
         body: JSON.stringify(formData),
       });
       if (response.ok) {
-        alert('Perfil actualizado correctamente.');
+        toast.success('Perfil actualizado correctamente.');
       } else {
-        alert('Error al actualizar el perfil.');
+        toast.error('Error al actualizar el perfil.');
       }
     } catch (e) {
-      alert('Error de red.');
+      toast.error('Error de red.');
     } finally {
       setLoading(false);
     }

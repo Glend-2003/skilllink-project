@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../constants/Config';
 import { Camera, Loader } from 'lucide-react';
+import { toast } from 'sonner';
 import './ProfileImageUploader.css';
 
 interface ProfileImageUploaderProps {
@@ -44,13 +45,13 @@ export default function ProfileImageUploader({ onChange }: ProfileImageUploaderP
 
     // Validate file is an image
     if (!file.type.startsWith('image/')) {
-      alert('Por favor selecciona un archivo de imagen');
+      toast.warning('Por favor selecciona un archivo de imagen');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('La imagen debe ser menor de 5MB');
+      toast.warning('La imagen debe ser menor de 5MB');
       return;
     }
 
@@ -93,7 +94,7 @@ export default function ProfileImageUploader({ onChange }: ProfileImageUploaderP
 
         if (updateResponse.ok) {
           setImageUrl(newImageUrl);
-          alert('Foto de perfil actualizada correctamente');
+          toast.success('Foto de perfil actualizada correctamente');
           
           // Notificar a otros componentes que se actualizó la foto (Navigation)
           // Usar localStorage para disparar un evento de storage
@@ -109,7 +110,7 @@ export default function ProfileImageUploader({ onChange }: ProfileImageUploaderP
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('No se pudo subir la imagen. Verifica tu conexión.');
+      toast.error('No se pudo subir la imagen. Verifica tu conexión.');
     } finally {
       setUploading(false);
       // Reset input

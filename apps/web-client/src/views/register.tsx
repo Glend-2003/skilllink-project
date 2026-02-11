@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Config } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Phone, Briefcase, FileText, MapPin } from 'lucide-react';
+import { toast } from 'sonner';
 import './auth.css';
 
 export default function RegisterScreen() {
@@ -34,7 +35,7 @@ export default function RegisterScreen() {
   const handleNextStep = () => {
     if (step === 1) {
       if (!userType) {
-        alert('Selecciona el tipo de cuenta');
+        toast.warning('Selecciona el tipo de cuenta');
         return;
       }
       setStep(2);
@@ -45,29 +46,29 @@ export default function RegisterScreen() {
     e.preventDefault();
     
     if (!formData.name || !formData.email || !formData.password) {
-      alert('Por favor completa todos los campos obligatorios');
+      toast.warning('Por favor completa todos los campos obligatorios');
       return;
     }
 
     if (userType === 'provider') {
       if (!formData.businessName || !formData.description || !formData.location) {
-        alert('Por favor completa todos los campos de proveedor');
+        toast.warning('Por favor completa todos los campos de proveedor');
         return;
       }
     }
 
     if (formData.password !== formData.confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      toast.error('Las contraseñas no coinciden');
       return;
     }
 
     if (formData.password.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+      toast.warning('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
     if (!acceptTerms) {
-      alert('Debes aceptar los términos y condiciones');
+      toast.warning('Debes aceptar los términos y condiciones');
       return;
     }
 
@@ -124,41 +125,41 @@ export default function RegisterScreen() {
             });
 
             if (providerResponse.ok) {
-              alert(
+              toast.success(
                 'Registro Exitoso\n\nTu cuenta ha sido creada y tu solicitud de proveedor está en revisión. Mientras tanto, puedes usar la app como cliente. Te notificaremos cuando sea aprobada.'
               );
               navigate('/');
             } else {
               const errorData = await providerResponse.json();
               console.error('Provider request error:', errorData);
-              alert(
+              toast.warning(
                 'Cuenta Creada\n\nTu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.'
               );
               navigate('/');
             }
           } catch (error) {
             console.error('Provider request exception:', error);
-            alert(
+            toast.warning(
               'Cuenta Creada\n\nTu cuenta fue creada pero hubo un error al enviar la solicitud de proveedor. Puedes enviarla desde tu perfil. Por ahora, usa la app como cliente.'
             );
             navigate('/');
           }
         } else {
-          alert('Éxito: Tu cuenta ha sido creada exitosamente');
+          toast.success('Éxito: Tu cuenta ha sido creada exitosamente');
           navigate('/');
         }
       } else {
-        alert(data.message || 'Error al registrar.');
+        toast.error(data.message || 'Error al registrar.');
       }
     } catch (error) {
-      alert('No se pudo conectar al servidor.');
+      toast.error('No se pudo conectar al servidor.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSocialRegister = (provider: string) => {
-    alert(`Registrándose con ${provider}... (Funcionalidad próximamente)`);
+    toast.info(`Registrándose con ${provider}... (Funcionalidad próximamente)`);
   };
 
   return (
