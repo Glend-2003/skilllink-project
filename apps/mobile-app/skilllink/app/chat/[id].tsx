@@ -91,6 +91,23 @@ export default function ChatDetail() {
     }
   };
 
+  // Mark messages as read
+  const markMessagesAsRead = async () => {
+    if (!id || !user) return;
+    
+    try {
+      await fetch(`${Config.API_GATEWAY_URL}/api/v1/chat/conversations/${id}/mark-read`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.userId }),
+      });
+      // Emit event to refresh chat list
+      DeviceEventEmitter.emit('messages_read', { conversationId: parseInt(id as string) });
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
   // Fetch conversation and provider info
   useEffect(() => {
     const loadConversationInfo = async () => {
@@ -176,6 +193,7 @@ export default function ChatDetail() {
       });
       
       loadPreviousMessages();
+      markMessagesAsRead();
     });
 
     newSocket.on("receive_message", (data) => {
@@ -189,6 +207,11 @@ export default function ChatDetail() {
         }),
       };
       setMessages((prev) => [...prev, newMessage]);
+      
+      // Mark new message as read immediately if from other user
+      if (data.sender_user_id !== user.userId) {
+        markMessagesAsRead();
+      }
     });
 
     return () => {

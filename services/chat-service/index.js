@@ -219,6 +219,10 @@ app.get("/api/conversations/:userId", async (req, res) => {
         (SELECT m.message_text FROM messages m 
          WHERE m.conversation_id = c.conversation_id 
          ORDER BY m.created_at DESC LIMIT 1) AS last_message_text,
+        (SELECT COUNT(*) FROM messages m 
+         WHERE m.conversation_id = c.conversation_id 
+         AND m.sender_user_id != ? 
+         AND m.is_read = 0) AS unread_count,
         COALESCE(c.last_message_at, c.created_at) AS last_activity_at,
         c.created_at
       FROM conversations c
@@ -232,7 +236,7 @@ app.get("/api/conversations/:userId", async (req, res) => {
       LEFT JOIN user_profiles up ON up.user_id = u_other.user_id
       WHERE c.participant1_user_id = ? OR c.participant2_user_id = ?
       ORDER BY last_activity_at DESC`,
-      [userId, userId, userId, userId]
+      [userId, userId, userId, userId, userId]
     );
 
     res.json(conversations);
@@ -259,6 +263,37 @@ app.get("/api/conversations/:conversationId/messages", async (req, res) => {
   } catch (error) {
     console.error("Error fetching messages:", error);
     res.status(500).json({ error: "Error fetching messages" });
+  }
+});
+
+// REST: Mark messages as read
+app.put("/api/conversations/:conversationId/mark-read", async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    // Mark all unread messages from other users as read
+    const [result] = await db.execute(
+      `UPDATE messages 
+       SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+       WHERE conversation_id = ? 
+       AND sender_user_id != ? 
+       AND is_read = 0`,
+      [conversationId, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      markedCount: result.affectedRows,
+      message: `${result.affectedRows} messages marked as read` 
+    });
+  } catch (error) {
+    console.error("Error marking messages as read:", error);
+    res.status(500).json({ error: "Error marking messages as read" });
   }
 });
 

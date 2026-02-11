@@ -21,6 +21,7 @@ type ApiConversation = {
   last_message_at: string | null;
   created_at: string;
   other_user_profile_image: string | null;
+  unread_count: number;
 };
 
 interface ConversationItemUI {
@@ -31,6 +32,7 @@ interface ConversationItemUI {
   time: string;
   avatar: string;
   profileImageUrl?: string;
+  unreadCount: number;
 }
 
 export default function ChatScreen() {
@@ -76,6 +78,7 @@ export default function ChatScreen() {
         // PNG avatar to ensure RN Image compatibility
         avatar: `https://i.pravatar.cc/150?u=${c.other_user_id}`,
         profileImageUrl: c.other_user_profile_image || undefined,
+        unreadCount: c.unread_count || 0,
       }));
       setItems(mapped);
     } catch (e) {
@@ -108,10 +111,12 @@ export default function ChatScreen() {
     useCallback(() => {
       fetchConversations();
       const sub = DeviceEventEmitter.addListener('conversation_sent', fetchConversations);
+      const readSub = DeviceEventEmitter.addListener('messages_read', fetchConversations);
       const interval = setInterval(fetchConversations, 7000);
       return () => {
         clearInterval(interval);
         sub.remove();
+        readSub.remove();
       };
     }, [fetchConversations])
   );
@@ -212,6 +217,11 @@ export default function ChatScreen() {
             >
               <Ionicons name="person-circle-outline" size={28} color="#FFF" />
             </LinearGradient>
+          )}
+          {item.unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text>
+            </View>
           )}
         </View>
 
@@ -344,6 +354,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginRight: 12,
+    position: 'relative',
   },
   avatar: {
     width: 56,
@@ -357,6 +368,25 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  unreadText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   conversationInfo: {
     flex: 1,
