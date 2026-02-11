@@ -4,9 +4,6 @@ import { Search as SearchIcon, SlidersHorizontal, MapPin, Star, Verified, Map } 
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import ServiceImageBg from '../components/ServiceImageBg';
-import ServiceDistance from '../components/ServiceDistance';
-import ServiceRatingFromReviews from '../components/ServiceRatingFromReviews';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -465,15 +462,25 @@ export default function Search() {
                       onClick={() => handleViewProvider(service)}
                     >
                       <CardContent className="p-0">
-                        <div className="relative h-40 rounded-t-lg overflow-hidden">
-                          <ServiceImageBg serviceId={service.serviceId} />
+                        <div className="relative h-40">
+                          {service.provider?.user?.profileImageUrl ? (
+                            <img
+                              src={service.provider.user.profileImageUrl}
+                              alt={service.serviceTitle}
+                              className="w-full h-full object-cover rounded-t-lg"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center rounded-t-lg">
+                              <span className="text-5xl">👤</span>
+                            </div>
+                          )}
                           {service.isVerified && (
-                            <Badge className="absolute top-2 right-2 bg-blue-600 z-10">
+                            <Badge className="absolute top-2 right-2 bg-blue-600">
                               <Verified className="w-3 h-3 mr-1" />
                               Verificado
                             </Badge>
                           )}
-                          <Badge className="absolute top-2 left-2 bg-green-600 z-10">
+                          <Badge className="absolute top-2 left-2 bg-green-600">
                             Disponible
                           </Badge>
                         </div>
@@ -491,8 +498,14 @@ export default function Search() {
                           </div>
 
                           <div className="flex items-center gap-3 text-sm mb-3">
-                            <ServiceRatingFromReviews providerId={service.provider?.providerId} />
-                            <ServiceDistance service={service} />
+                            <div className="flex items-center gap-1 text-amber-600">
+                              <Star className="w-4 h-4 fill-current" />
+                              <span className="font-medium">{(service.rating || 4.5).toFixed(1)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-slate-600">
+                              <MapPin className="w-4 h-4" />
+                              <span>{service.location || '1.5 km'}</span>
+                            </div>
                           </div>
 
                           <p className="text-sm text-slate-600 mb-3 line-clamp-2">

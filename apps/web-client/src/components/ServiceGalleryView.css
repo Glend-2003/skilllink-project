@@ -1,16 +1,14 @@
 .gallery-container {
-  padding: 0;
-  background-color: transparent;
+  padding: 16px;
+  background-color: #fff;
   border-radius: 12px;
-  width: 100%;
 }
 
 .gallery-scroll {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 12px 0;
-  width: 100%;
+  padding-bottom: 8px;
 }
 
 .gallery-scroll::-webkit-scrollbar {

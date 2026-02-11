@@ -77,6 +77,9 @@ export default function ProviderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  console.log('ProviderDetail component mounted with ID:', id);
+  
   const [provider, setProvider] = useState<Provider | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -85,25 +88,19 @@ export default function ProviderDetail() {
 
   useEffect(() => {
     if (id) {
+      console.log('Loading provider with ID:', id);
       // Try to load from localStorage first
       const cachedProvider = localStorage.getItem(`provider_${id}`);
       if (cachedProvider) {
+        console.log('Loading provider from localStorage');
         try {
           const providerData = JSON.parse(cachedProvider);
           setProvider(providerData as Provider);
           
-          // Use providerId directly from cache if available
-          const actualProviderId = providerData.providerId || id;
-          console.log('Loaded from cache, using providerId:', actualProviderId);
-          
           // Load services and reviews
           (async () => {
             try {
-              let servicesRes = await fetch(`${API_BASE_URL}/api/v1/providers/${actualProviderId}/services`);
-              if (!servicesRes.ok && servicesRes.status === 500) {
-                console.log('Trying alternative services endpoint...');
-                servicesRes = await fetch(`${API_BASE_URL}/api/v1/services/provider/${actualProviderId}`);
-              }
+              const servicesRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/services`);
               if (servicesRes.ok) {
                 const servicesData = await servicesRes.json();
                 setServices(Array.isArray(servicesData) ? servicesData.filter((s: Service) => s.isActive) : []);
@@ -113,42 +110,13 @@ export default function ProviderDetail() {
             }
             
             try {
-              const reviewsEndpoints = [
-                `${API_BASE_URL}/api/v1/providers/${actualProviderId}/reviews`,
-                `${API_BASE_URL}/api/v1/reviews/provider/${actualProviderId}`,
-                `${API_BASE_URL}/api/v1/reviews`,
-              ];
-              
-              let reviewsData = null;
-              for (const url of reviewsEndpoints) {
-                try {
-                  const reviewsRes = await fetch(url);
-                  if (reviewsRes.ok) {
-                    const data = await reviewsRes.json();
-                    if (url.includes('/api/v1/reviews') && !url.includes('provider') && !url.includes('providers')) {
-                      reviewsData = Array.isArray(data) 
-                        ? data.filter((r: any) => r.providerId === actualProviderId || r.provider?.providerId === actualProviderId)
-                        : [];
-                    } else {
-                      reviewsData = data;
-                    }
-                    console.log('Reviews loaded from:', url);
-                    break;
-                  }
-                } catch (e) {
-                  console.error('Error trying reviews endpoint:', url, e);
-                }
-              }
-              
-              if (reviewsData) {
+              const reviewsRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/reviews`);
+              if (reviewsRes.ok) {
+                const reviewsData = await reviewsRes.json();
                 setReviews(Array.isArray(reviewsData) ? reviewsData : []);
-              } else {
-                console.warn('Could not load reviews from any endpoint');
-                setReviews([]);
               }
             } catch (e) {
               console.error('Error loading reviews:', e);
-              setReviews([]);
             }
             
             setLoading(false);
@@ -164,134 +132,88 @@ export default function ProviderDetail() {
 
   const loadProviderDetails = async () => {
     setLoading(true);
+    console.log('Fetching provider details for ID:', id);
     
     try {
       let providerData = null;
       let providerRes = null;
       
-      // Try multiple endpoints to find the provider
-      const endpointsToTry = [
-        `${API_BASE_URL}/api/v1/providers/user/${id}`,  // First try: userId format
-        `${API_BASE_URL}/api/v1/providers/${id}`,       // Second try: providerId format
-      ];
+      // Intenta primero con el formato de userId (ya que probablemente es un userId)
+      let providerUrl = `${API_BASE_URL}/api/v1/providers/user/${id}`;
+      console.log('Trying provider URL (user format):', providerUrl);
       
-      for (const url of endpointsToTry) {
-        console.log('Trying provider endpoint:', url);
-        try {
-          providerRes = await fetch(url);
-          console.log('Response status:', providerRes.status);
-          
-          if (providerRes.ok) {
-            providerData = await providerRes.json();
-            console.log('Provider loaded from:', url, 'Data:', providerData);
-            break;
-          }
-        } catch (e) {
-          console.error('Error trying endpoint:', url, e);
-        }
+      providerRes = await fetch(providerUrl);
+      console.log('Provider response status:', providerRes.status);
+      
+      // Si falla, intenta con providerId directo
+      if (!providerRes.ok) {
+        console.log('First attempt failed, trying with providerId format...');
+        providerUrl = `${API_BASE_URL}/api/v1/providers/${id}`;
+        console.log('Trying alternative URL:', providerUrl);
+        
+        providerRes = await fetch(providerUrl);
+        console.log('Alternative provider response status:', providerRes.status);
       }
       
-      if (providerRes?.ok && providerData) {
+      if (providerRes.ok) {
+        providerData = await providerRes.json();
+        console.log('Provider data received:', providerData);
         setProvider(providerData);
         
-        // Usar el providerId del proveedor para cargar servicios y reviews
-        const actualProviderId = providerData.providerId || providerData.id || id;
-        console.log('Using providerId for services/reviews:', actualProviderId);
-        
-        if (!actualProviderId) {
-          console.error('Could not determine providerId from provider response');
-          setServices([]);
-          setReviews([]);
-          setLoading(false);
-          return;
-        }
-        
-        // Load services from multiple endpoints
+        // Load services only if provider loaded successfully
         try {
-          const servicesEndpoints = [
-            `${API_BASE_URL}/api/v1/providers/${actualProviderId}/services`,
-            `${API_BASE_URL}/api/v1/services/provider/${actualProviderId}`,
-          ];
+          const servicesUrl = `${API_BASE_URL}/api/v1/providers/${id}/services`;
+          console.log('Services URL:', servicesUrl);
           
-          let servicesData = null;
-          for (const url of servicesEndpoints) {
-            console.log('Trying services endpoint:', url);
-            try {
-              const servicesRes = await fetch(url);
-              console.log('Services response status:', servicesRes.status);
-              if (servicesRes.ok) {
-                servicesData = await servicesRes.json();
-                console.log('Services loaded from:', url);
-                break;
-              }
-            } catch (e) {
-              console.error('Error trying services endpoint:', url, e);
-            }
-          }
+          const servicesRes = await fetch(servicesUrl);
+          console.log('Services response status:', servicesRes.status);
           
-          if (servicesData) {
-            const activeServices = Array.isArray(servicesData) 
-              ? servicesData.filter((s: Service) => s.isActive !== false)
-              : [];
-            console.log('Filtered services:', activeServices);
-            setServices(activeServices);
-          } else {
-            console.warn('Could not load services from any endpoint');
-            setServices([]);
+          if (servicesRes.ok) {
+            const servicesData = await servicesRes.json();
+            console.log('Services data received:', servicesData);
+            setServices(Array.isArray(servicesData) ? servicesData.filter((s: Service) => s.isActive) : []);
           }
         } catch (servicesError) {
           console.error('Error loading services:', servicesError);
           setServices([]);
         }
 
-        // Load reviews from multiple endpoints
+        // Load reviews
         try {
-          const reviewsEndpoints = [
-            `${API_BASE_URL}/api/v1/providers/${actualProviderId}/reviews`,
-            `${API_BASE_URL}/api/v1/reviews/provider/${actualProviderId}`,
-            `${API_BASE_URL}/api/v1/reviews`,  // Try getting all reviews and filter
-          ];
+          const reviewsUrl = `${API_BASE_URL}/api/v1/providers/${id}/reviews`;
+          console.log('Reviews URL:', reviewsUrl);
           
-          let reviewsData = null;
-          for (const url of reviewsEndpoints) {
-            console.log('Trying reviews endpoint:', url);
-            try {
-              const reviewsRes = await fetch(url);
-              console.log('Reviews response status:', reviewsRes.status);
-              if (reviewsRes.ok) {
-                const data = await reviewsRes.json();
-                // If we got all reviews, filter by provider
-                if (url.includes('/api/v1/reviews') && !url.includes('provider') && !url.includes('providers')) {
-                  reviewsData = Array.isArray(data) 
-                    ? data.filter((r: any) => r.providerId === actualProviderId || r.provider?.providerId === actualProviderId)
-                    : [];
-                } else {
-                  reviewsData = data;
-                }
-                console.log('Reviews loaded from:', url);
-                break;
-              }
-            } catch (e) {
-              console.error('Error trying reviews endpoint:', url, e);
+          const reviewsRes = await fetch(reviewsUrl);
+          console.log('Reviews response status:', reviewsRes.status);
+          
+          if (reviewsRes.ok) {
+            const reviewsData = await reviewsRes.json();
+            console.log('Reviews data received (full structure):', reviewsData);
+            // Log cada review para ver su estructura
+            if (Array.isArray(reviewsData)) {
+              reviewsData.forEach((review, index) => {
+                console.log(`=== Review ${index} (${review.client?.email || review.email || 'Usuario'}) ===`);
+                console.log('Full review object:', review);
+                console.log('review.client:', review.client);
+                console.log('review.user:', review.user);
+                console.log('Keys in review:', Object.keys(review));
+                if (review.client) console.log('Keys in review.client:', Object.keys(review.client));
+                if (review.user) console.log('Keys in review.user:', Object.keys(review.user));
+              });
             }
-          }
-          
-          if (reviewsData) {
             setReviews(Array.isArray(reviewsData) ? reviewsData : []);
-          } else {
-            console.warn('Could not load reviews from any endpoint');
-            setReviews([]);
           }
         } catch (reviewsError) {
           console.error('Error loading reviews:', reviewsError);
           setReviews([]);
         }
       } else {
-        console.error('Failed to load provider from any endpoint');
+        const errorText = await providerRes.text();
+        console.error('Error loading provider:', providerRes.status, errorText);
         setProvider(null);
       }
     } catch (error) {
-      console.error('Error in loadProviderDetails:', error);
+      console.error('Error loading provider details:', error);
       setProvider(null);
     } finally {
       setLoading(false);
@@ -337,6 +259,10 @@ export default function ProviderDetail() {
 
   const handleRequestService = (serviceName: string) => {
     toast.success(`Solicitud enviada para: ${serviceName}`);
+  };
+
+  const handleScheduleAppointment = () => {
+    toast.info('Función de agendar cita próximamente disponible');
   };
 
   const calculateAverageRating = () => {
@@ -531,6 +457,14 @@ export default function ProviderDetail() {
                     <MessageCircle className="w-4 h-4" />
                     Contactar
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    onClick={handleScheduleAppointment}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Agendar cita
+                  </Button>
                 </div>
               </div>
             </div>
@@ -554,46 +488,42 @@ export default function ProviderDetail() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {services.map((service) => {
-                  const serviceId = service.serviceId || (service as any).id;
-                  return (
-                    <Card key={serviceId} className="hover:shadow-lg transition-shadow overflow-hidden">
-                      <CardHeader>
-                        <CardTitle className="flex items-start justify-between">
-                          <span className="text-lg">{service.serviceTitle || (service as any).name}</span>
-                          <span className="text-blue-600 font-bold text-lg">₡{(service.basePrice || (service as any).price).toLocaleString()}</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-slate-600">{service.serviceDescription || (service as any).description}</p>
-                        
-                        {serviceId && (
-                          <div className="mt-4 pt-4 border-t">
-                            <h4 className="text-sm font-semibold text-slate-900 mb-3">Galería de imágenes</h4>
-                            <ServiceGalleryView
-                              serviceId={serviceId}
-                              editable={false}
-                              maxImagesToShow={5}
-                            />
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center justify-between pt-2">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Clock className="w-4 h-4" />
-                            <span>{service.priceUnit || 'Servicio'}</span>
-                          </div>
-                          <Button 
-                            size="sm"
-                            onClick={() => handleRequestService(service.serviceTitle || (service as any).name)}
-                          >
-                            Solicitar
-                          </Button>
+                {services.map((service) => (
+                  <Card key={service.serviceId} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-start justify-between">
+                        <span>{service.serviceTitle}</span>
+                        <span className="text-blue-600 font-bold">₡{service.basePrice.toLocaleString()}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-slate-600 mb-3">{service.serviceDescription}</p>
+                      
+                      {service.serviceId && (
+                        <div className="mb-3">
+                          <ServiceGalleryView
+                            serviceId={service.serviceId}
+                            editable={false}
+                            maxImagesToShow={5}
+                          />
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      )}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                          <Clock className="w-4 h-4" />
+                          <span>{service.priceUnit}</span>
+                        </div>
+                        <Button 
+                          size="sm"
+                          onClick={() => handleRequestService(service.serviceTitle)}
+                        >
+                          Solicitar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </TabsContent>
@@ -645,25 +575,24 @@ export default function ProviderDetail() {
 
           {/* Gallery Tab */}
           <TabsContent value="gallery">
-            {services.length > 0 && services.some(s => s.serviceId || (s as any).id) ? (
+            {services.length > 0 && services.some(s => s.serviceId) ? (
               <div className="space-y-6">
-                {services.map((service) => {
-                  const serviceId = service.serviceId || (service as any).id;
-                  return serviceId ? (
-                    <Card key={serviceId}>
+                {services.map((service) => (
+                  service.serviceId && (
+                    <Card key={service.serviceId}>
                       <CardHeader>
-                        <CardTitle>{service.serviceTitle || (service as any).name}</CardTitle>
+                        <CardTitle>{service.serviceTitle}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ServiceGalleryView
-                          serviceId={serviceId}
+                          serviceId={service.serviceId}
                           editable={false}
-                          maxImagesToShow={undefined}
+                          maxImagesToShow={10}
                         />
                       </CardContent>
                     </Card>
-                  ) : null;
-                })}
+                  )
+                ))}
               </div>
             ) : (
               <Card className="p-12 text-center">
