@@ -43,15 +43,17 @@ export default function ServiceGalleryView({
   const loadImages = async () => {
     try {
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/gallery/service/${serviceId}`
+        `${Config.API_GATEWAY_URL}/api/v1/gallery/service/${serviceId}`
       );
 
       if (response.ok) {
         const data = await response.json();
         setImages(data);
+      } else {
+        console.warn(`No images found for service ${serviceId}`);
       }
     } catch (error) {
-      console.error('Error loading images:', error);
+      console.error(`Error loading images for service ${serviceId}:`, error);
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export default function ServiceGalleryView({
     setDeleting(galleryId);
     try {
       const response = await fetch(
-        `${Config.SERVICE_MANAGER_URL}/gallery/${galleryId}`,
+        `${Config.API_GATEWAY_URL}/api/v1/gallery/${galleryId}`,
         { method: 'DELETE' }
       );
 

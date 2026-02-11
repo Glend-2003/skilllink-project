@@ -1,4 +1,6 @@
 import React from 'react';
-export default function ProviderDetail() {
-  return <div>Detalle de Proveedor</div>;
+import ProviderDetail from './ProviderDetail';
+
+export default function ProviderDetailPage() {
+  return <ProviderDetail />;
 }
