@@ -4,6 +4,9 @@ import { Search as SearchIcon, Wrench, Zap, Scissors, Car, Palette, Home as Home
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../context/RoleContext';
+import ServiceImageBg from '../components/ServiceImageBg';
+import ServiceDistance from '../components/ServiceDistance';
+import ServiceRatingFromReviews from '../components/ServiceRatingFromReviews';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -81,14 +84,14 @@ export default function Home() {
       try {
         let categoriesData = [];
         try {
-          console.log('Intentando cargar categorías desde:', `${API_BASE_URL}/categories`);
-          const categoriesResponse = await fetch(`${API_BASE_URL}/categories`);
+          console.log('Intentando cargar categorías desde:', `${API_BASE_URL}/api/v1/categories`);
+          const categoriesResponse = await fetch(`${API_BASE_URL}/api/v1/categories`);
           if (categoriesResponse.ok) {
             categoriesData = await categoriesResponse.json();
             console.log('Categorías cargadas exitosamente:', categoriesData);
           } else {
-            console.warn('Error en /categories:', categoriesResponse.status);
-            const altResponse = await fetch(`${API_BASE_URL}/api/v1/categories`);
+            console.warn('Error en /api/v1/categories:', categoriesResponse.status);
+            const altResponse = await fetch(`${API_BASE_URL}/categories`);
             if (altResponse.ok) {
               categoriesData = await altResponse.json();
               console.log('Categorías cargadas desde endpoint alternativo:', categoriesData);
@@ -167,6 +170,7 @@ export default function Home() {
     if (idToUse) {
       // Save provider data to localStorage to avoid backend API calls
       const providerData = {
+        userId: userId,  // Add userId explicitly
         providerId: service.provider?.providerId,
         businessName: service.provider?.businessName,
         businessDescription: service.provider?.businessDescription,
@@ -446,20 +450,10 @@ export default function Home() {
                         onClick={() => handleViewProvider(service)}
                       >
                         <CardContent className="p-0">
-                          <div className="relative h-48">
-                            {service.provider?.user?.profileImageUrl ? (
-                              <img 
-                                src={service.provider.user.profileImageUrl}
-                                alt={service.serviceTitle}
-                                className="w-full h-full object-cover rounded-t-lg"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center rounded-t-lg">
-                                <span className="text-6xl">👤</span>
-                              </div>
-                            )}
+                          <div className="relative h-48 rounded-t-lg overflow-hidden">
+                            <ServiceImageBg serviceId={service.serviceId} />
                             {service.isVerified && (
-                              <Badge className="absolute top-3 right-3 bg-blue-600">
+                              <Badge className="absolute top-3 right-3 bg-blue-600 z-10">
                                 <Verified className="w-3 h-3 mr-1" />
                                 Verificado
                               </Badge>
@@ -479,14 +473,8 @@ export default function Home() {
                             </div>
                             
                             <div className="flex items-center justify-between text-sm mb-3">
-                              <div className="flex items-center gap-1 text-amber-600">
-                                <Star className="w-4 h-4 fill-current" />
-                                <span className="font-medium">{(service.rating || 4.5).toFixed(1)}</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-slate-600">
-                                <MapPin className="w-4 h-4" />
-                                <span>{service.location || '1.5 km'}</span>
-                              </div>
+                              <ServiceRatingFromReviews providerId={service.provider?.providerId} />
+                              <ServiceDistance service={service} />
                             </div>
                             
                             <p className="text-sm text-slate-600 mb-3 line-clamp-2">
@@ -542,20 +530,10 @@ export default function Home() {
                           onClick={() => handleViewProvider(service)}
                         >
                           <CardContent className="p-0">
-                            <div className="relative h-48">
-                              {service.provider?.user?.profileImageUrl ? (
-                                <img 
-                                  src={service.provider.user.profileImageUrl}
-                                  alt={service.serviceTitle}
-                                  className="w-full h-full object-cover rounded-t-lg"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center rounded-t-lg">
-                                  <span className="text-6xl">👤</span>
-                                </div>
-                              )}
+                            <div className="relative h-48 rounded-t-lg overflow-hidden">
+                              <ServiceImageBg serviceId={service.serviceId} />
                               {service.isVerified && (
-                                <Badge className="absolute top-3 right-3 bg-blue-600">
+                                <Badge className="absolute top-3 right-3 bg-blue-600 z-10">
                                   <Verified className="w-3 h-3 mr-1" />
                                   Verificado
                                 </Badge>
@@ -575,14 +553,8 @@ export default function Home() {
                               </div>
                               
                               <div className="flex items-center justify-between text-sm mb-3">
-                                <div className="flex items-center gap-1 text-amber-600">
-                                  <Star className="w-4 h-4 fill-current" />
-                                  <span className="font-medium">{(service.rating || 4.5).toFixed(1)}</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-slate-600">
-                                  <MapPin className="w-4 h-4" />
-                                  <span>{service.location || '1.5 km'}</span>
-                                </div>
+                                <ServiceRatingFromReviews providerId={service.provider?.providerId} />
+                                <ServiceDistance service={service} />
                               </div>
                               
                               <p className="text-sm text-slate-600 mb-3 line-clamp-2">

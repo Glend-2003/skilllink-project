@@ -4,6 +4,7 @@ import { ArrowLeft, Star, MapPin, Clock, CheckCircle, MessageCircle, Verified, C
 import { API_BASE_URL } from '../../constants/Config';
 import { useAuth } from '../../context/AuthContext';
 import ServiceGalleryView from '../../components/ServiceGalleryView';
+import ReviewItem from '../../components/ReviewItem';
 import { Button } from '../../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
@@ -77,9 +78,6 @@ export default function ProviderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
-  console.log('ProviderDetail component mounted with ID:', id);
-  
   const [provider, setProvider] = useState<Provider | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -88,35 +86,162 @@ export default function ProviderDetail() {
 
   useEffect(() => {
     if (id) {
-      console.log('Loading provider with ID:', id);
       // Try to load from localStorage first
       const cachedProvider = localStorage.getItem(`provider_${id}`);
       if (cachedProvider) {
-        console.log('Loading provider from localStorage');
         try {
           const providerData = JSON.parse(cachedProvider);
           setProvider(providerData as Provider);
           
+          // Use providerId directly from cache if available
+          const actualProviderId = providerData.providerId || id;
+          console.log('Loaded from cache, using providerId:', actualProviderId);
+          
           // Load services and reviews
           (async () => {
+            console.log('Starting to load services for providerId:', actualProviderId);
             try {
-              const servicesRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/services`);
-              if (servicesRes.ok) {
-                const servicesData = await servicesRes.json();
-                setServices(Array.isArray(servicesData) ? servicesData.filter((s: Service) => s.isActive) : []);
+              const servicesEndpoints = [
+                `${API_BASE_URL}/api/v1/providers/${actualProviderId}/services`,
+                `${API_BASE_URL}/api/v1/services/provider/${actualProviderId}`,
+                `${API_BASE_URL}/api/v1/services`,  // Fallback: get all services and filter locally
+              ];
+              
+              let servicesData = null;
+              let allServices = false;
+              let successUrl = null;
+              
+              for (const url of servicesEndpoints) {
+                console.log('🔄 Fetching FROM CACHE path, trying:', url);
+                try {
+                  const servicesRes = await fetch(url);
+                  console.log('📊 Response status:', servicesRes.status, 'URL:', url);
+                  
+                  if (servicesRes.ok) {
+                    const data = await servicesRes.json();
+                    console.log('✅ Data received from', url, ':', data);
+                    console.log('📈 Total items returned:', Array.isArray(data) ? data.length : 0);
+                    
+                    if (url.includes('/api/v1/services') && !url.includes('provider')) {
+                      allServices = true;
+                      console.log('🎯 This is all services, will filter locally');
+                    }
+                    
+                    // If data has items OR it's the last endpoint, use it
+                    const isLastEndpoint = url === servicesEndpoints[servicesEndpoints.length - 1];
+                    if ((Array.isArray(data) && data.length > 0) || isLastEndpoint) {
+                      servicesData = data;
+                      successUrl = url;
+                      console.log('✅ Using', isLastEndpoint ? '(last endpoint)' : '(has data)', 'URL:', url);
+                      break;
+                    } else {
+                      console.log('⚠️ Empty data, trying next endpoint...');
+                    }
+                  } else {
+                    console.log('⚠️ Response not OK, status:', servicesRes.status);
+                  }
+                } catch (e) {
+                  console.error('❌ Error trying services endpoint:', url, e);
+                }
+              }
+              
+              console.log('📦 servicesData after loop:', servicesData);
+              console.log('🎯 allServices flag:', allServices);
+              console.log('✅ Successful URL:', successUrl);
+              
+              if (servicesData) {
+                let filteredServices = Array.isArray(servicesData) ? servicesData : [];
+                console.log('🔢 Before filter count:', filteredServices.length);
+                
+                if (allServices && filteredServices.length > 0) {
+                  console.log('🔍 Filtering', filteredServices.length, 'services by providerId:', actualProviderId);
+                  filteredServices = filteredServices.filter((s: any) => {
+                    const matches = (s.providerId === actualProviderId || s.provider?.providerId === actualProviderId) && s.isActive !== false;
+                    if (!matches) {
+                      console.log('❌ Filtered out:', s.serviceTitle, 'providerId:', s.providerId, 'isActive:', s.isActive);
+                    }
+                    return matches;
+                  });
+                  console.log('✅ After filter count:', filteredServices.length);
+                } else {
+                  console.log('🔍 Filtering by isActive !== false');
+                  filteredServices = filteredServices.filter((s: Service) => s.isActive !== false);
+                  console.log('✅ After filter count:', filteredServices.length);
+                }
+                
+                console.log('📤 Setting services:', filteredServices);
+                setServices(filteredServices);
+              } else {
+                console.log('⚠️ servicesData is null/undefined');
+                setServices([]);
               }
             } catch (e) {
-              console.error('Error loading services:', e);
+              console.error('💥 Error loading services:', e);
             }
             
             try {
-              const reviewsRes = await fetch(`${API_BASE_URL}/api/v1/providers/${id}/reviews`);
-              if (reviewsRes.ok) {
-                const reviewsData = await reviewsRes.json();
-                setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+              const reviewsEndpoints = [
+                `${API_BASE_URL}/api/v1/providers/${actualProviderId}/reviews`,
+                `${API_BASE_URL}/api/v1/reviews/provider/${actualProviderId}`,
+                `${API_BASE_URL}/api/v1/reviews`,  // Fallback: get all reviews and filter locally
+              ];
+              
+              let reviewsData = null;
+              let allReviews = false;
+              let reviewsSuccessUrl = null;
+              
+              for (const url of reviewsEndpoints) {
+                console.log('🔄 Fetching reviews, trying:', url);
+                try {
+                  const reviewsRes = await fetch(url);
+                  console.log('📊 Reviews response status:', reviewsRes.status, 'URL:', url);
+                  
+                  if (reviewsRes.ok) {
+                    const data = await reviewsRes.json();
+                    console.log('✅ Reviews data received:', Array.isArray(data) ? data.length + ' items' : 'not an array');
+                    
+                    if (url.includes('/api/v1/reviews') && !url.includes('provider') && !url.includes('providers')) {
+                      allReviews = true;
+                      console.log('🎯 This is all reviews, will filter by providerId');
+                    }
+                    
+                    // If data has items OR it's the last endpoint, use it
+                    const isLastEndpoint = url === reviewsEndpoints[reviewsEndpoints.length - 1];
+                    if ((Array.isArray(data) && data.length > 0) || isLastEndpoint) {
+                      reviewsData = data;
+                      reviewsSuccessUrl = url;
+                      console.log('✅ Using reviews from', isLastEndpoint ? '(last endpoint)' : '(has data)');
+                      break;
+                    } else {
+                      console.log('⚠️ Empty reviews data, trying next endpoint...');
+                    }
+                  } else {
+                    console.log('⚠️ Reviews response not OK, status:', reviewsRes.status);
+                  }
+                } catch (e) {
+                  console.error('❌ Error trying reviews endpoint:', url, e);
+                }
+              }
+              
+              if (reviewsData) {
+                let filteredReviews = Array.isArray(reviewsData) ? reviewsData : [];
+                
+                if (allReviews && filteredReviews.length > 0) {
+                  console.log('🔍 Filtering', filteredReviews.length, 'reviews by providerId:', actualProviderId);
+                  filteredReviews = filteredReviews.filter((r: any) => 
+                    r.providerId === actualProviderId || r.provider?.providerId === actualProviderId
+                  );
+                  console.log('✅ After filter reviews count:', filteredReviews.length);
+                }
+                
+                setReviews(filteredReviews);
+              } else {
+                console.log('⚠️ reviewsData is null/undefined');
+                setReviews([]);
               }
             } catch (e) {
-              console.error('Error loading reviews:', e);
+              console.error('💥 Error loading reviews:', e);
+              setReviews([]);
             }
             
             setLoading(false);
@@ -132,88 +257,148 @@ export default function ProviderDetail() {
 
   const loadProviderDetails = async () => {
     setLoading(true);
-    console.log('Fetching provider details for ID:', id);
     
     try {
       let providerData = null;
       let providerRes = null;
       
-      // Intenta primero con el formato de userId (ya que probablemente es un userId)
-      let providerUrl = `${API_BASE_URL}/api/v1/providers/user/${id}`;
-      console.log('Trying provider URL (user format):', providerUrl);
+      // Try multiple endpoints to find the provider
+      const endpointsToTry = [
+        `${API_BASE_URL}/api/v1/providers/user/${id}`,  // First try: userId format
+        `${API_BASE_URL}/api/v1/providers/${id}`,       // Second try: providerId format
+      ];
       
-      providerRes = await fetch(providerUrl);
-      console.log('Provider response status:', providerRes.status);
-      
-      // Si falla, intenta con providerId directo
-      if (!providerRes.ok) {
-        console.log('First attempt failed, trying with providerId format...');
-        providerUrl = `${API_BASE_URL}/api/v1/providers/${id}`;
-        console.log('Trying alternative URL:', providerUrl);
-        
-        providerRes = await fetch(providerUrl);
-        console.log('Alternative provider response status:', providerRes.status);
+      for (const url of endpointsToTry) {
+        console.log('Trying provider endpoint:', url);
+        try {
+          providerRes = await fetch(url);
+          console.log('Response status:', providerRes.status);
+          
+          if (providerRes.ok) {
+            providerData = await providerRes.json();
+            console.log('Provider loaded from:', url, 'Data:', providerData);
+            break;
+          }
+        } catch (e) {
+          console.error('Error trying endpoint:', url, e);
+        }
       }
       
-      if (providerRes.ok) {
-        providerData = await providerRes.json();
-        console.log('Provider data received:', providerData);
+      if (providerRes?.ok && providerData) {
         setProvider(providerData);
         
-        // Load services only if provider loaded successfully
+        // Usar el providerId del proveedor para cargar servicios y reviews
+        const actualProviderId = providerData.providerId || providerData.id || id;
+        console.log('Using providerId for services/reviews:', actualProviderId);
+        
+        if (!actualProviderId) {
+          console.error('Could not determine providerId from provider response');
+          setServices([]);
+          setReviews([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Load services from multiple endpoints
         try {
-          const servicesUrl = `${API_BASE_URL}/api/v1/providers/${id}/services`;
-          console.log('Services URL:', servicesUrl);
+          const servicesEndpoints = [
+            `${API_BASE_URL}/api/v1/providers/${actualProviderId}/services`,
+            `${API_BASE_URL}/api/v1/services/provider/${actualProviderId}`,
+            `${API_BASE_URL}/api/v1/services`,  // Fallback: get all services and filter locally
+          ];
           
-          const servicesRes = await fetch(servicesUrl);
-          console.log('Services response status:', servicesRes.status);
+          let servicesData = null;
+          let allServices = false;
           
-          if (servicesRes.ok) {
-            const servicesData = await servicesRes.json();
-            console.log('Services data received:', servicesData);
-            setServices(Array.isArray(servicesData) ? servicesData.filter((s: Service) => s.isActive) : []);
+          for (const url of servicesEndpoints) {
+            console.log('Trying services endpoint:', url);
+            try {
+              const servicesRes = await fetch(url);
+              console.log('Services response status:', servicesRes.status);
+              if (servicesRes.ok) {
+                const data = await servicesRes.json();
+                console.log('Services loaded from:', url, 'Count:', Array.isArray(data) ? data.length : 0);
+                if (url.includes('/api/v1/services') && !url.includes('provider')) {
+                  allServices = true;
+                }
+                servicesData = data;
+                break;
+              }
+            } catch (e) {
+              console.error('Error trying services endpoint:', url, e);
+            }
+          }
+          
+          if (servicesData) {
+            let activeServices = Array.isArray(servicesData) ? servicesData : [];
+            if (allServices && activeServices.length > 0) {
+              const beforeFilter = activeServices.length;
+              activeServices = activeServices.filter((s: any) => 
+                (s.providerId === actualProviderId || s.provider?.providerId === actualProviderId) && s.isActive !== false
+              );
+              console.log(`Filtered ${beforeFilter} total services down to ${activeServices.length} for providerId ${actualProviderId}`);
+            } else {
+              activeServices = activeServices.filter((s: Service) => s.isActive !== false);
+            }
+            console.log('Filtered services:', activeServices);
+            setServices(activeServices);
+          } else {
+            console.warn('Could not load services from any endpoint');
+            setServices([]);
           }
         } catch (servicesError) {
           console.error('Error loading services:', servicesError);
           setServices([]);
         }
 
-        // Load reviews
+        // Load reviews from multiple endpoints
         try {
-          const reviewsUrl = `${API_BASE_URL}/api/v1/providers/${id}/reviews`;
-          console.log('Reviews URL:', reviewsUrl);
+          const reviewsEndpoints = [
+            `${API_BASE_URL}/api/v1/providers/${actualProviderId}/reviews`,
+            `${API_BASE_URL}/api/v1/reviews/provider/${actualProviderId}`,
+            `${API_BASE_URL}/api/v1/reviews`,  // Try getting all reviews and filter
+          ];
           
-          const reviewsRes = await fetch(reviewsUrl);
-          console.log('Reviews response status:', reviewsRes.status);
-          
-          if (reviewsRes.ok) {
-            const reviewsData = await reviewsRes.json();
-            console.log('Reviews data received (full structure):', reviewsData);
-            // Log cada review para ver su estructura
-            if (Array.isArray(reviewsData)) {
-              reviewsData.forEach((review, index) => {
-                console.log(`=== Review ${index} (${review.client?.email || review.email || 'Usuario'}) ===`);
-                console.log('Full review object:', review);
-                console.log('review.client:', review.client);
-                console.log('review.user:', review.user);
-                console.log('Keys in review:', Object.keys(review));
-                if (review.client) console.log('Keys in review.client:', Object.keys(review.client));
-                if (review.user) console.log('Keys in review.user:', Object.keys(review.user));
-              });
+          let reviewsData = null;
+          for (const url of reviewsEndpoints) {
+            console.log('Trying reviews endpoint:', url);
+            try {
+              const reviewsRes = await fetch(url);
+              console.log('Reviews response status:', reviewsRes.status);
+              if (reviewsRes.ok) {
+                const data = await reviewsRes.json();
+                // If we got all reviews, filter by provider
+                if (url.includes('/api/v1/reviews') && !url.includes('provider') && !url.includes('providers')) {
+                  reviewsData = Array.isArray(data) 
+                    ? data.filter((r: any) => r.providerId === actualProviderId || r.provider?.providerId === actualProviderId)
+                    : [];
+                } else {
+                  reviewsData = data;
+                }
+                console.log('Reviews loaded from:', url);
+                break;
+              }
+            } catch (e) {
+              console.error('Error trying reviews endpoint:', url, e);
             }
+          }
+          
+          if (reviewsData) {
             setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+          } else {
+            console.warn('Could not load reviews from any endpoint');
+            setReviews([]);
           }
         } catch (reviewsError) {
           console.error('Error loading reviews:', reviewsError);
           setReviews([]);
         }
       } else {
-        const errorText = await providerRes.text();
-        console.error('Error loading provider:', providerRes.status, errorText);
+        console.error('Failed to load provider from any endpoint');
         setProvider(null);
       }
     } catch (error) {
-      console.error('Error loading provider details:', error);
+      console.error('Error in loadProviderDetails:', error);
       setProvider(null);
     } finally {
       setLoading(false);
@@ -261,10 +446,6 @@ export default function ProviderDetail() {
     toast.success(`Solicitud enviada para: ${serviceName}`);
   };
 
-  const handleScheduleAppointment = () => {
-    toast.info('Función de agendar cita próximamente disponible');
-  };
-
   const calculateAverageRating = () => {
     if (reviews.length === 0) return provider?.rating || 0;
     const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
@@ -298,38 +479,65 @@ export default function ProviderDetail() {
   };
 
   // Helper function to extract email and image from review
+  const [reviewerCache, setReviewerCache] = useState<{ [key: number]: any }>({});
+
+  const getReviewerInfo = async (reviewerId: number) => {
+    // Check cache first
+    if (reviewerCache[reviewerId]) {
+      console.log('✅ Reviewer found in cache:', reviewerId);
+      return reviewerCache[reviewerId];
+    }
+
+    try {
+      console.log('🔄 Fetching reviewer info for ID:', reviewerId);
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/${reviewerId}`);
+      
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('✅ Reviewer data fetched:', userData);
+        
+        // Cache it
+        setReviewerCache(prev => ({
+          ...prev,
+          [reviewerId]: userData
+        }));
+        
+        return userData;
+      } else {
+        console.log('⚠️ Could not fetch reviewer, status:', response.status);
+        return null;
+      }
+    } catch (e) {
+      console.error('❌ Error fetching reviewer:', e);
+      return null;
+    }
+  };
+
   const getReviewClientInfo = (review: Review) => {
     let email = 'Usuario';
     let imageUrl = null;
     
-    // Try to find email in various fields
+    console.log('🔍 Processing review:', review);
+    
+    // Try to find email and image from direct fields first
     if (review.client?.email) {
       email = review.client.email;
-      // Try to find image from multiple sources on client object
-      imageUrl = review.client.profileImageUrl || review.client.image || (review.client as any).avatar || (review.client as any).profileImage || null;
-    } else if (review.clientEmail) {
-      email = review.clientEmail;
-    } else if (review.email) {
-      email = review.email;
+      imageUrl = review.client.profileImageUrl || review.client.image || null;
+      console.log('✅ Found in review.client');
     } else if (review.user?.email) {
       email = review.user.email;
-      // Try to find image from multiple sources on user object
-      imageUrl = review.user.profileImageUrl || review.user.image || (review.user as any).avatar || (review.user as any).profileImage || null;
-    } else if ((review as any).userName) {
-      email = (review as any).userName;
-    } else if ((review as any).username) {
-      email = (review as any).username;
-    }
-    
-    // Try additional image sources if still not found
-    if (!imageUrl) {
-      imageUrl = (review as any).profileImageUrl || (review as any).imageUrl || (review as any).image || (review as any).avatar || null;
+      imageUrl = review.user.profileImageUrl || review.user.image || null;
+      console.log('✅ Found in review.user');
+    } else if (review.email) {
+      email = review.email;
+      imageUrl = (review as any).profileImageUrl || null;
+      console.log('✅ Found in review.email');
     }
     
     // Get initial from email
     const initial = email.includes('@') ? email.split('@')[0].charAt(0).toUpperCase() : email.charAt(0).toUpperCase();
     
-    console.log(`Review (${email}): imageUrl found: ${imageUrl}`);
+    console.log(`📸 Review email: ${email}, image: ${imageUrl}`);
     
     return { email, initial, imageUrl };
   };
@@ -457,14 +665,6 @@ export default function ProviderDetail() {
                     <MessageCircle className="w-4 h-4" />
                     Contactar
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="gap-2"
-                    onClick={handleScheduleAppointment}
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Agendar cita
-                  </Button>
                 </div>
               </div>
             </div>
@@ -488,42 +688,40 @@ export default function ProviderDetail() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {services.map((service) => (
-                  <Card key={service.serviceId} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="flex items-start justify-between">
-                        <span>{service.serviceTitle}</span>
-                        <span className="text-blue-600 font-bold">₡{service.basePrice.toLocaleString()}</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-slate-600 mb-3">{service.serviceDescription}</p>
-                      
-                      {service.serviceId && (
-                        <div className="mb-3">
-                          <ServiceGalleryView
-                            serviceId={service.serviceId}
-                            editable={false}
-                            maxImagesToShow={5}
-                          />
+                {services.map((service) => {
+                  const serviceId = service.serviceId || (service as any).id;
+                  return (
+                    <Card key={serviceId} className="hover:shadow-lg transition-shadow overflow-hidden">
+                      <CardHeader>
+                        <CardTitle className="flex items-start justify-between">
+                          <span className="text-lg">{service.serviceTitle || (service as any).name}</span>
+                          <span className="text-blue-600 font-bold text-lg">₡{(service.basePrice || (service as any).price).toLocaleString()}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-slate-600">{service.serviceDescription || (service as any).description}</p>
+                        
+                        {serviceId && (
+                          <div className="mt-4 pt-4 border-t">
+                            <h4 className="text-sm font-semibold text-slate-900 mb-3">Galería de imágenes</h4>
+                            <ServiceGalleryView
+                              serviceId={serviceId}
+                              editable={false}
+                              maxImagesToShow={5}
+                            />
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between pt-2">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <Clock className="w-4 h-4" />
+                            <span>{service.priceUnit || 'Servicio'}</span>
+                          </div>
                         </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Clock className="w-4 h-4" />
-                          <span>{service.priceUnit}</span>
-                        </div>
-                        <Button 
-                          size="sm"
-                          onClick={() => handleRequestService(service.serviceTitle)}
-                        >
-                          Solicitar
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -540,34 +738,15 @@ export default function ProviderDetail() {
                     <p className="text-slate-500">No hay reseñas aún</p>
                   </div>
                 ) : (
-                  reviews.map((review, index) => {
-                    const { email, initial, imageUrl } = getReviewClientInfo(review);
-                    
-                    return (
-                      <div key={review.reviewId}>
-                        {index > 0 && <Separator className="my-6" />}
-                        <div className="flex gap-4">
-                          <Avatar>
-                            {imageUrl && <AvatarImage src={imageUrl} alt={email} />}
-                            <AvatarFallback>{initial}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold text-slate-900">{email}</h4>
-                              <span className="text-sm text-slate-600">{formatDate(review.createdAt)}</span>
-                            </div>
-                            <div className="flex items-center gap-1 mb-2">
-                              {renderStars(review.rating)}
-                            </div>
-                            {review.title && (
-                              <p className="font-medium text-slate-800 mb-1">{review.title}</p>
-                            )}
-                            <p className="text-slate-700">{review.comment}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                  reviews.map((review, index) => (
+                    <ReviewItem
+                      key={review.reviewId}
+                      review={review}
+                      index={index}
+                      formatDate={formatDate}
+                      renderStars={renderStars}
+                    />
+                  ))
                 )}
               </CardContent>
             </Card>
@@ -575,24 +754,25 @@ export default function ProviderDetail() {
 
           {/* Gallery Tab */}
           <TabsContent value="gallery">
-            {services.length > 0 && services.some(s => s.serviceId) ? (
+            {services.length > 0 && services.some(s => s.serviceId || (s as any).id) ? (
               <div className="space-y-6">
-                {services.map((service) => (
-                  service.serviceId && (
-                    <Card key={service.serviceId}>
+                {services.map((service) => {
+                  const serviceId = service.serviceId || (service as any).id;
+                  return serviceId ? (
+                    <Card key={serviceId}>
                       <CardHeader>
-                        <CardTitle>{service.serviceTitle}</CardTitle>
+                        <CardTitle>{service.serviceTitle || (service as any).name}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ServiceGalleryView
-                          serviceId={service.serviceId}
+                          serviceId={serviceId}
                           editable={false}
-                          maxImagesToShow={10}
+                          maxImagesToShow={undefined}
                         />
                       </CardContent>
                     </Card>
-                  )
-                ))}
+                  ) : null;
+                })}
               </div>
             ) : (
               <Card className="p-12 text-center">
