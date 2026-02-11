@@ -9,6 +9,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { toast } from 'sonner';
 import './Home.css';
 
 interface Category {
@@ -193,7 +194,7 @@ export default function Home() {
     }
 
     if (!user) {
-      alert('Debes iniciar sesión para contactar al proveedor');
+      toast.warning('Debes iniciar sesión para contactar al proveedor');
       navigate('/login');
       return;
     }
@@ -221,7 +222,7 @@ export default function Home() {
       navigate(`/chat/${conversation.conversation_id}`);
     } catch (error) {
       console.error('Error contacting provider:', error);
-      alert('No se pudo iniciar la conversación');
+      toast.error('No se pudo iniciar la conversación');
     }
   };
 

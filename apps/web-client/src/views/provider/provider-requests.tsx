@@ -8,6 +8,7 @@ import { Badge } from '../../ui/badge';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { toast } from 'sonner';
+import { confirmToast } from '../../utils/confirmToast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { RefreshCw } from 'lucide-react';
 
@@ -215,7 +216,7 @@ export default function ProviderRequests() {
     }
   };
 
-  const handleAcceptRequest = () => {
+  const handleAcceptRequest = async () => {
     if (!selectedRequest) return;
 
     const cost = parseFloat(finalCost);
@@ -224,15 +225,18 @@ export default function ProviderRequests() {
       return;
     }
 
-    if (window.confirm(`¿Deseas aceptar esta solicitud por ₡${cost.toLocaleString()}?`)) {
-      updateRequestStatus(selectedRequest.requestId, 'accepted', cost).then((success) => {
-        if (success) {
-          setShowAcceptModal(false);
-          setSelectedRequest(null);
-          setFinalCost('');
-        }
-      });
-    }
+    const confirmed = await confirmToast(
+      `¿Deseas aceptar esta solicitud por ₡${cost.toLocaleString()}?`
+    );
+    if (!confirmed) return;
+
+    updateRequestStatus(selectedRequest.requestId, 'accepted', cost).then((success) => {
+      if (success) {
+        setShowAcceptModal(false);
+        setSelectedRequest(null);
+        setFinalCost('');
+      }
+    });
   };
 
   const openAcceptModal = (request: ServiceRequest) => {
@@ -415,8 +419,9 @@ export default function ProviderRequests() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => {
-                                if (window.confirm('¿Deseas cancelar esta solicitud?')) {
+                              onClick={async () => {
+                                const confirmed = await confirmToast('¿Deseas cancelar esta solicitud?');
+                                if (confirmed) {
                                   updateRequestStatus(request.requestId, 'cancelled');
                                 }
                               }}
@@ -429,8 +434,9 @@ export default function ProviderRequests() {
                         {request.status === 'accepted' && (
                           <Button
                             size="sm"
-                            onClick={() => {
-                              if (window.confirm('¿Iniciar trabajo en esta solicitud?')) {
+                            onClick={async () => {
+                              const confirmed = await confirmToast('¿Iniciar trabajo en esta solicitud?');
+                              if (confirmed) {
                                 updateRequestStatus(request.requestId, 'in_progress');
                               }
                             }}
@@ -442,8 +448,9 @@ export default function ProviderRequests() {
                         {request.status === 'in_progress' && (
                           <Button
                             size="sm"
-                            onClick={() => {
-                              if (window.confirm('¿Marcar esta solicitud como completada?')) {
+                            onClick={async () => {
+                              const confirmed = await confirmToast('¿Marcar esta solicitud como completada?');
+                              if (confirmed) {
                                 updateRequestStatus(request.requestId, 'completed');
                               }
                             }}

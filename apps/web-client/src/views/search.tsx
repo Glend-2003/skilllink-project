@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Search as SearchIcon, SlidersHorizontal, MapPin, Star, Verified, Map } from 'lucide-react';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -74,11 +75,11 @@ export default function Search() {
             },
             (error) => {
               console.error('Error getting location:', error);
-              alert('No se pudo acceder a tu ubicación. Verifica los permisos del navegador.');
+              toast.error('No se pudo acceder a tu ubicación. Verifica los permisos del navegador.');
             }
           );
         } else {
-          alert('Tu navegador no soporta geolocalización');
+          toast.error('Tu navegador no soporta geolocalización');
         }
       } finally {
         setLoadingLocation(false);
@@ -213,7 +214,7 @@ export default function Search() {
       navigate(`/provider/${idToUse}`);
     } else {
       console.error('No valid ID found:', service);
-      alert('No se pudo encontrar el ID del proveedor');
+      toast.error('No se pudo encontrar el ID del proveedor');
     }
   };
 
@@ -228,7 +229,7 @@ export default function Search() {
     }
 
     if (!user) {
-      alert('Debes iniciar sesión para contactar al proveedor');
+      toast.warning('Debes iniciar sesión para contactar al proveedor');
       navigate('/login');
       return;
     }
@@ -255,7 +256,7 @@ export default function Search() {
       navigate(`/chat/${conversation.conversationId}`);
     } catch (error) {
       console.error('Error contacting provider:', error);
-      alert('No se pudo crear la conversación');
+      toast.error('No se pudo crear la conversación');
     }
   };
 

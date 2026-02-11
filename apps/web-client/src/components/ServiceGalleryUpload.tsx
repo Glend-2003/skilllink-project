@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Config } from '../constants/Config';
+import { toast } from 'sonner';
 import './ServiceGalleryUpload.css';
 
 interface ServiceGalleryUploadProps {
@@ -32,7 +33,7 @@ export default function ServiceGalleryUpload({
 
   const uploadImages = async () => {
     if (selectedImages.length === 0) {
-      alert('Selecciona al menos una imagen');
+      toast.warning('Selecciona al menos una imagen');
       return;
     }
 
@@ -76,9 +77,9 @@ export default function ServiceGalleryUpload({
               detalles: err
             });
           });
-          alert(successMsg + `\n\nAlgunos archivos no se pudieron subir:\n${result.errors.map((e: any) => `• ${e.fileName}: ${e.error}`).join('\n')}`);
+          toast.warning(successMsg + `\n\nAlgunos archivos no se pudieron subir:\n${result.errors.map((e: any) => `• ${e.fileName}: ${e.error}`).join('\n')}`);
         } else {
-          alert(successMsg);
+          toast.success(successMsg);
         }
         setSelectedImages([]);
         onUploadComplete?.(result.uploaded);
@@ -88,7 +89,7 @@ export default function ServiceGalleryUpload({
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('No se pudieron subir las imágenes. Verifica tu conexión y que Cloudinary esté configurado.');
+      toast.error('No se pudieron subir las imágenes. Verifica tu conexión y que Cloudinary esté configurado.');
     } finally {
       setUploading(false);
     }

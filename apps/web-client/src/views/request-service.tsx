@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../constants/Config';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 import './request-service.css';
 
 interface Service {
@@ -46,7 +47,7 @@ export default function RequestService() {
 
   useEffect(() => {
     if (!providerId) {
-      alert('Proveedor no especificado');
+      toast.error('Proveedor no especificado');
       navigate(-1);
       return;
     }
@@ -81,7 +82,7 @@ export default function RequestService() {
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización');
+      toast.error('Tu navegador no soporta geolocalización');
       return;
     }
 
@@ -113,12 +114,12 @@ export default function RequestService() {
         }
 
         setLoadingLocation(false);
-        alert('Ubicación obtenida correctamente');
+        toast.success('Ubicación obtenida correctamente');
       },
       (error) => {
         setLoadingLocation(false);
         console.error('Error getting location:', error);
-        alert('No se pudo obtener la ubicación. Por favor, ingresa la dirección manualmente.');
+        toast.error('No se pudo obtener la ubicación. Por favor, ingresa la dirección manualmente.');
       },
       {
         enableHighAccuracy: true,
@@ -133,31 +134,31 @@ export default function RequestService() {
 
     // Validation
     if (!selectedService) {
-      alert('Selecciona un servicio');
+      toast.warning('Selecciona un servicio');
       return;
     }
     if (!requestTitle.trim()) {
-      alert('Ingresa un título para la solicitud');
+      toast.warning('Ingresa un título para la solicitud');
       return;
     }
     if (!requestDescription.trim()) {
-      alert('Describe lo que necesitas');
+      toast.warning('Describe lo que necesitas');
       return;
     }
     if (!serviceAddress.trim()) {
-      alert('Ingresa la dirección del servicio');
+      toast.warning('Ingresa la dirección del servicio');
       return;
     }
     if (!latitude || !longitude) {
-      alert('Obtén tu ubicación antes de enviar');
+      toast.warning('Obtén tu ubicación antes de enviar');
       return;
     }
     if (!preferredDate) {
-      alert('Selecciona una fecha preferida');
+      toast.warning('Selecciona una fecha preferida');
       return;
     }
     if (!preferredTime) {
-      alert('Selecciona una hora preferida');
+      toast.warning('Selecciona una hora preferida');
       return;
     }
 
@@ -188,7 +189,7 @@ export default function RequestService() {
       });
 
       if (response.ok) {
-        alert(`Solicitud enviada a ${providerName} correctamente`);
+        toast.success(`Solicitud enviada a ${providerName} correctamente`);
         navigate('/my-requests');
       } else {
         const errorData = await response.json();

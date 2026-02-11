@@ -7,6 +7,7 @@ import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { Plus, Edit, Trash2, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { confirmToast } from '../../utils/confirmToast';
 
 interface Category {
   categoryId: number;
@@ -134,13 +135,14 @@ export default function CategoriesManagement() {
     setModalVisible(true);
   };
 
-  const handleDelete = (cat: Category) => {
+  const handleDelete = async (cat: Category) => {
     if (cat.serviceCount > 0) {
       toast.error(`Esta categoría tiene ${cat.serviceCount} servicio(s) asociado(s). No se puede eliminar.`);
       return;
     }
 
-    if (window.confirm(`¿Estás seguro de eliminar "${cat.categoryName}"?`)) {
+    const confirmed = await confirmToast(`¿Estás seguro de eliminar "${cat.categoryName}"?`);
+    if (confirmed) {
       deleteCategory(cat.categoryId);
     }
   };
