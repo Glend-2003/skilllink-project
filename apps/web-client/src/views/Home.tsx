@@ -170,6 +170,7 @@ export default function Home() {
     if (idToUse) {
       // Save provider data to localStorage to avoid backend API calls
       const providerData = {
+        userId: userId,  // Add userId explicitly
         providerId: service.provider?.providerId,
         businessName: service.provider?.businessName,
         businessDescription: service.provider?.businessDescription,
