@@ -266,19 +266,19 @@ export default function Search() {
 
   // Filter Panel Component
   const FilterPanel = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Location Filter */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <Label className="flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
-            Buscar por ubicación
+        <div className="flex items-center justify-between mb-4">
+          <Label className="text-sm font-medium text-slate-900 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-slate-600" />
+            Ubicación
           </Label>
           <button
             onClick={handleLocationToggle}
             disabled={loadingLocation}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              useLocation ? 'bg-blue-600' : 'bg-slate-300'
+              useLocation ? 'bg-blue-600' : 'bg-slate-200'
             } ${loadingLocation ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <span
@@ -290,29 +290,32 @@ export default function Search() {
         </div>
         
         {useLocation && userLocation && (
-          <div className="text-sm text-slate-600 mb-3">
-            📍 Ubicación activa
+          <div className="text-xs text-slate-600 mb-3 pl-6">
+            Tu ubicación está activa
+          </div>
+        )}
+        
+        {useLocation && (
+          <div className="pl-6 mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-slate-600">Distancia máxima</span>
+              <span className="text-sm font-semibold text-slate-900">{maxDistance[0]} km</span>
+            </div>
+            <Slider
+              value={maxDistance}
+              onValueChange={setMaxDistance}
+              max={50}
+              min={1}
+              step={1}
+            />
           </div>
         )}
       </div>
 
-      {useLocation && (
-        <div>
-          <Label className="mb-3 block">Distancia máxima: {maxDistance[0]} km</Label>
-          <Slider
-            value={maxDistance}
-            onValueChange={setMaxDistance}
-            max={50}
-            min={1}
-            step={1}
-            className="mt-2"
-          />
-        </div>
-      )}
-      <div>
-        <Label className="mb-3 block">Categoría</Label>
+      <div className="border-t pt-5">
+        <Label className="text-sm font-medium text-slate-900 mb-3 block">Categoría</Label>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder="Todas las categorías" />
           </SelectTrigger>
           <SelectContent>
@@ -326,17 +329,33 @@ export default function Search() {
         </Select>
       </div>
 
-      <div>
-        <Label className="mb-3 block">Calificación mínima: {minRating[0]} ⭐</Label>
+      <div className="border-t pt-5">
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-sm font-medium text-slate-900">Calificación mínima</Label>
+          <span className="text-sm font-semibold text-slate-900">{minRating[0]} ⭐</span>
+        </div>
         <Slider
           value={minRating}
           onValueChange={setMinRating}
           max={5}
           min={0}
           step={0.5}
-          className="mt-2"
+          className="mt-3"
         />
       </div>
+
+      {(selectedCategory !== 'all' || minRating[0] > 0 || useLocation) && (
+        <div className="border-t pt-5">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleClearFilters}
+            className="w-full text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+          >
+            Limpiar filtros
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -360,16 +379,29 @@ export default function Search() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <span className="text-lg">×</span>
+                </button>
+              )}
             </div>
             
             {/* Mobile Filters */}
             <Sheet>
               <SheetTrigger asChild className="md:hidden">
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" className="relative">
                   <SlidersHorizontal className="w-5 h-5" />
+                  {(selectedCategory !== 'all' || minRating[0] > 0 || useLocation) && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full text-[10px] text-white flex items-center justify-center font-bold">
+                      {[selectedCategory !== 'all', minRating[0] > 0, useLocation].filter(Boolean).length}
+                    </span>
+                  )}
                 </Button>
               </SheetTrigger>
-              <SheetContent>
+              <SheetContent className="w-80">
                 <SheetHeader>
                   <SheetTitle>Filtros</SheetTitle>
                   <SheetDescription>
@@ -393,13 +425,16 @@ export default function Search() {
           </div>
 
           <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>{filteredServices.length} proveedores encontrados</span>
+            <span>{filteredServices.length} {filteredServices.length === 1 ? 'proveedor encontrado' : 'proveedores encontrados'}</span>
+            {(selectedCategory !== 'all' || searchQuery || minRating[0] > 0 || useLocation) && (
+              <span className="text-slate-400">•</span>
+            )}
             {(selectedCategory !== 'all' || searchQuery || minRating[0] > 0 || useLocation) && (
               <Button 
                 variant="link" 
                 size="sm" 
                 onClick={handleClearFilters}
-                className="text-blue-600"
+                className="h-auto p-0 text-blue-600 hover:text-blue-700"
               >
                 Limpiar filtros
               </Button>
@@ -412,10 +447,10 @@ export default function Search() {
         <div className="flex gap-6">
           {/* Desktop Filters */}
           <aside className="hidden md:block w-64 flex-shrink-0">
-            <Card>
+            <Card className="sticky top-24">
               <CardContent className="p-6">
-                <h3 className="font-bold mb-4 flex items-center gap-2">
-                  <SlidersHorizontal className="w-5 h-5" />
+                <h3 className="font-semibold text-slate-900 mb-6 flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4" />
                   Filtros
                 </h3>
                 <FilterPanel />
