@@ -157,18 +157,19 @@ export default function Search() {
     // Location filter
     if (useLocation && userLocation) {
       filtered = filtered.filter((s: any) => {
-        const providerLat = parseFloat(s.provider?.userProfile?.latitude);
-        const providerLon = parseFloat(s.provider?.userProfile?.longitude);
+        const providerLat = s.provider?.latitude;
+        const providerLon = s.provider?.longitude;
         
-        if (!providerLat || !providerLon || isNaN(providerLat) || isNaN(providerLon)) {
+        if (providerLat === undefined || providerLon === undefined || 
+            providerLat === null || providerLon === null) {
           return false;
         }
         
         const distance = calculateDistance(
           userLocation.lat,
           userLocation.lon,
-          providerLat,
-          providerLon
+          parseFloat(providerLat),
+          parseFloat(providerLon)
         );
         
         return distance <= maxDistance[0];

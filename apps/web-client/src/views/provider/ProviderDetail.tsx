@@ -717,12 +717,6 @@ export default function ProviderDetail() {
                             <Clock className="w-4 h-4" />
                             <span>{service.priceUnit || 'Servicio'}</span>
                           </div>
-                          <Button 
-                            size="sm"
-                            onClick={() => handleRequestService(service.serviceTitle || (service as any).name)}
-                          >
-                            Solicitar
-                          </Button>
                         </div>
                       </CardContent>
                     </Card>
