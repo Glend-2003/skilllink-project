@@ -89,14 +89,22 @@ export default function RegisterScreen() {
       const data = await response.json();
 
       if (response.ok) {
+        const resolvedUserType = userType === 'provider'
+          ? 'client'
+          : (data.userType || 'client');
+
         // Save user data to auth context
         const userData = {
           userId: data.userId,
           email: data.email,
-          userType: 'client',
+          userType: resolvedUserType,
           token: data.token,
+          providerStatus: userType === 'provider' ? 'pending' : data.providerStatus,
         };
         login(userData);
+
+        // Disparar evento para que RoleContext se recargue inmediatamente
+        window.dispatchEvent(new Event('userDataChanged'));
 
         // If user registered as provider, create provider request
         if (userType === 'provider') {
@@ -282,7 +290,7 @@ export default function RegisterScreen() {
                     <input
                       className="auth-input"
                       type="tel"
-                      placeholder="+52 55 1234 5678"
+                      placeholder="+506 1234 5678"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                     />
@@ -327,7 +335,7 @@ export default function RegisterScreen() {
                       <input
                         className="auth-input"
                         type="text"
-                        placeholder="Ej: Ciudad de Guatemala, Zona 10"
+                        placeholder="Ej: Heredia, San Isidro de Heredia..."
                         value={formData.location}
                         onChange={(e) => handleInputChange('location', e.target.value)}
                       />
@@ -343,7 +351,7 @@ export default function RegisterScreen() {
                   <input
                     className="auth-input"
                     type="email"
-                    placeholder="tu@email.com"
+                    placeholder="tuemail@email.com"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     autoComplete="email"
